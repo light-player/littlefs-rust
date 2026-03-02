@@ -8,6 +8,21 @@ On-disk format compatible with upstream LittleFS for interoperability.
 Created for use in [LightPlayer](https://github.com/light-player/lightplayer), an LED lighting
 control system, for use on esp32 and other embedded targets.
 
+## Development
+
+One-time setup:
+
+```bash
+./dev-init.sh
+```
+
+Installs Rust (stable + rustfmt), the `thumbv6m-none-eabi` target for no_std checks, and cargo-deny.
+Requires [just](https://github.com/casey/just) to run the CI recipe locally.
+
+```bash
+just ci
+```
+
 ## Upstream and reference
 
 - [littlefs-project/littlefs](https://github.com/littlefs-project/littlefs) — original C implementation
