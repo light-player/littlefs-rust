@@ -8,7 +8,29 @@ mod ram;
 pub use cache::CachedBlockDevice;
 pub use ram::RamBlockDevice;
 
+use crate::crc;
 use crate::Error;
+
+/// Compute CRC32 of a block region. Per lfs_bd_crc. Used for FCRC and fs_gc.
+#[allow(dead_code)]
+pub fn block_crc<B: BlockDevice>(
+    bd: &B,
+    block: u32,
+    off: u32,
+    size: usize,
+    init: u32,
+) -> Result<u32, Error> {
+    let mut buf = [0u8; 64];
+    let mut c = init;
+    let mut pos = 0u32;
+    while pos < size as u32 {
+        let n = (size - pos as usize).min(buf.len());
+        bd.read(block, off + pos, &mut buf[..n])?;
+        c = crc::crc32(c, &buf[..n]);
+        pos += n as u32;
+    }
+    Ok(c)
+}
 
 /// Block device interface for littlefs storage.
 ///

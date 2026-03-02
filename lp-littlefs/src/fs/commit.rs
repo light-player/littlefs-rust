@@ -220,9 +220,10 @@ pub fn dir_commit_append<B: BlockDevice>(
         dir.rev = new_rev;
     }
 
+    const CRC_MIN: usize = 20;
     for attr in attrs {
         let dsize = tag_dsize(attr.tag);
-        if off + dsize > block_size - 8 {
+        if off + dsize > block_size - CRC_MIN {
             return Err(Error::Nospc);
         }
 
@@ -254,7 +255,7 @@ pub fn dir_commit_append<B: BlockDevice>(
         )? {
             let movestate_attr = CommitAttr::movestate(&delta);
             let dsize = tag_dsize(movestate_attr.tag);
-            if off + dsize > block_size - 8 {
+            if off + dsize > block_size - CRC_MIN {
                 return Err(Error::Nospc);
             }
             let ntag = (movestate_attr.tag & 0x7fff_ffff) ^ ptag;
@@ -274,10 +275,7 @@ pub fn dir_commit_append<B: BlockDevice>(
         }
     }
 
-    // CRC tag + value (8 bytes) must fit. Per lfs.c lfs_dir_commitcrc: write
-    // immediately after last attr; no padding between tags (parser expects
-    // next tag contiguously).
-    if off + 8 > block_size {
+    if off + CRC_MIN > block_size {
         return Err(Error::Nospc);
     }
 
@@ -288,9 +286,10 @@ pub fn dir_commit_append<B: BlockDevice>(
     off += 4;
     bd.prog(block_idx, off as u32, &crc.to_le_bytes())?;
     off += 4;
+    ptag = (crc_tag & 0x7fff_ffff) ^ ((tag_chunk(crc_tag) & 1) as u32) << 31;
 
     dir.off = off;
-    dir.etag = (crc_tag & 0x7fff_ffff) ^ ((tag_chunk(crc_tag) & 1) as u32) << 31;
+    dir.etag = ptag;
 
     trace!("dir_commit_append done new_off={} count={}", off, dir.count);
     Ok(())
@@ -319,7 +318,6 @@ fn metadata_max(config: &Config) -> usize {
     }
 }
 
-#[allow(dead_code)]
 fn dir_needsrelocation(config: &Config, dir: &MdDir) -> bool {
     if config.block_cycles <= 0 {
         return false;
@@ -381,9 +379,10 @@ pub fn dir_compact<B: BlockDevice>(
         let mut ptag: u32 = 0xffff_ffff;
         let mut crc = crate::crc::crc32(0xffff_ffff, &rev_buf);
 
+        const CRC_MIN: usize = 20;
         let traverse_res = dir_traverse_tags(source, begin, end, -(begin as i32), |tag, data| {
             let dsize = tag_dsize(tag);
-            if off + dsize > meta_max - 8 {
+            if off + dsize > meta_max - CRC_MIN {
                 return Err(Error::Nospc);
             }
             let ntag = (tag & 0x7fff_ffff) ^ ptag;
@@ -422,7 +421,7 @@ pub fn dir_compact<B: BlockDevice>(
         let mut need_relocate = false;
         for attr in attrs {
             let dsize = tag_dsize(attr.tag);
-            if off + dsize > meta_max - 8 {
+            if off + dsize > meta_max - CRC_MIN {
                 need_relocate = true;
                 break;
             }
@@ -470,7 +469,7 @@ pub fn dir_compact<B: BlockDevice>(
                 .flatten()
                 .collect::<Vec<_>>();
             let dsize = tag_dsize(tail_tag);
-            if off + dsize > meta_max - 8 {
+            if off + dsize > meta_max - CRC_MIN {
                 relocated = true;
                 if pair_eq(dir.pair, SUPERBLOCK) {
                     return Err(Error::Nospc);
@@ -500,7 +499,7 @@ pub fn dir_compact<B: BlockDevice>(
             )? {
                 let movestate_attr = CommitAttr::movestate(&delta);
                 let dsize = tag_dsize(movestate_attr.tag);
-                if off + dsize > meta_max - 8 {
+                if off + dsize > meta_max - CRC_MIN {
                     relocated = true;
                     if pair_eq(dir.pair, SUPERBLOCK) {
                         return Err(Error::Nospc);
@@ -526,6 +525,15 @@ pub fn dir_compact<B: BlockDevice>(
             }
         }
 
+        if off + CRC_MIN > meta_max {
+            relocated = true;
+            if pair_eq(dir.pair, SUPERBLOCK) {
+                return Err(Error::Nospc);
+            }
+            let new_block = alloc::alloc(bd, config, root, lookahead)?;
+            dir.pair[1] = new_block;
+            continue;
+        }
         let crc_tag = mktag(tag::TYPE_CCRC, 0x3ff, 4);
         let stored_crc_tag = (crc_tag & 0x7fff_ffff) ^ ptag;
         bd.prog(block_idx, off as u32, &stored_crc_tag.to_be_bytes())?;
@@ -533,13 +541,14 @@ pub fn dir_compact<B: BlockDevice>(
         off += 4;
         bd.prog(block_idx, off as u32, &crc.to_le_bytes())?;
         off += 4;
+        ptag = (crc_tag & 0x7fff_ffff) ^ ((tag_chunk(crc_tag) & 1) as u32) << 31;
 
         dir.pair.swap(0, 1);
         if attrs.is_empty() {
             dir.count = end.saturating_sub(begin);
         }
         dir.off = off;
-        dir.etag = (crc_tag & 0x7fff_ffff) ^ ((tag_chunk(crc_tag) & 1) as u32) << 31;
+        dir.etag = ptag;
 
         return Ok(if relocated {
             CompactResult::Relocated
@@ -662,10 +671,13 @@ pub fn dir_relocatingcommit<B: BlockDevice>(
         }
     }
 
-    match dir_commit_append(bd, config, dir, attrs, gstate_ctx) {
-        Ok(()) => return Ok(RelocatingResult::Ok),
-        Err(Error::Nospc) | Err(Error::Corrupt) => {}
-        Err(e) => return Err(e),
+    let force_compact = dir_needsrelocation(config, dir);
+    if !force_compact {
+        match dir_commit_append(bd, config, dir, attrs, gstate_ctx) {
+            Ok(()) => return Ok(RelocatingResult::Ok),
+            Err(Error::Nospc) | Err(Error::Corrupt) => {}
+            Err(e) => return Err(e),
+        }
     }
 
     let source = dir.clone();

@@ -50,6 +50,7 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
     let mut root = [0u32, 1u32];
     let mut superblock: Option<Superblock> = None;
     let limit = config.block_count.max(1) as usize;
+    let mut seed = 0u32;
 
     for _ in 0..limit {
         if pair_is_null(tail) {
@@ -57,7 +58,7 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
         }
 
         trace!("mount: fetch_metadata_pair tail={:?}", tail);
-        let dir = metadata::fetch_metadata_pair(bd, config, tail)?;
+        let dir = metadata::fetch_metadata_pair_ext(bd, config, tail, Some(&mut seed), None)?;
 
         if let Some(sb) = metadata::get_superblock_from_dir(&dir) {
             root = dir.pair;
@@ -111,13 +112,14 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
     let disk_version = sb.version;
 
     let mut lookahead = Lookahead::new(config);
+    lookahead.start = seed.wrapping_rem(sb.block_count);
     lookahead.alloc_drop(sb.block_count);
 
     let inline_max = match config.inline_max {
-        0 => config.cache_size,
+        0 => config.cache_size.min(attr_max),
         -1 => 0,
         n if n > 0 => n as u32,
-        _ => config.cache_size,
+        _ => config.cache_size.min(attr_max),
     };
 
     gstate::ensure_valid(&mut gstate);

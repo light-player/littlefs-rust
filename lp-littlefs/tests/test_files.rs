@@ -118,6 +118,48 @@ fn test_files_simple() {
     fs.file_close(&bd, &config, file).unwrap();
 }
 
+#[test]
+fn test_rename_file_same_dir() {
+    let (bd, config, mut fs) = make_fs_with_hello();
+    fs.rename(&bd, &config, "hello", "world").unwrap();
+    let info = fs.stat(&bd, &config, "world").unwrap();
+    assert_eq!(info.name().unwrap(), "world");
+    assert!(fs.stat(&bd, &config, "hello").is_err());
+    let mut file = fs
+        .file_open(&bd, &config, "world", OpenFlags::new(OpenFlags::RDONLY))
+        .unwrap();
+    let mut buf = [0u8; 32];
+    let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
+    assert_eq!(n, 13);
+    assert_eq!(&buf[..n], b"Hello World!\0");
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+#[test]
+fn test_fs_gc() {
+    let config = make_config();
+    let bd = cached_bd(&config);
+    let mut fs = LittleFs::new();
+    fs.format(&bd, &config).unwrap();
+    fs.mount(&bd, &config).unwrap();
+    fs.mkdir(&bd, &config, "d").unwrap();
+    let mut f = fs
+        .file_open(
+            &bd,
+            &config,
+            "d/x",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
+        )
+        .unwrap();
+    fs.file_write(&bd, &config, &mut f, b"hello").unwrap();
+    fs.file_close(&bd, &config, f).unwrap();
+    fs.fs_gc(&bd, &config).unwrap();
+    fs.unmount().unwrap();
+    fs.mount(&bd, &config).unwrap();
+    let info = fs.stat(&bd, &config, "d/x").unwrap();
+    assert_eq!(info.name().unwrap(), "x");
+}
+
 /// APPEND flag: write, close, reopen with APPEND, write more, read back.
 #[test]
 fn test_files_append() {

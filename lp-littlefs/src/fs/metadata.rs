@@ -12,6 +12,13 @@ use crate::trace;
 
 const BLOCK_NULL: u32 = 0xffff_ffff;
 
+/// FCRC (forward CRC) data from TYPE_FCRC tag. Per lfs_fcrc.
+#[derive(Clone, Copy)]
+struct Fcrc {
+    size: u32,
+    crc: u32,
+}
+
 /// Parsed metadata pair state. Holds block data for backward iteration.
 #[derive(Clone)]
 pub struct MdDir {
@@ -31,6 +38,9 @@ pub struct MdDir {
     pub tail: [u32; 2],
     /// True if tail is hard (more entries in this dir).
     pub split: bool,
+    /// True if the region after off is erased (valid for next commit). Set from FCRC check. Used by fs_gc.
+    #[allow(dead_code)]
+    pub erased: bool,
 }
 
 impl MdDir {
@@ -45,6 +55,7 @@ impl MdDir {
             count: 0,
             tail: [BLOCK_NULL, BLOCK_NULL],
             split: false,
+            erased: true,
         }
     }
 
@@ -95,6 +106,18 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
     config: &Config,
     pair: [u32; 2],
 ) -> Result<MdDir, Error> {
+    fetch_metadata_pair_ext(bd, config, pair, None, None)
+}
+
+/// Extended fetch with optional seed accumulation and disk version for FCRC/erased check.
+pub fn fetch_metadata_pair_ext<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    pair: [u32; 2],
+    mut seed_out: Option<&mut u32>,
+    disk_version: Option<u32>,
+) -> Result<MdDir, Error> {
+    use crate::superblock::DISK_VERSION;
     trace!("fetch_metadata_pair pair={:?}", pair);
     let block_size = config.block_size as usize;
     if config.block_count != 0 && (pair[0] >= config.block_count || pair[1] >= config.block_count) {
@@ -138,6 +161,8 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
         let mut last_etag = 0u32;
         let mut last_tail: [u32; 2] = [0xffff_ffff, 0xffff_ffff];
         let mut last_split = false;
+        let mut hasfcrc = false;
+        let mut fcrc = Fcrc { size: 0, crc: 0 };
 
         let mut ptag: u32 = 0xffff_ffff;
         let mut off = 4usize;
@@ -174,10 +199,13 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
             if tag_type2(tag) == tag::TYPE_CCRC {
                 let mut dcrc_bytes = [0u8; 4];
                 dcrc_bytes.copy_from_slice(&block[off + 4..off + 8]);
-                let dcrc = u32::from_le_bytes(dcrc_bytes);
+                let dcrc_val = u32::from_le_bytes(dcrc_bytes);
                 // CRC covers revision + all tag headers (including this one); stored value is expected crc
-                if crc != dcrc {
+                if crc != dcrc_val {
                     break;
+                }
+                if let Some(seed) = seed_out.as_deref_mut() {
+                    *seed = crc::crc32(*seed, &dcrc_val.to_le_bytes());
                 }
                 ptag ^= ((tag_chunk(tag) & 1) as u32) << 31;
 
@@ -237,6 +265,10 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
                 tempsplit = (tag_chunk(tag) & 1) != 0;
                 temptail[0] = u32::from_le_bytes(block[off + 4..off + 8].try_into().unwrap());
                 temptail[1] = u32::from_le_bytes(block[off + 8..off + 12].try_into().unwrap());
+            } else if tag_type3(tag) == tag::TYPE_FCRC && dsize >= 12 {
+                fcrc.size = u32::from_le_bytes(block[off + 4..off + 8].try_into().unwrap());
+                fcrc.crc = u32::from_le_bytes(block[off + 8..off + 12].try_into().unwrap());
+                hasfcrc = true;
             }
 
             off += dsize;
@@ -244,12 +276,26 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
 
         if last_off > 0 {
             let count = if tempcount < 0 { 0 } else { tempcount as u16 };
+            let prog_size = config.prog_size as usize;
+            let dv = disk_version.unwrap_or(DISK_VERSION);
+            let erased = if last_off.is_multiple_of(prog_size)
+                && dv >= 0x0002_0001
+                && hasfcrc
+                && last_off + fcrc.size as usize <= block_size
+            {
+                let fcrc_actual =
+                    crc::crc32(0xffff_ffff, &block[last_off..last_off + fcrc.size as usize]);
+                fcrc_actual == fcrc.crc
+            } else {
+                last_off.is_multiple_of(prog_size) && dv < 0x0002_0001
+            };
             trace!(
-                "fetch_metadata_pair done count={} off={} tail={:?} split={}",
+                "fetch_metadata_pair done count={} off={} tail={:?} split={} erased={}",
                 count,
                 last_off,
                 last_tail,
-                last_split
+                last_split,
+                erased
             );
             return Ok(MdDir {
                 pair: [block_idx, pair[1 - r_use]],
@@ -260,6 +306,7 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
                 count,
                 tail: last_tail,
                 split: last_split,
+                erased,
             });
         }
     }

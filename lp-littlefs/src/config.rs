@@ -34,6 +34,9 @@ pub struct Config {
     /// Max size for inlined files. When 0, defaults to cache_size.
     /// -1 disables inline files.
     pub inline_max: i32,
+    /// Threshold for metadata compaction during fs_gc in bytes. 0 = use
+    /// block_size - block_size/8. -1 = disabled. Per lfs.h compact_thresh.
+    pub compact_thresh: i32,
 }
 
 impl Config {
@@ -61,6 +64,7 @@ impl Config {
             prog_buffer: None,
             lookahead_buffer: None,
             inline_max: 0,
+            compact_thresh: 0,
         }
     }
 }

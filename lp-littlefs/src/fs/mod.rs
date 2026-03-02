@@ -73,6 +73,69 @@ impl LittleFs {
         })
     }
 
+    /// Garbage collection: force consistency, compact metadata pairs exceeding
+    /// compact_thresh, refill lookahead buffer. Per lfs_fs_gc (lfs.h:752).
+    pub fn fs_gc<B: BlockDevice>(&mut self, bd: &B, config: &Config) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+
+        consistent::force_consistency(
+            bd,
+            config,
+            &mut state.root,
+            &mut state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            &mut state.lookahead,
+            state.name_max,
+            state.block_count,
+            state.file_max,
+            state.attr_max,
+        )?;
+
+        let block_size = state.block_size as usize;
+        let prog_size = config.prog_size as usize;
+        let compact_thresh = if config.compact_thresh < 0 {
+            block_size
+        } else if config.compact_thresh == 0 {
+            block_size - block_size / 8
+        } else {
+            config.compact_thresh as usize
+        };
+
+        if config.compact_thresh >= 0 && (config.compact_thresh as usize) < block_size - prog_size {
+            let mut tail = state.root;
+            while tail[0] != 0xffff_ffff || tail[1] != 0xffff_ffff {
+                let mut dir = metadata::fetch_metadata_pair(bd, config, tail)?;
+                let needs_compact = !dir.erased || dir.off > compact_thresh;
+                if needs_compact {
+                    dir.erased = false;
+                    commit::dir_orphaningcommit(
+                        bd,
+                        config,
+                        &mut dir,
+                        &[],
+                        &mut state.root,
+                        &mut state.lookahead,
+                        state.name_max,
+                        &state.gstate,
+                        &mut state.gdisk,
+                        &mut state.gdelta,
+                        false,
+                    )?;
+                }
+                tail = dir.tail;
+            }
+        }
+
+        let lookahead_bits = config.lookahead_size.saturating_mul(8);
+        let lookahead_full = state.lookahead.size >= lookahead_bits.min(state.block_count);
+        if !lookahead_full {
+            alloc::alloc_scan(bd, config, state.root, &mut state.lookahead)?;
+        }
+
+        Ok(())
+    }
+
     /// Traverse all used blocks. Calls `cb` for each block.
     /// Per lfs_fs_traverse (lfs.h:519).
     pub fn fs_traverse<B: BlockDevice, F>(
@@ -243,6 +306,23 @@ impl LittleFs {
         flags: crate::info::OpenFlags,
     ) -> Result<file::File, Error> {
         let state = self.require_mounted_mut()?;
+        if flags.contains(crate::info::OpenFlags::WRONLY)
+            || flags.contains(crate::info::OpenFlags::RDWR)
+        {
+            consistent::force_consistency(
+                bd,
+                config,
+                &mut state.root,
+                &mut state.gstate,
+                &mut state.gdisk,
+                &mut state.gdelta,
+                &mut state.lookahead,
+                state.name_max,
+                state.block_count,
+                state.file_max,
+                state.attr_max,
+            )?;
+        }
         file::File::open(
             bd,
             config,
@@ -388,6 +468,19 @@ impl LittleFs {
     ) -> Result<(), Error> {
         trace!("mkdir path={:?}", path);
         let state = self.require_mounted_mut()?;
+        consistent::force_consistency(
+            bd,
+            config,
+            &mut state.root,
+            &mut state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            &mut state.lookahead,
+            state.name_max,
+            state.block_count,
+            state.file_max,
+            state.attr_max,
+        )?;
         let (cwd, id, name) =
             path::dir_find_for_create(bd, config, state.root, path, state.name_max)?;
         trace!("mkdir cwd.pair={:?} id={} name={:?}", cwd.pair, id, name);
@@ -475,6 +568,19 @@ impl LittleFs {
         path: &str,
     ) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
+        consistent::force_consistency(
+            bd,
+            config,
+            &mut state.root,
+            &mut state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            &mut state.lookahead,
+            state.name_max,
+            state.block_count,
+            state.file_max,
+            state.attr_max,
+        )?;
         let (cwd, id) = path::dir_find(bd, config, state.root, path, state.name_max)?;
 
         if id == 0x3ff {
@@ -522,6 +628,19 @@ impl LittleFs {
     ) -> Result<(), Error> {
         trace!("rename old={:?} new={:?}", old_path, new_path);
         let state = self.require_mounted_mut()?;
+        consistent::force_consistency(
+            bd,
+            config,
+            &mut state.root,
+            &mut state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            &mut state.lookahead,
+            state.name_max,
+            state.block_count,
+            state.file_max,
+            state.attr_max,
+        )?;
         let (old_cwd, old_id) = path::dir_find(bd, config, state.root, old_path, state.name_max)?;
         trace!("rename old_cwd.pair={:?} old_id={}", old_cwd.pair, old_id);
 
@@ -549,45 +668,83 @@ impl LittleFs {
             return Err(Error::Nametoolong);
         }
 
-        if old_info.typ != crate::info::FileType::Dir {
-            return Err(Error::Inval);
-        }
-
         let same_pair = old_cwd.pair[0] == new_cwd.pair[0] && old_cwd.pair[1] == new_cwd.pair[1];
-        trace!(
-            "rename same_pair={} attrs: create={} name_dir={} dir_struct delete={}",
-            same_pair,
-            new_id,
-            new_id,
-            old_id
-        );
         if !same_pair {
             return Err(Error::Inval);
         }
 
-        let attrs = [
-            commit::CommitAttr::create(new_id),
-            commit::CommitAttr::name_dir(new_id, new_name.as_bytes()),
-            commit::CommitAttr::dir_struct(new_id, dir_pair),
-            commit::CommitAttr::delete(old_id),
-        ];
+        let mut new_id = new_id;
+        if new_id <= old_id {
+            new_id = old_id + 1;
+        }
 
         let mut new_cwd_mut = metadata::fetch_metadata_pair(bd, config, new_cwd.pair)?;
-        commit::dir_orphaningcommit(
-            bd,
-            config,
-            &mut new_cwd_mut,
-            &attrs,
-            &mut state.root,
-            &mut state.lookahead,
-            state.name_max,
-            &state.gstate,
-            &mut state.gdisk,
-            &mut state.gdelta,
-            false,
-        )?;
-        trace!("rename commit done, syncing");
 
+        match old_info.typ {
+            crate::info::FileType::Dir => {
+                let attrs = [
+                    commit::CommitAttr::create(new_id),
+                    commit::CommitAttr::name_dir(new_id, new_name.as_bytes()),
+                    commit::CommitAttr::dir_struct(new_id, dir_pair),
+                    commit::CommitAttr::delete(old_id),
+                ];
+                commit::dir_orphaningcommit(
+                    bd,
+                    config,
+                    &mut new_cwd_mut,
+                    &attrs,
+                    &mut state.root,
+                    &mut state.lookahead,
+                    state.name_max,
+                    &state.gstate,
+                    &mut state.gdisk,
+                    &mut state.gdelta,
+                    false,
+                )?;
+            }
+            crate::info::FileType::Reg => {
+                let (is_inline, head, size) = metadata::get_file_struct(&old_cwd, old_id)?;
+                let inline_data = if is_inline {
+                    let mut buf = ::alloc::vec![0; state.inline_max as usize];
+                    let n = metadata::get_inline_slice(&old_cwd, old_id, 0, &mut buf)?;
+                    let mut data = Vec::new();
+                    data.extend_from_slice(&buf[..n]);
+                    data
+                } else {
+                    Vec::new()
+                };
+                let attrs = if is_inline {
+                    [
+                        commit::CommitAttr::create(new_id),
+                        commit::CommitAttr::name_reg(new_id, new_name.as_bytes()),
+                        commit::CommitAttr::inline_struct(new_id, &inline_data),
+                        commit::CommitAttr::delete(old_id),
+                    ]
+                } else {
+                    [
+                        commit::CommitAttr::create(new_id),
+                        commit::CommitAttr::name_reg(new_id, new_name.as_bytes()),
+                        commit::CommitAttr::ctz_struct(new_id, head, size as u32),
+                        commit::CommitAttr::delete(old_id),
+                    ]
+                };
+                commit::dir_orphaningcommit(
+                    bd,
+                    config,
+                    &mut new_cwd_mut,
+                    &attrs,
+                    &mut state.root,
+                    &mut state.lookahead,
+                    state.name_max,
+                    &state.gstate,
+                    &mut state.gdisk,
+                    &mut state.gdelta,
+                    false,
+                )?;
+            }
+        }
+
+        trace!("rename commit done, syncing");
         bd.sync()?;
         Ok(())
     }
@@ -599,6 +756,7 @@ pub use file::File;
 
 /// Create an inline file. Requires a formatted fs (not mounted).
 /// Used by integration tests and for seeding filesystems.
+#[doc(hidden)]
 pub fn create_inline_file<B: BlockDevice>(
     bd: &B,
     config: &Config,
@@ -646,11 +804,13 @@ pub struct Dir {
 
 impl Dir {
     /// Metadata block pair for this directory. For power-loss simulation.
+    #[doc(hidden)]
     pub fn pair(&self) -> [u32; 2] {
         self.head
     }
 
     /// Revision of the block we read from. For power-loss simulation.
+    #[doc(hidden)]
     pub fn revision(&self) -> u32 {
         self.mdir.rev
     }

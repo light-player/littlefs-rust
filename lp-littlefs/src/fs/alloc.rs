@@ -93,7 +93,7 @@ pub fn alloc<B: BlockDevice>(
     }
 }
 
-fn alloc_scan<B: BlockDevice>(
+pub(crate) fn alloc_scan<B: BlockDevice>(
     bd: &B,
     config: &Config,
     root: [u32; 2],

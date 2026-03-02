@@ -20,9 +20,9 @@ fn uncached_bd(config: &Config) -> RamBlockDevice {
 }
 
 // --- test_orphans_mkconsistent_no_orphans ---
-// Upstream: preporphans +1, commit (persist), unmount; remount, mkconsistent, remount.
-// Persistence now happens via normal commit path (MOVESTATE in dir_commit).
-// Use a no-op mkdir+remove to trigger a commit that persists gstate.
+// With lazy force_consistency, mkdir/remove run deorphan first. So preporphans(1)
+// gets cleared before the commit. We verify: mkconsistent clears (no-op here)
+// and persists; remount shows no orphans.
 #[test]
 fn test_orphans_mkconsistent_no_orphans() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -34,12 +34,20 @@ fn test_orphans_mkconsistent_no_orphans() {
 
     lfs.fs_preporphans(1).unwrap();
     assert!(lfs.fs_has_orphans(&bd, &config).unwrap());
+    // mkdir runs force_consistency first, which clears orphan count
     lfs.mkdir(&bd, &config, "_p").unwrap();
     lfs.remove(&bd, &config, "_p").unwrap();
+    assert!(
+        !lfs.fs_has_orphans(&bd, &config).unwrap(),
+        "force_consistency before mkdir clears orphans"
+    );
     lfs.unmount().unwrap();
 
     lfs.mount(&bd, &config).unwrap();
-    assert!(lfs.fs_has_orphans(&bd, &config).unwrap());
+    assert!(
+        !lfs.fs_has_orphans(&bd, &config).unwrap(),
+        "persisted gstate has no orphans (cleared before commit)"
+    );
     lfs.fs_mkconsistent(&bd, &config).unwrap();
     assert!(
         !lfs.fs_has_orphans(&bd, &config).unwrap(),

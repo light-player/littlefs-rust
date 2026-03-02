@@ -34,6 +34,7 @@ pub mod tag {
     pub const TYPE_SOFTTAIL: u32 = 0x600;
     pub const TYPE_HARDTAIL: u32 = 0x601;
     pub const TYPE_CCRC: u32 = 0x500;
+    pub const TYPE_FCRC: u32 = 0x5ff;
     pub const TYPE_MOVESTATE: u32 = 0x7ff;
 }
 
