@@ -1,13 +1,18 @@
 //! Mount implementation.
 //!
-//! Reads and validates superblock from metadata pair (blocks 0, 1).
+//! Traverses metadata tail chain from [0,1], finds superblock, accumulates gstate.
+//! Per lfs_mount_ (lfs.c:4482).
 
 use crate::block::BlockDevice;
 use crate::config::Config;
 use crate::error::Error;
-use crate::superblock::{MAGIC, REVISION_OFFSET};
+use crate::superblock::{Superblock, DISK_VERSION};
 
 use super::alloc::Lookahead;
+use super::gstate::{self, GState};
+use super::metadata;
+
+const BLOCK_NULL: u32 = 0xffff_ffff;
 
 /// Mount state to store in LittleFs.
 #[derive(Clone)]
@@ -21,84 +26,115 @@ pub(crate) struct MountState {
     pub inline_max: u32,
     pub disk_version: u32,
     pub lookahead: Lookahead,
+    /// Accumulated global state (orphans, moves). Per lfs.gstate.
+    pub gstate: GState,
+    /// Last committed gstate on disk. Per lfs.gdisk.
+    pub gdisk: GState,
+    /// Pending gstate delta. Per lfs.gdelta.
+    pub gdelta: GState,
+}
+
+fn pair_is_null(pair: [u32; 2]) -> bool {
+    pair[0] == BLOCK_NULL && pair[1] == BLOCK_NULL
 }
 
 pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Error> {
-    let block_size = config.block_size as usize;
-    let mut block0 = alloc::vec![0u8; block_size];
-    let mut block1 = alloc::vec![0u8; block_size];
+    use crate::trace;
+    // Ensure caches are flushed and dropped so we read current device state.
+    // Needed when CachedBlockDevice persists across unmount/remount (C code creates fresh lfs each mount).
+    trace!("mount: sync block device");
+    bd.sync()?;
 
-    bd.read(0, 0, &mut block0)?;
-    bd.read(1, 0, &mut block1)?;
+    let mut tail = [0u32, 1u32];
+    let mut gstate = GState::zero();
+    let mut root = [0u32, 1u32];
+    let mut superblock: Option<Superblock> = None;
+    let limit = config.block_count.max(1) as usize;
 
-    // Pick block with higher revision.
-    let rev0 = u32::from_le_bytes(
-        block0[REVISION_OFFSET as usize..REVISION_OFFSET as usize + 4]
-            .try_into()
-            .unwrap(),
-    );
-    let rev1 = u32::from_le_bytes(
-        block1[REVISION_OFFSET as usize..REVISION_OFFSET as usize + 4]
-            .try_into()
-            .unwrap(),
-    );
+    for _ in 0..limit {
+        if pair_is_null(tail) {
+            break;
+        }
 
-    let block = if (rev0 as i32).wrapping_sub(rev1 as i32) >= 0 {
-        &block0
-    } else {
-        &block1
-    };
+        trace!("mount: fetch_metadata_pair tail={:?}", tail);
+        let dir = metadata::fetch_metadata_pair(bd, config, tail)?;
 
-    // Check magic at offset 12. Layout: [rev:4][create_tag:4][sb_tag:4][magic:8]...
-    if block.len() < 20 {
-        return Err(Error::Corrupt);
-    }
-    if &block[12..20] != MAGIC {
-        return Err(Error::Corrupt);
+        if let Some(sb) = metadata::get_superblock_from_dir(&dir) {
+            root = dir.pair;
+            superblock = Some(sb);
+        }
+
+        gstate::dir_getgstate(&dir, &mut gstate)?;
+        tail = dir.tail;
     }
 
-    // Validate block_size and block_count from superblock (at offset 20 + 4 + 8 = 32)
-    // Layout after magic: [tag:4][superblock:24]. So superblock starts at 8+4+8 = 20? No.
-    // [rev:4][create_tag:4][sb_tag:4][littlefs:8][struct_tag:4][superblock:24]
-    use crate::superblock::Superblock;
-    let sb_off = 24usize;
-    if block.len() < sb_off + Superblock::SIZE {
-        return Err(Error::Corrupt);
-    }
-    let disk_block_size = u32::from_le_bytes(block[sb_off + 4..sb_off + 8].try_into().unwrap());
-    let disk_block_count = u32::from_le_bytes(block[sb_off + 8..sb_off + 12].try_into().unwrap());
+    let sb = superblock.ok_or_else(|| {
+        trace!("mount Corrupt: no superblock found in tail chain");
+        Error::Corrupt
+    })?;
 
-    if disk_block_size != config.block_size {
+    if sb.block_size != config.block_size {
+        trace!(
+            "mount Corrupt: block_size mismatch sb={} config={}",
+            sb.block_size,
+            config.block_size
+        );
         return Err(Error::Corrupt);
     }
-    if config.block_count != 0 && disk_block_count != config.block_count {
+    if config.block_count != 0 && sb.block_count != config.block_count {
+        trace!(
+            "mount Corrupt: block_count mismatch sb={} config={}",
+            sb.block_count,
+            config.block_count
+        );
         return Err(Error::Corrupt);
     }
 
-    let name_max = u32::from_le_bytes(block[sb_off + 12..sb_off + 16].try_into().unwrap());
-    let file_max = u32::from_le_bytes(block[sb_off + 16..sb_off + 20].try_into().unwrap());
-    let attr_max = u32::from_le_bytes(block[sb_off + 20..sb_off + 24].try_into().unwrap());
-    let disk_version = u32::from_le_bytes(block[sb_off..sb_off + 4].try_into().unwrap());
+    let major = (0xffff & (sb.version >> 16)) as u16;
+    let minor = (0xffff & sb.version) as u16;
+    let disk_major = (0xffff & (DISK_VERSION >> 16)) as u16;
+    let disk_minor = (0xffff & DISK_VERSION) as u16;
+    if major != disk_major || minor > disk_minor {
+        trace!(
+            "mount Corrupt: version mismatch major={} minor={} disk={}/{}",
+            major,
+            minor,
+            disk_major,
+            disk_minor
+        );
+        return Err(Error::Corrupt);
+    }
+
+    let name_max = sb.name_max;
+    let file_max = sb.file_max;
+    let attr_max = sb.attr_max;
+    let disk_version = sb.version;
 
     let mut lookahead = Lookahead::new(config);
-    lookahead.alloc_drop(disk_block_count);
+    lookahead.alloc_drop(sb.block_count);
 
     let inline_max = match config.inline_max {
-        0 => config.cache_size, // default: cache_size
-        -1 => 0,                // disabled
-        n if n > 0 => n as u32, // explicit
+        0 => config.cache_size,
+        -1 => 0,
+        n if n > 0 => n as u32,
         _ => config.cache_size,
     };
 
+    gstate::ensure_valid(&mut gstate);
+    let gdisk = gstate;
+
     Ok(MountState {
-        root: [0, 1],
-        block_size: disk_block_size,
-        block_count: disk_block_count,
+        root,
+        block_size: sb.block_size,
+        block_count: sb.block_count,
         name_max,
         file_max,
         attr_max,
         inline_max,
         disk_version,
         lookahead,
+        gstate,
+        gdisk,
+        gdelta: GState::zero(),
     })
 }

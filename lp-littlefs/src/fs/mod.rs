@@ -2,10 +2,12 @@
 
 mod alloc;
 mod commit;
+mod consistent;
 mod ctz;
 mod dir;
 mod file;
 mod format;
+mod gstate;
 mod metadata;
 mod mount;
 mod parent;
@@ -46,6 +48,7 @@ impl LittleFs {
     }
 
     pub fn unmount(&mut self) -> Result<(), Error> {
+        trace!("unmount");
         self.mounted = None;
         Ok(())
     }
@@ -68,6 +71,91 @@ impl LittleFs {
             file_max: state.file_max,
             attr_max: state.attr_max,
         })
+    }
+
+    /// Traverse all used blocks. Calls `cb` for each block.
+    /// Per lfs_fs_traverse (lfs.h:519).
+    pub fn fs_traverse<B: BlockDevice, F>(
+        &self,
+        bd: &B,
+        config: &Config,
+        cb: F,
+    ) -> Result<(), Error>
+    where
+        F: FnMut(u32) -> Result<(), Error>,
+    {
+        let state = self.require_mounted()?;
+        traverse::fs_traverse(bd, config, state.root, false, cb)
+    }
+
+    /// Number of allocated blocks. Per lfs_fs_size (lfs.h:510).
+    pub fn fs_size<B: BlockDevice>(&self, bd: &B, config: &Config) -> Result<i64, Error> {
+        let mut count: i64 = 0;
+        self.fs_traverse(bd, config, |_block| {
+            count += 1;
+            Ok(())
+        })?;
+        Ok(count)
+    }
+
+    /// Adjust orphan count. Per lfs_fs_preporphans. For testing power-loss paths.
+    pub fn fs_preporphans(&mut self, delta: i8) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+        gstate::preporphans(&mut state.gstate, delta)
+    }
+
+    /// True if gstate has orphan count. For testing. Per lfs_gstate_hasorphans.
+    pub fn fs_has_orphans<B: BlockDevice>(&self, _bd: &B, _config: &Config) -> Result<bool, Error> {
+        let state = self.require_mounted()?;
+        Ok(state.gstate.hasorphans())
+    }
+
+    /// Deorphan, complete moves, persist gstate. Per lfs_fs_mkconsistent (lfs.h:529).
+    pub fn fs_mkconsistent<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+    ) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+
+        consistent::force_consistency(
+            bd,
+            config,
+            &mut state.root,
+            &mut state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            &mut state.lookahead,
+            state.name_max,
+            state.block_count,
+            state.file_max,
+            state.attr_max,
+        )?;
+
+        // Per upstream: if gdisk != gstate, commit root with empty attrs.
+        // The shared commit path adds MOVESTATE internally.
+        let mut delta = gstate::GState::zero();
+        delta.xor(&state.gdisk);
+        delta.xor(&state.gstate);
+        if !delta.iszero() {
+            let mut root_dir = metadata::fetch_metadata_pair(bd, config, state.root)?;
+            commit::dir_orphaningcommit(
+                bd,
+                config,
+                &mut root_dir,
+                &[],
+                &mut state.root,
+                &mut state.lookahead,
+                state.name_max,
+                &state.gstate,
+                &mut state.gdisk,
+                &mut state.gdelta,
+                true, // skip_dir_adjust for explicit persist
+            )?;
+        }
+
+        bd.sync()?;
+        Ok(())
     }
 
     pub fn stat<B: BlockDevice>(&self, bd: &B, config: &Config, path: &str) -> Result<Info, Error> {
@@ -97,6 +185,7 @@ impl LittleFs {
         config: &Config,
         path: &str,
     ) -> Result<Dir, Error> {
+        trace!("dir_open path={:?}", path);
         let state = self.require_mounted()?;
         let (dir, id) = path::dir_find(bd, config, state.root, path, state.name_max)?;
 
@@ -117,6 +206,7 @@ impl LittleFs {
             ]
         };
 
+        trace!("dir_open fetch_metadata_pair pair={:?}", pair);
         let md = metadata::fetch_metadata_pair(bd, config, pair)?;
         let is_root = pair[0] == 0 || pair[0] == 1;
 
@@ -162,6 +252,9 @@ impl LittleFs {
             state.name_max,
             state.inline_max,
             flags,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
         )
     }
 
@@ -230,6 +323,9 @@ impl LittleFs {
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
         )
     }
 
@@ -249,6 +345,9 @@ impl LittleFs {
             state.name_max,
             size,
             state.inline_max,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
         )
     }
 
@@ -275,6 +374,9 @@ impl LittleFs {
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
         )
     }
 
@@ -313,6 +415,10 @@ impl LittleFs {
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            false,
         )?;
 
         let new_pair = new_dir.pair;
@@ -327,6 +433,10 @@ impl LittleFs {
                 &mut state.root,
                 &mut state.lookahead,
                 state.name_max,
+                &state.gstate,
+                &mut state.gdisk,
+                &mut state.gdelta,
+                false,
             )?;
         }
 
@@ -346,6 +456,10 @@ impl LittleFs {
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            false,
         )?;
 
         state.lookahead.alloc_ckpoint(state.block_count);
@@ -389,6 +503,10 @@ impl LittleFs {
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            false,
         )?;
 
         bd.sync()?;
@@ -463,6 +581,10 @@ impl LittleFs {
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            false,
         )?;
         trace!("rename commit done, syncing");
 
@@ -492,6 +614,9 @@ pub fn create_inline_file<B: BlockDevice>(
         commit::CommitAttr::inline_struct(id, content),
     ];
     let mut lookahead = alloc::Lookahead::new(config);
+    let gstate = gstate::GState::zero();
+    let mut gdisk = gstate::GState::zero();
+    let mut gdelta = gstate::GState::zero();
     commit::dir_orphaningcommit(
         bd,
         config,
@@ -500,6 +625,10 @@ pub fn create_inline_file<B: BlockDevice>(
         &mut root,
         &mut lookahead,
         255,
+        &gstate,
+        &mut gdisk,
+        &mut gdelta,
+        false,
     )?;
     bd.sync()
 }
@@ -513,4 +642,16 @@ pub struct Dir {
     pub(crate) pos: u32,
     pub(crate) is_root: bool,
     pub(crate) name_max: u32,
+}
+
+impl Dir {
+    /// Metadata block pair for this directory. For power-loss simulation.
+    pub fn pair(&self) -> [u32; 2] {
+        self.head
+    }
+
+    /// Revision of the block we read from. For power-loss simulation.
+    pub fn revision(&self) -> u32 {
+        self.mdir.rev
+    }
 }

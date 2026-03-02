@@ -276,8 +276,8 @@ fn test_files_large() {
         if n == 0 {
             break;
         }
-        for j in 0..n {
-            assert_eq!(buf[j], ((pos + j) % 256) as u8, "at pos {}", pos + j);
+        for (j, &b) in buf.iter().take(n).enumerate() {
+            assert_eq!(b, ((pos + j) % 256) as u8, "at pos {}", pos + j);
         }
         pos += n;
     }

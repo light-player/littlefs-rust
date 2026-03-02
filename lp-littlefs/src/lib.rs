@@ -3,6 +3,7 @@
 //! No C dependencies—avoids C compiler and cross-compilation issues on embedded targets.
 
 #![no_std]
+#![allow(clippy::too_many_arguments)]
 
 extern crate alloc;
 

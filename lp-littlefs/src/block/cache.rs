@@ -109,11 +109,26 @@ impl<B: BlockDevice> CachedBlockDevice<B> {
             return Ok(());
         }
 
+        crate::trace!(
+            "cache flush block={} off={} size={}",
+            pcache.block,
+            pcache.off,
+            pcache.size
+        );
+        let flushed_block = pcache.block;
         let diff = alignup(pcache.size, self.prog_size);
         self.device
             .prog(pcache.block, pcache.off, &pcache.buffer[..diff as usize])?;
 
         pcache.zero(self.cache_size);
+        drop(pcache);
+
+        // Read cache for this block is now stale after prog.
+        let mut rcache = self.rcache.borrow_mut();
+        if rcache.block == flushed_block {
+            crate::trace!("cache flush invalidate rcache block={}", flushed_block);
+            rcache.drop_();
+        }
         Ok(())
     }
 
@@ -126,6 +141,7 @@ impl<B: BlockDevice> CachedBlockDevice<B> {
 impl<B: BlockDevice> BlockDevice for CachedBlockDevice<B> {
     fn read(&self, block: u32, off: u32, buffer: &mut [u8]) -> Result<(), Error> {
         let mut size = buffer.len() as u32;
+        crate::trace!("cache read block={} off={} len={}", block, off, size);
         if off + size > self.block_size {
             return Err(Error::Corrupt);
         }
@@ -144,6 +160,7 @@ impl<B: BlockDevice> BlockDevice for CachedBlockDevice<B> {
             if pcache.block != BLOCK_NULL && block == pcache.block && off < pcache.off + pcache.size
             {
                 if off >= pcache.off {
+                    crate::trace!("cache read HIT pcache block={}", block);
                     let in_cache = (off - pcache.off) as usize;
                     let avail = pcache.size as usize - in_cache;
                     diff = diff.min(avail as u32);
@@ -161,6 +178,7 @@ impl<B: BlockDevice> BlockDevice for CachedBlockDevice<B> {
             let rcache = self.rcache.borrow();
             if rcache.block == block && off < rcache.off + rcache.size {
                 if off >= rcache.off {
+                    crate::trace!("cache read HIT rcache block={}", block);
                     let in_cache = (off - rcache.off) as usize;
                     let avail = rcache.size as usize - in_cache;
                     diff = diff.min(avail as u32);
@@ -176,6 +194,7 @@ impl<B: BlockDevice> BlockDevice for CachedBlockDevice<B> {
             drop(rcache);
 
             if size >= hint && off.is_multiple_of(self.read_size) && size >= self.read_size {
+                crate::trace!("cache read MISS passthrough block={} off={}", block, off);
                 diff = aligndown(diff, self.read_size);
                 self.device
                     .read(block, off, &mut buffer[pos..][..diff as usize])?;
@@ -191,6 +210,12 @@ impl<B: BlockDevice> BlockDevice for CachedBlockDevice<B> {
             let align_up = alignup(off + hint, self.read_size).min(self.block_size);
             let load_size = (align_up - rcache.off).min(self.cache_size);
             rcache.size = load_size;
+            crate::trace!(
+                "cache read MISS load block={} off={} size={}",
+                block,
+                rcache.off,
+                load_size
+            );
             self.device.read(
                 rcache.block,
                 rcache.off,
@@ -201,6 +226,7 @@ impl<B: BlockDevice> BlockDevice for CachedBlockDevice<B> {
     }
 
     fn prog(&self, block: u32, off: u32, data: &[u8]) -> Result<(), Error> {
+        crate::trace!("cache prog block={} off={} len={}", block, off, data.len());
         let mut size = data.len() as u32;
         let mut off = off;
         let mut pos = 0usize;
@@ -249,6 +275,7 @@ impl<B: BlockDevice> BlockDevice for CachedBlockDevice<B> {
     }
 
     fn sync(&self) -> Result<(), Error> {
+        crate::trace!("cache sync");
         self.drop_rcache();
         self.flush()?;
         self.device.sync()

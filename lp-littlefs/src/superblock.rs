@@ -34,6 +34,7 @@ pub mod tag {
     pub const TYPE_SOFTTAIL: u32 = 0x600;
     pub const TYPE_HARDTAIL: u32 = 0x601;
     pub const TYPE_CCRC: u32 = 0x500;
+    pub const TYPE_MOVESTATE: u32 = 0x7ff;
 }
 
 /// On-disk superblock struct (little-endian).
@@ -55,6 +56,7 @@ impl Superblock {
 }
 
 /// Revision count at start of metadata block (4 bytes, little-endian).
+#[allow(dead_code)]
 pub const REVISION_OFFSET: u32 = 0;
 
 /// Magic is at offset 12 in block. Layout: [rev:4][create_tag:4][sb_tag:4][magic:8]...

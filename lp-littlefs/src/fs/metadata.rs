@@ -88,6 +88,8 @@ fn tag_isvalid(t: u32) -> bool {
 }
 
 /// Fetch and parse a metadata pair. Picks block by revision, scans commits.
+/// If the higher-rev block fails CRC (e.g. partial write), tries the other block.
+/// Per lfs.c lfs_dir_fetchmatch.
 pub fn fetch_metadata_pair<B: BlockDevice>(
     bd: &B,
     config: &Config,
@@ -112,152 +114,161 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
     } else {
         1
     };
-    let block = &blocks[r];
-    let block_idx = pair[r];
-    trace!(
-        "fetch_metadata_pair picked block r={} block_idx={} revs={:?}",
-        r,
-        block_idx,
-        revs
-    );
 
-    let mut tempcount: i32 = 0;
-    let mut max_id: u16 = 0;
-    let mut seen_name_or_splice = false;
-    let mut temptail: [u32; 2] = [0xffff_ffff, 0xffff_ffff];
-    let mut tempsplit = false;
-    let mut last_off = 0usize;
-    let mut last_etag = 0u32;
-    let mut last_tail: [u32; 2] = [0xffff_ffff, 0xffff_ffff];
-    let mut last_split = false;
-
-    let mut ptag: u32 = 0xffff_ffff;
-    let mut off = 4usize;
-    let dir_rev = revs[r];
-    let mut crc = crc::crc32(0xffff_ffff, &dir_rev.to_le_bytes());
-
-    loop {
-        trace!("fetch_metadata_pair loop off={} ptag=0x{:08x}", off, ptag);
-        if off + 4 > block_size {
-            break;
-        }
-        let stored_tag =
-            u32::from_be_bytes(block[off..off + 4].try_into().map_err(|_| Error::Corrupt)?);
-        crc = crc::crc32(crc, &block[off..off + 4]);
-        let tag = (stored_tag ^ ptag) & 0x7fff_ffff;
+    // Try higher-rev block first; if no valid commits (e.g. partial prog), try other. Per lfs_dir_fetchmatch.
+    for attempt in 0..2 {
+        let r_use = if attempt == 0 { r } else { 1 - r };
+        let block = &blocks[r_use];
+        let block_idx = pair[r_use];
+        let dir_rev = revs[r_use];
         trace!(
-            "fetch_metadata_pair tag=0x{:08x} type1={} type2={} id={} dsize={}",
-            tag,
-            tag_type1(tag),
-            tag_type2(tag),
-            tag_id(tag),
-            tag_dsize(tag)
+            "fetch_metadata_pair attempt={} r_use={} block_idx={} revs={:?}",
+            attempt,
+            r_use,
+            block_idx,
+            revs
         );
 
-        if !tag_isvalid(tag) {
-            break;
-        }
-        let dsize = tag_dsize(tag);
-        if off + dsize > block_size {
-            break;
-        }
+        let mut tempcount: i32 = 0;
+        let mut max_id: u16 = 0;
+        let mut seen_name_or_splice = false;
+        let mut temptail: [u32; 2] = [0xffff_ffff, 0xffff_ffff];
+        let mut tempsplit = false;
+        let mut last_off = 0usize;
+        let mut last_etag = 0u32;
+        let mut last_tail: [u32; 2] = [0xffff_ffff, 0xffff_ffff];
+        let mut last_split = false;
 
-        ptag = tag;
+        let mut ptag: u32 = 0xffff_ffff;
+        let mut off = 4usize;
+        let mut crc = crc::crc32(0xffff_ffff, &dir_rev.to_le_bytes());
 
-        if tag_type2(tag) == tag::TYPE_CCRC {
-            let mut dcrc_bytes = [0u8; 4];
-            dcrc_bytes.copy_from_slice(&block[off + 4..off + 8]);
-            let dcrc = u32::from_le_bytes(dcrc_bytes);
-            // CRC covers revision + all tag headers (including this one); stored value is expected crc
-            if crc != dcrc {
+        loop {
+            trace!("fetch_metadata_pair loop off={} ptag=0x{:08x}", off, ptag);
+            if off + 4 > block_size {
                 break;
             }
-            ptag ^= ((tag_chunk(tag) & 1) as u32) << 31;
-
-            last_off = off + dsize;
-            last_etag = ptag;
-            last_tail = temptail;
-            last_split = tempsplit;
-            // Per lfs.c lfs_dir_fetchmatch: splice gives live count. For dir_read/find
-            // we iterate ids 0..count; count must be >= max_id+1 to reach all entries.
-            // Only apply max_id when we've seen NAME/SPLICE (avoid count=1 for empty child dirs).
-            if seen_name_or_splice {
-                tempcount = tempcount.max(0).max(max_id as i32 + 1);
-            } else {
-                tempcount = tempcount.max(0);
-            }
+            let stored_tag =
+                u32::from_be_bytes(block[off..off + 4].try_into().map_err(|_| Error::Corrupt)?);
+            crc = crc::crc32(crc, &block[off..off + 4]);
+            let tag = (stored_tag ^ ptag) & 0x7fff_ffff;
             trace!(
-                "fetch_metadata_pair CRC tempcount={} max_id={} seen_name_or_splice={}",
-                tempcount,
-                max_id,
-                seen_name_or_splice
-            );
-            temptail = [0xffff_ffff, 0xffff_ffff];
-            tempsplit = false;
-
-            crc = 0xffff_ffff;
-            off += dsize;
-            continue;
-        }
-
-        crc = crc::crc32(crc, &block[off + 4..off + dsize]);
-
-        if tag_type1(tag) == tag::TYPE_NAME {
-            let id = tag_id(tag);
-            seen_name_or_splice = true;
-            max_id = max_id.max(id);
-            if id as i32 >= tempcount {
-                tempcount = id as i32 + 1;
-            }
-            trace!(
-                "fetch_metadata_pair NAME id={} tempcount={} max_id={}",
-                id,
-                tempcount,
-                max_id
-            );
-        } else if tag_type1(tag) == tag::TYPE_SPLICE {
-            seen_name_or_splice = true;
-            max_id = max_id.max(tag_id(tag));
-            tempcount += tag_splice(tag);
-            trace!(
-                "fetch_metadata_pair SPLICE id={} splice={} tempcount={} max_id={}",
+                "fetch_metadata_pair tag=0x{:08x} type1={} type2={} id={} dsize={}",
+                tag,
+                tag_type1(tag),
+                tag_type2(tag),
                 tag_id(tag),
-                tag_splice(tag),
-                tempcount,
-                max_id
+                tag_dsize(tag)
             );
-        } else if tag_type1(tag) == tag::TYPE_TAIL {
-            tempsplit = (tag_chunk(tag) & 1) != 0;
-            temptail[0] = u32::from_le_bytes(block[off + 4..off + 8].try_into().unwrap());
-            temptail[1] = u32::from_le_bytes(block[off + 8..off + 12].try_into().unwrap());
+
+            if !tag_isvalid(tag) {
+                break;
+            }
+            let dsize = tag_dsize(tag);
+            if off + dsize > block_size {
+                break;
+            }
+
+            ptag = tag;
+
+            if tag_type2(tag) == tag::TYPE_CCRC {
+                let mut dcrc_bytes = [0u8; 4];
+                dcrc_bytes.copy_from_slice(&block[off + 4..off + 8]);
+                let dcrc = u32::from_le_bytes(dcrc_bytes);
+                // CRC covers revision + all tag headers (including this one); stored value is expected crc
+                if crc != dcrc {
+                    break;
+                }
+                ptag ^= ((tag_chunk(tag) & 1) as u32) << 31;
+
+                last_off = off + dsize;
+                last_etag = ptag;
+                last_tail = temptail;
+                last_split = tempsplit;
+                // Per lfs.c lfs_dir_fetchmatch: splice gives live count. For dir_read/find
+                // we iterate ids 0..count; count must be >= max_id+1 to reach all entries.
+                // Only apply max_id when we've seen NAME/SPLICE (avoid count=1 for empty child dirs).
+                if seen_name_or_splice {
+                    tempcount = tempcount.max(0).max(max_id as i32 + 1);
+                } else {
+                    tempcount = tempcount.max(0);
+                }
+                trace!(
+                    "fetch_metadata_pair CRC tempcount={} max_id={} seen_name_or_splice={}",
+                    tempcount,
+                    max_id,
+                    seen_name_or_splice
+                );
+                temptail = [0xffff_ffff, 0xffff_ffff];
+                tempsplit = false;
+
+                crc = 0xffff_ffff;
+                off += dsize;
+                continue;
+            }
+
+            crc = crc::crc32(crc, &block[off + 4..off + dsize]);
+
+            if tag_type1(tag) == tag::TYPE_NAME {
+                let id = tag_id(tag);
+                seen_name_or_splice = true;
+                max_id = max_id.max(id);
+                if id as i32 >= tempcount {
+                    tempcount = id as i32 + 1;
+                }
+                trace!(
+                    "fetch_metadata_pair NAME id={} tempcount={} max_id={}",
+                    id,
+                    tempcount,
+                    max_id
+                );
+            } else if tag_type1(tag) == tag::TYPE_SPLICE {
+                seen_name_or_splice = true;
+                max_id = max_id.max(tag_id(tag));
+                tempcount += tag_splice(tag);
+                trace!(
+                    "fetch_metadata_pair SPLICE id={} splice={} tempcount={} max_id={}",
+                    tag_id(tag),
+                    tag_splice(tag),
+                    tempcount,
+                    max_id
+                );
+            } else if tag_type1(tag) == tag::TYPE_TAIL {
+                tempsplit = (tag_chunk(tag) & 1) != 0;
+                temptail[0] = u32::from_le_bytes(block[off + 4..off + 8].try_into().unwrap());
+                temptail[1] = u32::from_le_bytes(block[off + 8..off + 12].try_into().unwrap());
+            }
+
+            off += dsize;
         }
 
-        off += dsize;
+        if last_off > 0 {
+            let count = if tempcount < 0 { 0 } else { tempcount as u16 };
+            trace!(
+                "fetch_metadata_pair done count={} off={} tail={:?} split={}",
+                count,
+                last_off,
+                last_tail,
+                last_split
+            );
+            return Ok(MdDir {
+                pair: [block_idx, pair[1 - r_use]],
+                block: block.to_vec(),
+                rev: dir_rev,
+                off: last_off,
+                etag: last_etag,
+                count,
+                tail: last_tail,
+                split: last_split,
+            });
+        }
     }
-
-    if last_off == 0 {
-        return Err(Error::Corrupt);
-    }
-
-    let count = if tempcount < 0 { 0 } else { tempcount as u16 };
     trace!(
-        "fetch_metadata_pair done count={} off={} tail={:?} split={}",
-        count,
-        last_off,
-        last_tail,
-        last_split
+        "fetch_metadata_pair Corrupt pair={:?} revs={:?} (no valid commit in either block)",
+        pair,
+        revs
     );
-
-    Ok(MdDir {
-        pair: [block_idx, pair[1 - r]],
-        block: block.to_vec(),
-        rev: dir_rev,
-        off: last_off,
-        etag: last_etag,
-        count,
-        tail: last_tail,
-        split: last_split,
-    })
+    Err(Error::Corrupt)
 }
 
 /// Iterate backward to find tag matching (gmask, gtag). Returns (tag, data_offset, size) or None.
@@ -404,6 +415,33 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
     Ok(info)
 }
 
+/// Try to read superblock from an already-fetched metadata dir.
+/// Returns Some if the dir contains the superblock (INLINESTRUCT id 0, size 24).
+/// Per LittleFS, only the root metadata pair [0,1] contains the superblock.
+pub fn get_superblock_from_dir(dir: &MdDir) -> Option<Superblock> {
+    if dir.pair[0] > 1 && dir.pair[1] > 1 {
+        return None;
+    }
+    let gmask = 0x7ff0_fc00;
+    let gtag = (tag::TYPE_INLINESTRUCT << 20) | Superblock::SIZE as u32;
+    let (_, off, size) = get_tag_backwards(dir, gmask, gtag).ok()??;
+    if size != Superblock::SIZE as u32 {
+        return None;
+    }
+    let block = &dir.block;
+    if off + Superblock::SIZE > block.len() {
+        return None;
+    }
+    Some(Superblock {
+        version: u32::from_le_bytes(block[off..off + 4].try_into().unwrap()),
+        block_size: u32::from_le_bytes(block[off + 4..off + 8].try_into().unwrap()),
+        block_count: u32::from_le_bytes(block[off + 8..off + 12].try_into().unwrap()),
+        name_max: u32::from_le_bytes(block[off + 12..off + 16].try_into().unwrap()),
+        file_max: u32::from_le_bytes(block[off + 16..off + 20].try_into().unwrap()),
+        attr_max: u32::from_le_bytes(block[off + 20..off + 24].try_into().unwrap()),
+    })
+}
+
 /// Read superblock from root metadata pair.
 #[allow(dead_code)]
 pub fn read_superblock<B: BlockDevice>(
@@ -489,6 +527,7 @@ pub fn get_inline_slice(
 #[derive(Clone, Copy)]
 pub enum TraverseAction {
     Continue,
+    #[allow(dead_code)]
     Stop,
 }
 
@@ -555,7 +594,7 @@ where
             continue;
         }
 
-        let out_id = (id as i32 + diff).max(0).min(0x3ff) as u16;
+        let out_id = (id as i32 + diff).clamp(0, 0x3ff) as u16;
         let out_tag = (tag & 0xffff_fc00) | ((out_id as u32) << 10) | (tag & 0x3ff);
 
         match cb(out_tag, data)? {
@@ -664,7 +703,7 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root, &attrs).unwrap();
+        commit::dir_commit_append(&bd, &config, &mut root, &attrs, &mut None).unwrap();
         bd.sync().unwrap();
 
         let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
@@ -704,7 +743,7 @@ mod tests {
             commit::CommitAttr::dir_struct(1, d0_pair),
             commit::CommitAttr::soft_tail(d0_pair),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root, &mkdir_attrs).unwrap();
+        commit::dir_commit_append(&bd, &config, &mut root, &mkdir_attrs, &mut None).unwrap();
         root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
 
         let rename_attrs = [
@@ -713,7 +752,7 @@ mod tests {
             commit::CommitAttr::dir_struct(2, d0_pair),
             commit::CommitAttr::delete(1),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root, &rename_attrs).unwrap();
+        commit::dir_commit_append(&bd, &config, &mut root, &rename_attrs, &mut None).unwrap();
         bd.sync().unwrap();
 
         let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
@@ -753,7 +792,7 @@ mod tests {
             commit::CommitAttr::name_reg(1, b"hello"),
             commit::CommitAttr::inline_struct(1, content),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root, &attrs).unwrap();
+        commit::dir_commit_append(&bd, &config, &mut root, &attrs, &mut None).unwrap();
         bd.sync().unwrap();
 
         let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();

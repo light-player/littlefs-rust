@@ -154,6 +154,7 @@ mod tests {
             &config,
             &mut new_dir,
             &[commit::CommitAttr::soft_tail(pred_tail)],
+            &mut None,
         )
         .unwrap();
 
@@ -164,7 +165,7 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root_mut, &attrs).unwrap();
+        commit::dir_commit_append(&bd, &config, &mut root_mut, &attrs, &mut None).unwrap();
         bd.sync().unwrap();
 
         let pred = fs_pred(&bd, &config, root, new_pair).unwrap();
@@ -189,6 +190,7 @@ mod tests {
             &config,
             &mut new_dir,
             &[commit::CommitAttr::soft_tail(pred_tail)],
+            &mut None,
         )
         .unwrap();
 
@@ -199,7 +201,7 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root_mut, &attrs).unwrap();
+        commit::dir_commit_append(&bd, &config, &mut root_mut, &attrs, &mut None).unwrap();
         bd.sync().unwrap();
 
         let parent = fs_parent(&bd, &config, root, new_pair, 255).unwrap();

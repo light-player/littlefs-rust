@@ -38,6 +38,49 @@ fn test_superblocks_mount() {
     lfs.unmount().unwrap();
 }
 
+// --- test_fs_size_traverse ---
+// Phase 06: fs_size and fs_traverse APIs
+#[test]
+fn test_fs_size_traverse() {
+    let config = default_config();
+    let bd = cached_bd(&config);
+    let mut lfs = LittleFs::new();
+    lfs.format(&bd, &config).unwrap();
+    lfs.mount(&bd, &config).unwrap();
+
+    let size = lfs.fs_size(&bd, &config).unwrap();
+    assert!(
+        size >= 2,
+        "fs_size should count at least root pair (2 blocks)"
+    );
+
+    let mut count = 0u32;
+    lfs.fs_traverse(&bd, &config, |_block| {
+        count += 1;
+        Ok(())
+    })
+    .unwrap();
+    assert!(count >= 2);
+}
+
+// --- test_fs_mkconsistent ---
+// Phase 06: fs_mkconsistent persists gstate; remount succeeds
+#[test]
+fn test_fs_mkconsistent() {
+    let config = default_config();
+    let bd = cached_bd(&config);
+    let mut lfs = LittleFs::new();
+    lfs.format(&bd, &config).unwrap();
+    lfs.mount(&bd, &config).unwrap();
+    lfs.mkdir(&bd, &config, "d0").unwrap();
+    lfs.fs_mkconsistent(&bd, &config).unwrap();
+    lfs.unmount().unwrap();
+
+    lfs.mount(&bd, &config).unwrap();
+    let info = lfs.stat(&bd, &config, "d0").unwrap();
+    assert_eq!(info.name().unwrap(), "d0");
+}
+
 // --- test_superblocks_magic ---
 // Upstream: format, then raw read to verify "littlefs" at MAGIC_OFFSET in both blocks
 #[test]
