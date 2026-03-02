@@ -14,7 +14,7 @@ mod fs;
 mod info;
 mod superblock;
 
-pub use block::{BlockDevice, RamBlockDevice};
+pub use block::{BlockDevice, CachedBlockDevice, RamBlockDevice};
 pub use config::Config;
 pub use error::Error;
 pub use fs::{Dir, LittleFs};

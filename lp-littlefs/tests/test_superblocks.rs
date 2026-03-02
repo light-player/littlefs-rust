@@ -3,10 +3,17 @@
 //! Corresponds to upstream test_superblocks.toml
 //! Source: https://github.com/littlefs-project/littlefs/blob/master/tests/test_superblocks.toml
 
-use lp_littlefs::{BlockDevice, Config, FsInfo, LittleFs, RamBlockDevice, MAGIC, MAGIC_OFFSET};
+use lp_littlefs::{
+    BlockDevice, CachedBlockDevice, Config, FsInfo, LittleFs, RamBlockDevice, MAGIC, MAGIC_OFFSET,
+};
 
 fn default_config() -> Config {
     Config::default_for_tests(128)
+}
+
+fn cached_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
+    let ram = RamBlockDevice::new(config.block_size, config.block_count);
+    CachedBlockDevice::new(ram, config).unwrap()
 }
 
 // --- test_superblocks_format ---
@@ -14,7 +21,7 @@ fn default_config() -> Config {
 #[test]
 fn test_superblocks_format() {
     let config = default_config();
-    let bd = RamBlockDevice::new(config.block_size, config.block_count);
+    let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
 }
@@ -24,7 +31,7 @@ fn test_superblocks_format() {
 #[test]
 fn test_superblocks_mount() {
     let config = default_config();
-    let bd = RamBlockDevice::new(config.block_size, config.block_count);
+    let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();
@@ -36,7 +43,7 @@ fn test_superblocks_mount() {
 #[test]
 fn test_superblocks_magic() {
     let config = default_config();
-    let bd = RamBlockDevice::new(config.block_size, config.block_count);
+    let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
 
@@ -52,7 +59,7 @@ fn test_superblocks_magic() {
 #[test]
 fn test_superblocks_invalid_mount() {
     let config = default_config();
-    let bd = RamBlockDevice::new(config.block_size, config.block_count);
+    let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
     let err = lfs.mount(&bd, &config).unwrap_err();
     assert!(matches!(err, lp_littlefs::Error::Corrupt));
@@ -63,7 +70,7 @@ fn test_superblocks_invalid_mount() {
 #[test]
 fn test_superblocks_stat() {
     let config = default_config();
-    let bd = RamBlockDevice::new(config.block_size, config.block_count);
+    let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();

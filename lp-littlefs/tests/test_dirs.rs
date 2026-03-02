@@ -3,10 +3,15 @@
 //! Corresponds to upstream test_dirs.toml
 //! Source: https://github.com/littlefs-project/littlefs/blob/master/tests/test_dirs.toml
 
-use lp_littlefs::{Config, Dir, FileType, Info, LittleFs, RamBlockDevice};
+use lp_littlefs::{CachedBlockDevice, Config, Dir, FileType, Info, LittleFs, RamBlockDevice};
 
 fn default_config() -> Config {
     Config::default_for_tests(128)
+}
+
+fn cached_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
+    let ram = RamBlockDevice::new(config.block_size, config.block_count);
+    CachedBlockDevice::new(ram, config).unwrap()
 }
 
 // --- test_dirs_root ---
@@ -14,7 +19,7 @@ fn default_config() -> Config {
 #[test]
 fn test_dirs_root() {
     let config = default_config();
-    let bd = RamBlockDevice::new(config.block_size, config.block_count);
+    let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();
