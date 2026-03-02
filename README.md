@@ -1,6 +1,12 @@
 # lp-littlefs
 
-Pure Rust implementation of the LittleFS embedded filesystem. No C dependencies—avoids C compiler, bindgen, and cross-compilation headaches on embedded targets (ESP32, RISC-V, etc.). On-disk format compatible with upstream LittleFS for interoperability.
+Pure Rust implementation of the LittleFS embedded filesystem. No C dependencies—avoids C compiler,
+bindgen, and cross-compilation headaches on embedded targets (ESP32, RISC-V, etc.).
+
+On-disk format compatible with upstream LittleFS for interoperability.
+
+Created for use in [LightPlayer](https://github.com/light-player/lightplayer), an LED lighting
+control system, for use on esp32 and other embedded targets.
 
 ## Upstream and reference
 
@@ -16,7 +22,9 @@ Pure Rust implementation of the LittleFS embedded filesystem. No C dependencies�
 
 ## Why lp-littlefs
 
-Existing Rust options (`littlefs2`, `littlefs2-sys`) depend on the C library and thus require a C toolchain for every target. lp-littlefs is a from-spec Rust port—no C, no bindgen, no cross-compilation toolchain headaches.
+Existing Rust options (`littlefs2`, `littlefs2-sys`) depend on the C library and thus require a C
+toolchain for every target. lp-littlefs is a from-spec Rust port—no C, no bindgen,
+no cross-compilation toolchain headaches.
 
 ## Versioning
 
