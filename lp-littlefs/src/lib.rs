@@ -8,14 +8,17 @@ extern crate alloc;
 
 mod block;
 mod config;
+mod crc;
 mod error;
 mod fs;
+mod info;
 mod superblock;
 
 pub use block::{BlockDevice, RamBlockDevice};
 pub use config::Config;
 pub use error::Error;
-pub use fs::LittleFs;
+pub use fs::{Dir, LittleFs};
+pub use info::{FileType, FsInfo, Info};
 pub use superblock::{MAGIC, MAGIC_OFFSET};
 
 #[cfg(test)]

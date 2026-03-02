@@ -4,6 +4,9 @@
 
 Add read and program caches to the block device layer. All format/mount/file/dir operations use cached reads and program-through-cache where applicable. Matches upstream `lfs_bd_read`, `lfs_bd_prog`, `lfs_bd_cmp`, `lfs_bd_crc` behavior.
 
+Refer to the C implementation /Users/yona/dev/photomancer/oss/littlefs/lfs.c for the implementation details,
+match the C implementation as closely as possible while keeping the Rust code clean and idiomatic.
+
 ## API targets
 
 No new public API. Internal:

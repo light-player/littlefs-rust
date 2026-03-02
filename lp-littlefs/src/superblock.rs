@@ -12,15 +12,28 @@ pub const DISK_VERSION: u32 = 0x0002_0001;
 
 /// Metadata tag types (lfs.h enum lfs_type).
 /// Tags in commits are stored big-endian.
+/// Use type1 = (tag >> 20) & 0x7, type3 = (tag >> 20) & 0x7ff for branching.
+#[allow(dead_code)]
 pub mod tag {
-    /// Superblock name tag (id 0, size 8 for magic).
-    pub const TYPE_SUPERBLOCK: u32 = 0x0ff;
-    /// Inline struct tag (superblock struct).
-    pub const TYPE_INLINESTRUCT: u32 = 0x201;
-    /// Create entry (id 0 for superblock).
-    pub const TYPE_CREATE: u32 = 0x401;
-    /// CRC tag (end of commit).
+    // Abstract type1 (3 bits)
+    pub const TYPE_NAME: u32 = 0x000;
+    pub const TYPE_STRUCT: u32 = 0x200;
+    pub const TYPE_SPLICE: u32 = 0x400;
+    pub const TYPE_TAIL: u32 = 0x600;
     pub const TYPE_CRC: u32 = 0x500;
+
+    // type3 specializations
+    pub const TYPE_CREATE: u32 = 0x401;
+    pub const TYPE_DELETE: u32 = 0x4ff;
+    pub const TYPE_SUPERBLOCK: u32 = 0x0ff;
+    pub const TYPE_REG: u32 = 0x001;
+    pub const TYPE_DIR: u32 = 0x002;
+    pub const TYPE_INLINESTRUCT: u32 = 0x201;
+    pub const TYPE_DIRSTRUCT: u32 = 0x200;
+    pub const TYPE_CTZSTRUCT: u32 = 0x202;
+    pub const TYPE_SOFTTAIL: u32 = 0x600;
+    pub const TYPE_HARDTAIL: u32 = 0x601;
+    pub const TYPE_CCRC: u32 = 0x500;
 }
 
 /// On-disk superblock struct (little-endian).

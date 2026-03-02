@@ -7,7 +7,19 @@ use crate::config::Config;
 use crate::error::Error;
 use crate::superblock::{MAGIC, REVISION_OFFSET};
 
-pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<(), Error> {
+/// Mount state to store in LittleFs.
+#[derive(Clone)]
+pub(crate) struct MountState {
+    pub root: [u32; 2],
+    pub block_size: u32,
+    pub block_count: u32,
+    pub name_max: u32,
+    pub file_max: u32,
+    pub attr_max: u32,
+    pub disk_version: u32,
+}
+
+pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Error> {
     let block_size = config.block_size as usize;
     let mut block0 = alloc::vec![0u8; block_size];
     let mut block1 = alloc::vec![0u8; block_size];
@@ -59,5 +71,18 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<(), Error> {
         return Err(Error::Corrupt);
     }
 
-    Ok(())
+    let name_max = u32::from_le_bytes(block[sb_off + 12..sb_off + 16].try_into().unwrap());
+    let file_max = u32::from_le_bytes(block[sb_off + 16..sb_off + 20].try_into().unwrap());
+    let attr_max = u32::from_le_bytes(block[sb_off + 20..sb_off + 24].try_into().unwrap());
+    let disk_version = u32::from_le_bytes(block[sb_off..sb_off + 4].try_into().unwrap());
+
+    Ok(MountState {
+        root: [0, 1],
+        block_size: disk_block_size,
+        block_count: disk_block_count,
+        name_max,
+        file_max,
+        attr_max,
+        disk_version,
+    })
 }

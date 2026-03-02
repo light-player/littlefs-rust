@@ -3,7 +3,7 @@
 //! Corresponds to upstream test_superblocks.toml
 //! Source: https://github.com/littlefs-project/littlefs/blob/master/tests/test_superblocks.toml
 
-use lp_littlefs::{BlockDevice, Config, LittleFs, RamBlockDevice, MAGIC, MAGIC_OFFSET};
+use lp_littlefs::{BlockDevice, Config, FsInfo, LittleFs, RamBlockDevice, MAGIC, MAGIC_OFFSET};
 
 fn default_config() -> Config {
     Config::default_for_tests(128)
@@ -56,4 +56,23 @@ fn test_superblocks_invalid_mount() {
     let mut lfs = LittleFs::new();
     let err = lfs.mount(&bd, &config).unwrap_err();
     assert!(matches!(err, lp_littlefs::Error::Corrupt));
+}
+
+// --- test_superblocks_stat ---
+// Upstream: fs_stat after format/mount returns correct values
+#[test]
+fn test_superblocks_stat() {
+    let config = default_config();
+    let bd = RamBlockDevice::new(config.block_size, config.block_count);
+    let mut lfs = LittleFs::new();
+    lfs.format(&bd, &config).unwrap();
+    lfs.mount(&bd, &config).unwrap();
+
+    let info: FsInfo = lfs.fs_stat(&bd, &config).unwrap();
+    assert_eq!(info.block_size, config.block_size);
+    assert_eq!(info.block_count, config.block_count);
+    assert_eq!(info.disk_version, 0x0002_0001);
+    assert_eq!(info.name_max, 255);
+    assert_eq!(info.file_max, 2_147_483_647);
+    assert_eq!(info.attr_max, 1022);
 }

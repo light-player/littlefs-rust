@@ -5,6 +5,15 @@ default:
 # First-time setup: just install-tools
 ci: lint build features no_std deny
 
+# Format code and apply linter fixes (clippy, rustfix)
+fix:
+    cargo fmt --all
+    cargo fix --allow-dirty --allow-staged
+    cargo clippy --all-targets --all-features --fix --allow-dirty --allow-staged
+
+# Fix, then run CI
+fci: fix ci
+
 # One-time setup: run dev-init.sh to install Rust, cargo-deny, and targets
 install-tools:
     ./dev-init.sh
