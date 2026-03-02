@@ -1,12 +1,14 @@
 //! CTZ skip-list operations for file block traversal.
 //!
-//! Per lfs.c lfs_ctz_index, lfs_ctz_find. See SPEC.md "CTZ skip-lists" and DESIGN.md.
+//! Per lfs.c lfs_ctz_index, lfs_ctz_find, lfs_ctz_extend. See SPEC.md "CTZ skip-lists" and DESIGN.md.
 
 use crate::block::BlockDevice;
 use crate::config::Config;
 use crate::error::Error;
 
-const BLOCK_NULL: u32 = 0xffff_ffff;
+use super::alloc;
+
+pub(super) const BLOCK_NULL: u32 = 0xffff_ffff;
 
 /// Population count (number of set bits). Portable replacement for lfs_popc.
 fn popc(a: u32) -> u32 {
@@ -78,9 +80,121 @@ pub fn ctz_find<B: BlockDevice>(
     Ok((head, target_off as u32))
 }
 
+/// Extend the CTZ skip-list by one block. Allocates, erases, and links the new block.
+///
+/// Per lfs.c lfs_ctz_extend. When size > 0, either copies the incomplete last block
+/// or appends a new block with skip pointers.
+pub fn ctz_extend<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    root: [u32; 2],
+    lookahead: &mut alloc::Lookahead,
+    head: u32,
+    size: u64,
+) -> Result<(u32, u32), Error> {
+    let block_size = config.block_size;
+    let nblock = alloc::alloc(bd, config, root, lookahead)?;
+    bd.erase(nblock)?;
+
+    if size == 0 {
+        return Ok((nblock, 0));
+    }
+
+    let mut noff = size - 1;
+    let index = ctz_index(config.block_size, &mut noff);
+    let noff = noff + 1;
+
+    if noff != block_size as u64 {
+        for i in 0..noff {
+            let mut data = [0u8; 1];
+            bd.read(head, i as u32, &mut data)?;
+            bd.prog(nblock, i as u32, &data)?;
+        }
+        return Ok((nblock, noff as u32));
+    }
+
+    let index = index + 1;
+    let skips = ctz(index) + 1;
+    let mut nhead = head;
+
+    for i in 0..skips {
+        let nhead_le = nhead.to_le_bytes();
+        bd.prog(nblock, 4 * i, &nhead_le)?;
+        if i != skips - 1 {
+            let mut buf = [0u8; 4];
+            bd.read(nhead, 4 * i, &mut buf)?;
+            nhead = u32::from_le_bytes(buf);
+        }
+    }
+
+    Ok((nblock, 4 * skips))
+}
+
+/// Traverse CTZ skip-list blocks, calling cb for each block.
+/// Per lfs.c lfs_ctz_traverse.
+pub fn ctz_traverse<B: BlockDevice, F>(
+    bd: &B,
+    config: &Config,
+    head: u32,
+    size: u64,
+    mut cb: F,
+) -> Result<(), Error>
+where
+    F: FnMut(u32) -> Result<(), Error>,
+{
+    if size == 0 {
+        return Ok(());
+    }
+
+    let mut head = head;
+    let mut current_off = size - 1;
+    let mut index = ctz_index(config.block_size, &mut current_off);
+
+    loop {
+        cb(head)?;
+        if index == 0 {
+            return Ok(());
+        }
+
+        let count = (2 - (index & 1)) as usize;
+        let mut heads = [0u32; 2];
+        let mut buf = [0u8; 8];
+        bd.read(head, 0, &mut buf[..count * 4])?;
+        heads[0] = u32::from_le_bytes(buf[0..4].try_into().unwrap());
+        if count > 1 {
+            heads[1] = u32::from_le_bytes(buf[4..8].try_into().unwrap());
+        }
+
+        for head in heads.iter().take(count - 1) {
+            cb(*head)?;
+        }
+        head = heads[count - 1];
+        index -= count as u32;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::RamBlockDevice;
+    use crate::config::Config;
+    use crate::fs::alloc::Lookahead;
+    use crate::fs::format;
+
+    #[test]
+    fn ctz_extend_empty_file() {
+        let config = Config::default_for_tests(64);
+        let bd = RamBlockDevice::new(config.block_size, config.block_count);
+        format::format(&bd, &config).unwrap();
+
+        let root = [0u32, 1];
+        let mut lookahead = Lookahead::new(&config);
+        lookahead.alloc_drop(config.block_count);
+
+        let (block, off) = ctz_extend(&bd, &config, root, &mut lookahead, BLOCK_NULL, 0).unwrap();
+        assert!(block >= 2);
+        assert_eq!(off, 0);
+    }
 
     #[test]
     fn ctz_index_empty() {

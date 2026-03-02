@@ -8,6 +8,12 @@ pub struct OpenFlags(pub u32);
 
 impl OpenFlags {
     pub const RDONLY: u32 = 1;
+    pub const WRONLY: u32 = 2;
+    pub const RDWR: u32 = 3;
+    pub const CREAT: u32 = 0x0100;
+    pub const EXCL: u32 = 0x0200;
+    pub const TRUNC: u32 = 0x0400;
+    pub const APPEND: u32 = 0x0800;
 
     pub fn new(flags: u32) -> Self {
         Self(flags)

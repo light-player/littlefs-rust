@@ -29,6 +29,9 @@ pub struct Config {
     pub prog_buffer: Option<&'static [u8]>,
     /// Optional statically allocated lookahead buffer. Must be lookahead_size bytes.
     pub lookahead_buffer: Option<&'static [u8]>,
+    /// Max size for inlined files. When 0, defaults to cache_size.
+    /// -1 disables inline files.
+    pub inline_max: i32,
 }
 
 impl Config {
@@ -54,6 +57,7 @@ impl Config {
             read_buffer: None,
             prog_buffer: None,
             lookahead_buffer: None,
+            inline_max: 0,
         }
     }
 }

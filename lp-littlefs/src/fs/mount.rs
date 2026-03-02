@@ -18,6 +18,7 @@ pub(crate) struct MountState {
     pub name_max: u32,
     pub file_max: u32,
     pub attr_max: u32,
+    pub inline_max: u32,
     pub disk_version: u32,
     pub lookahead: Lookahead,
 }
@@ -82,6 +83,13 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
     let mut lookahead = Lookahead::new(config);
     lookahead.alloc_drop(disk_block_count);
 
+    let inline_max = match config.inline_max {
+        0 => config.cache_size, // default: cache_size
+        -1 => 0,                // disabled
+        n if n > 0 => n as u32, // explicit
+        _ => config.cache_size,
+    };
+
     Ok(MountState {
         root: [0, 1],
         block_size: disk_block_size,
@@ -89,6 +97,7 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
         name_max,
         file_max,
         attr_max,
+        inline_max,
         disk_version,
         lookahead,
     })

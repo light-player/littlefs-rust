@@ -24,6 +24,7 @@ pub enum CommitData<'a> {
     None,
     Slice(&'a [u8]),
     Pair([u32; 2]),
+    CtzStruct { head: u32, size: u32 },
 }
 
 /// A single attribute to commit.
@@ -79,6 +80,13 @@ impl<'a> CommitAttr<'a> {
         }
     }
 
+    pub fn ctz_struct(id: u16, head: u32, size: u32) -> Self {
+        Self {
+            tag: mktag(tag::TYPE_CTZSTRUCT, id as u32, 8),
+            data: CommitData::CtzStruct { head, size },
+        }
+    }
+
     pub fn soft_tail(pair: [u32; 2]) -> Self {
         Self {
             tag: mktag(tag::TYPE_SOFTTAIL, 0x3ff, 8),
@@ -110,6 +118,10 @@ fn attr_data_bytes(attr: &CommitAttr<'_>) -> Vec<u8> {
         CommitData::None => Vec::new(),
         CommitData::Slice(s) => s.to_vec(),
         CommitData::Pair(p) => [p[0].to_le_bytes(), p[1].to_le_bytes()]
+            .into_iter()
+            .flatten()
+            .collect(),
+        CommitData::CtzStruct { head, size } => [head.to_le_bytes(), size.to_le_bytes()]
             .into_iter()
             .flatten()
             .collect(),

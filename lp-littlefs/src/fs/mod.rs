@@ -152,7 +152,15 @@ impl LittleFs {
         flags: crate::info::OpenFlags,
     ) -> Result<file::File, Error> {
         let state = self.require_mounted()?;
-        file::File::open(bd, config, state.root, path, state.name_max, flags)
+        file::File::open(
+            bd,
+            config,
+            state.root,
+            path,
+            state.name_max,
+            state.inline_max,
+            flags,
+        )
     }
 
     pub fn file_read<B: BlockDevice>(
@@ -188,9 +196,71 @@ impl LittleFs {
         Ok(file.size())
     }
 
-    pub fn file_close(&self, file: file::File) -> Result<(), Error> {
+    pub fn file_write<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+        file: &mut file::File,
+        data: &[u8],
+    ) -> Result<usize, Error> {
+        let state = self.require_mounted_mut()?;
+        file.write(
+            bd,
+            config,
+            state.root,
+            &mut state.lookahead,
+            state.inline_max,
+            state.file_max,
+            data,
+        )
+    }
+
+    pub fn file_sync<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+        file: &mut file::File,
+    ) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+        file.sync(bd, config, state.root, &mut state.lookahead)
+    }
+
+    pub fn file_truncate<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+        file: &mut file::File,
+        size: u64,
+    ) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+        file.truncate(
+            bd,
+            config,
+            state.root,
+            &mut state.lookahead,
+            size,
+            state.inline_max,
+        )
+    }
+
+    pub fn file_rewind<B: BlockDevice>(
+        &mut self,
+        _bd: &B,
+        _config: &Config,
+        file: &mut file::File,
+    ) -> Result<(), Error> {
         self.require_mounted()?;
-        file.close()
+        file.rewind()
+    }
+
+    pub fn file_close<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+        file: file::File,
+    ) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+        file.close(bd, config, state.root, &mut state.lookahead)
     }
 
     pub fn mkdir<B: BlockDevice>(

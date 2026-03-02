@@ -3,6 +3,7 @@
 //! Per lfs_fs_traverse_ (lfs.c:4693-4794). Walks metadata pairs via the
 //! threaded linked list (softtail chain) and marks used blocks.
 
+use super::ctz;
 use super::metadata;
 use crate::block::BlockDevice;
 use crate::config::Config;
@@ -72,24 +73,34 @@ where
                 Err(Error::Noent) => continue,
                 Err(e) => return Err(e),
             };
-            if info.typ != crate::info::FileType::Dir {
-                continue;
+            if info.typ == crate::info::FileType::Dir {
+                if !include_orphans {
+                    continue;
+                }
+                let bytes = match metadata::get_struct(&dir, id) {
+                    Ok(b) => b,
+                    Err(Error::Noent) => continue,
+                    Err(e) => return Err(e),
+                };
+                let b0 = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
+                let b1 = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+                if !pair_isnull([b0, b1]) {
+                    cb(b0)?;
+                    cb(b1)?;
+                }
+            } else {
+                let (inline_, head, size) = match metadata::get_file_struct(&dir, id) {
+                    Ok(x) => x,
+                    Err(Error::Noent) => continue,
+                    Err(e) => return Err(e),
+                };
+                if !inline_ && head != 0xffff_ffff && size > 0 {
+                    ctz::ctz_traverse(bd, config, head, size, |block| {
+                        cb(block)?;
+                        Ok(())
+                    })?;
+                }
             }
-            if !include_orphans {
-                continue;
-            }
-            let bytes = match metadata::get_struct(&dir, id) {
-                Ok(b) => b,
-                Err(Error::Noent) => continue,
-                Err(e) => return Err(e),
-            };
-            let b0 = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
-            let b1 = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
-            if !pair_isnull([b0, b1]) {
-                cb(b0)?;
-                cb(b1)?;
-            }
-            // CTZSTRUCT (file blocks) skipped for phase 03 - no file writes yet
         }
 
         tail = dir.tail;
