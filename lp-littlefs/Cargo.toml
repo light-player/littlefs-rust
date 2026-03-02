@@ -1,0 +1,15 @@
+[package]
+name = "lp-littlefs"
+version = "0.1.0"
+edition = "2021"
+description = "Pure Rust implementation of the LittleFS embedded filesystem (no C dependencies)"
+license = "BSD-3-Clause"
+repository = "https://github.com/light-player/lp-littlefs"
+
+[lib]
+name = "lp_littlefs"
+path = "src/lib.rs"
+
+[features]
+default = []
+std = []
