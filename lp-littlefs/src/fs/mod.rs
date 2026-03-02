@@ -1,10 +1,15 @@
 //! LittleFS filesystem implementation.
 
+mod alloc;
+mod commit;
 mod dir;
 mod format;
 mod metadata;
 mod mount;
 mod path;
+mod traverse;
+
+use ::alloc::vec::Vec;
 
 use crate::block::BlockDevice;
 use crate::config::Config;
@@ -43,6 +48,10 @@ impl LittleFs {
 
     fn require_mounted(&self) -> Result<&mount::MountState, Error> {
         self.mounted.as_ref().ok_or(Error::Badf)
+    }
+
+    fn require_mounted_mut(&mut self) -> Result<&mut mount::MountState, Error> {
+        self.mounted.as_mut().ok_or(Error::Badf)
     }
 
     pub fn fs_stat<B: BlockDevice>(&self, _bd: &B, _config: &Config) -> Result<FsInfo, Error> {
@@ -127,6 +136,150 @@ impl LittleFs {
     }
 
     pub fn dir_close(&self, _dir: Dir) -> Result<(), Error> {
+        Ok(())
+    }
+
+    pub fn mkdir<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+        path: &str,
+    ) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+        let (cwd, id, name) =
+            path::dir_find_for_create(bd, config, state.root, path, state.name_max)?;
+
+        let name_len = name.len();
+        if name_len > state.name_max as usize {
+            return Err(Error::Nametoolong);
+        }
+
+        state.lookahead.alloc_ckpoint(state.block_count);
+
+        let mut new_dir = commit::dir_alloc(bd, config, state.root, &mut state.lookahead)?;
+
+        let mut pred = cwd.clone();
+        while pred.split {
+            pred = metadata::fetch_metadata_pair(bd, config, pred.tail)?;
+        }
+
+        let pred_tail = pred.tail;
+        commit::dir_commit_append(
+            bd,
+            config,
+            &mut new_dir,
+            &[commit::CommitAttr::soft_tail(pred_tail)],
+        )?;
+
+        let new_pair = new_dir.pair;
+
+        if cwd.split {
+            let mut pred_mut = metadata::fetch_metadata_pair(bd, config, pred.pair)?;
+            commit::dir_commit_append(
+                bd,
+                config,
+                &mut pred_mut,
+                &[commit::CommitAttr::soft_tail(new_pair)],
+            )?;
+        }
+
+        let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
+        let mut attrs: Vec<commit::CommitAttr> = Vec::new();
+        attrs.push(commit::CommitAttr::create(id));
+        attrs.push(commit::CommitAttr::name_dir(id, name.as_bytes()));
+        attrs.push(commit::CommitAttr::dir_struct(id, new_pair));
+        if !cwd_mut.split {
+            attrs.push(commit::CommitAttr::soft_tail(new_pair));
+        }
+        commit::dir_commit_append(bd, config, &mut cwd_mut, &attrs)?;
+
+        state.lookahead.alloc_ckpoint(state.block_count);
+
+        bd.sync()?;
+        Ok(())
+    }
+
+    pub fn remove<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+        path: &str,
+    ) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+        let (cwd, id) = path::dir_find(bd, config, state.root, path, state.name_max)?;
+
+        if id == 0x3ff {
+            return Err(Error::Inval);
+        }
+
+        let info = metadata::get_entry_info(&cwd, id, state.name_max)?;
+        if info.typ == crate::info::FileType::Dir {
+            let pair = metadata::get_struct(&cwd, id)?;
+            let dir_pair = [
+                u32::from_le_bytes(pair[0..4].try_into().unwrap()),
+                u32::from_le_bytes(pair[4..8].try_into().unwrap()),
+            ];
+            let child = metadata::fetch_metadata_pair(bd, config, dir_pair)?;
+            if child.count != 0 || child.split {
+                return Err(Error::NotEmpty);
+            }
+        }
+
+        let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
+        commit::dir_commit_append(bd, config, &mut cwd_mut, &[commit::CommitAttr::delete(id)])?;
+
+        bd.sync()?;
+        Ok(())
+    }
+
+    pub fn rename<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+        old_path: &str,
+        new_path: &str,
+    ) -> Result<(), Error> {
+        let state = self.require_mounted_mut()?;
+        let (old_cwd, old_id) = path::dir_find(bd, config, state.root, old_path, state.name_max)?;
+
+        if old_id == 0x3ff {
+            return Err(Error::Inval);
+        }
+
+        let old_info = metadata::get_entry_info(&old_cwd, old_id, state.name_max)?;
+        let old_pair = metadata::get_struct(&old_cwd, old_id)?;
+        let dir_pair = [
+            u32::from_le_bytes(old_pair[0..4].try_into().unwrap()),
+            u32::from_le_bytes(old_pair[4..8].try_into().unwrap()),
+        ];
+
+        let (new_cwd, new_id, new_name) =
+            path::dir_find_for_create(bd, config, state.root, new_path, state.name_max)?;
+
+        if new_name.len() > state.name_max as usize {
+            return Err(Error::Nametoolong);
+        }
+
+        if old_info.typ != crate::info::FileType::Dir {
+            return Err(Error::Inval);
+        }
+
+        let same_pair = old_cwd.pair[0] == new_cwd.pair[0] && old_cwd.pair[1] == new_cwd.pair[1];
+        if !same_pair {
+            return Err(Error::Inval);
+        }
+
+        let attrs = [
+            commit::CommitAttr::create(new_id),
+            commit::CommitAttr::name_dir(new_id, new_name.as_bytes()),
+            commit::CommitAttr::dir_struct(new_id, dir_pair),
+            commit::CommitAttr::delete(old_id),
+        ];
+
+        let mut new_cwd_mut = metadata::fetch_metadata_pair(bd, config, new_cwd.pair)?;
+        commit::dir_commit_append(bd, config, &mut new_cwd_mut, &attrs)?;
+
+        bd.sync()?;
         Ok(())
     }
 }

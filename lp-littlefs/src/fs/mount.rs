@@ -7,6 +7,8 @@ use crate::config::Config;
 use crate::error::Error;
 use crate::superblock::{MAGIC, REVISION_OFFSET};
 
+use super::alloc::Lookahead;
+
 /// Mount state to store in LittleFs.
 #[derive(Clone)]
 pub(crate) struct MountState {
@@ -17,6 +19,7 @@ pub(crate) struct MountState {
     pub file_max: u32,
     pub attr_max: u32,
     pub disk_version: u32,
+    pub lookahead: Lookahead,
 }
 
 pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Error> {
@@ -76,6 +79,9 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
     let attr_max = u32::from_le_bytes(block[sb_off + 20..sb_off + 24].try_into().unwrap());
     let disk_version = u32::from_le_bytes(block[sb_off..sb_off + 4].try_into().unwrap());
 
+    let mut lookahead = Lookahead::new(config);
+    lookahead.alloc_drop(disk_block_count);
+
     Ok(MountState {
         root: [0, 1],
         block_size: disk_block_size,
@@ -84,5 +90,6 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
         file_max,
         attr_max,
         disk_version,
+        lookahead,
     })
 }

@@ -4,8 +4,7 @@
 
 /// Filesystem configuration (geometry and tuning).
 ///
-/// Corresponds to struct lfs_config. Only fields needed for format/mount
-/// are included for now.
+/// Corresponds to struct lfs_config.
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Minimum read size in bytes (read alignment).
@@ -16,13 +15,20 @@ pub struct Config {
     pub block_size: u32,
     /// Number of blocks. 0 = read from disk (not yet supported).
     pub block_count: u32,
+    /// Number of erase cycles before metadata block relocation for wear leveling.
+    /// -1 = disabled.
+    pub block_cycles: i32,
     /// Size of block caches in bytes. Must be a multiple of read_size and
     /// prog_size, and a factor of block_size.
     pub cache_size: u32,
+    /// Size of lookahead buffer in bytes (bitmap: 1 byte tracks 8 blocks).
+    pub lookahead_size: u32,
     /// Optional statically allocated read buffer. Must be cache_size bytes.
     pub read_buffer: Option<&'static [u8]>,
     /// Optional statically allocated program buffer. Must be cache_size bytes.
     pub prog_buffer: Option<&'static [u8]>,
+    /// Optional statically allocated lookahead buffer. Must be lookahead_size bytes.
+    pub lookahead_buffer: Option<&'static [u8]>,
 }
 
 impl Config {
@@ -36,14 +42,18 @@ impl Config {
         let prog_size = 16;
         let block_size = 512;
         let cache_size = 64.max(read_size.max(prog_size));
+        let lookahead_size = (block_count / 8).max(4);
         Self {
             read_size,
             prog_size,
             block_size,
             block_count,
+            block_cycles: -1,
             cache_size,
+            lookahead_size,
             read_buffer: None,
             prog_buffer: None,
+            lookahead_buffer: None,
         }
     }
 }

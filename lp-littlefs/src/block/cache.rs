@@ -231,9 +231,14 @@ impl<B: BlockDevice> BlockDevice for CachedBlockDevice<B> {
                 continue;
             }
 
+            // Load cache line: must read-before-write for partial updates
+            // (e.g. appending to metadata block), per lfs_bd_prog behavior.
             pcache.block = block;
             pcache.off = aligndown(off, self.prog_size);
-            pcache.size = 0;
+            let load_size = (self.cache_size as usize).min((self.block_size - pcache.off) as usize);
+            self.device
+                .read(block, pcache.off, &mut pcache.buffer[..load_size])?;
+            pcache.size = load_size as u32;
             drop(pcache);
         }
         Ok(())

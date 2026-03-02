@@ -108,6 +108,134 @@ pub fn dir_find<B: BlockDevice>(
     Ok((cwd, tag_id))
 }
 
+/// Find parent directory and insertion id for creating a new entry at path.
+/// Returns (parent_dir, id, name) when the path does not exist and can be created.
+/// Returns Err(Exist) when the final component already exists.
+/// Returns Err(Noent) when a parent component does not exist.
+pub fn dir_find_for_create<'a, B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    root: [u32; 2],
+    path: &'a str,
+    name_max: u32,
+) -> Result<(metadata::MdDir, u16, &'a str), Error> {
+    if path.is_empty() {
+        return Err(Error::Inval);
+    }
+
+    let trimmed = path.trim_matches('/');
+    let segments: alloc::vec::Vec<&str> = if trimmed.is_empty() {
+        alloc::vec![]
+    } else {
+        trimmed.split('/').filter(|s| !s.is_empty()).collect()
+    };
+
+    if segments.is_empty() {
+        return Err(Error::Inval);
+    }
+
+    let mut stack: alloc::vec::Vec<(metadata::MdDir, u16)> = alloc::vec![];
+    let mut cwd = metadata::fetch_metadata_pair(bd, config, root)?;
+    let mut tag_id: u16 = 0x3ff;
+    let mut seg_idx = 0usize;
+
+    while seg_idx < segments.len() {
+        let seg = segments[seg_idx];
+
+        if seg == "." {
+            seg_idx += 1;
+            continue;
+        }
+
+        if seg == ".." {
+            if tag_id == 0x3ff {
+                return Err(Error::Inval);
+            }
+            let cancel_count = find_dotdot_cancel_count(&segments[seg_idx + 1..]);
+            if cancel_count > 0 {
+                seg_idx += 1 + cancel_count;
+                if seg_idx >= segments.len() {
+                    let _ = stack.pop();
+                    return Err(Error::Inval);
+                }
+                continue;
+            }
+            if stack.is_empty() {
+                return Err(Error::Inval);
+            }
+            seg_idx += 1;
+            let (parent_dir, parent_id) = stack.pop().unwrap();
+            cwd = parent_dir;
+            tag_id = parent_id;
+            seg_idx += 1;
+            continue;
+        }
+
+        let cancel_count = find_dotdot_cancel_count(&segments[seg_idx + 1..]);
+        if cancel_count > 0 {
+            seg_idx += 1 + cancel_count;
+            if seg_idx >= segments.len() {
+                break;
+            }
+            continue;
+        }
+
+        let found_id = match find_name_in_dir(bd, config, &cwd, seg, name_max) {
+            Ok(id) => id,
+            Err(Error::Noent) if seg_idx + 1 >= segments.len() => {
+                let id = find_insertion_id(&cwd, seg, name_max)?;
+                return Ok((cwd, id, seg));
+            }
+            Err(e) => return Err(e),
+        };
+        let info = metadata::get_entry_info(&cwd, found_id, name_max)?;
+
+        if seg_idx + 1 >= segments.len() {
+            return Err(Error::Exist);
+        }
+
+        if info.typ != FileType::Dir {
+            return Err(Error::NotDir);
+        }
+
+        stack.push((cwd.clone(), found_id));
+        if found_id == 0x3ff {
+            cwd = metadata::fetch_metadata_pair(bd, config, root)?;
+        } else {
+            let pair = get_dir_struct(&cwd, found_id)?;
+            cwd = metadata::fetch_metadata_pair(bd, config, pair)?;
+        }
+        tag_id = found_id;
+        seg_idx += 1;
+    }
+
+    Err(Error::Noent)
+}
+
+/// Find the id slot where a new name would be inserted to maintain alphabetical order.
+fn find_insertion_id(dir: &metadata::MdDir, name: &str, name_max: u32) -> Result<u16, Error> {
+    let name_bytes = name.as_bytes();
+    let start_id = if dir.pair[0] == 0 || dir.pair[0] == 1 {
+        1
+    } else {
+        0
+    };
+
+    for id in start_id..dir.count {
+        match metadata::get_entry_info(dir, id, name_max) {
+            Ok(info) => {
+                let cmp = info.name_bytes().cmp(name_bytes);
+                if cmp == core::cmp::Ordering::Greater || cmp == core::cmp::Ordering::Equal {
+                    return Ok(id);
+                }
+            }
+            Err(Error::Noent) => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(dir.count)
+}
+
 /// If suffix cancels the current segment via "..", return the number of suffix segments to skip.
 fn find_dotdot_cancel_count(remaining: &[&str]) -> usize {
     let mut depth = 1usize;

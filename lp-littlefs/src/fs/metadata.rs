@@ -28,6 +28,21 @@ pub struct MdDir {
     pub split: bool,
 }
 
+impl MdDir {
+    /// Create an empty MdDir for a newly allocated pair. Used by dir_alloc.
+    pub fn alloc_empty(pair: [u32; 2], block_size: usize) -> Self {
+        Self {
+            pair,
+            block: alloc::vec![0; block_size],
+            off: 4,
+            etag: 0xffff_ffff,
+            count: 0,
+            tail: [0xffff_ffff, 0xffff_ffff],
+            split: false,
+        }
+    }
+}
+
 fn tag_type1(t: u32) -> u32 {
     (t & 0x7000_0000) >> 20
 }
@@ -207,11 +222,19 @@ pub fn get_tag_backwards(
 }
 
 /// Get entry info for id. Returns NAME (name+type) and STRUCT (size).
+/// Skips entries that have a DELETE tag (most recent in backward order).
 pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error> {
     if id == 0x3ff {
         let mut info = Info::new(FileType::Dir, 0);
         info.set_name(b"/");
         return Ok(info);
+    }
+
+    // If entry was deleted, return Noent. Check DELETE before NAME since
+    // backward iteration sees most-recent tags first.
+    let delete_gtag = (tag::TYPE_DELETE << 20) | ((id as u32) << 10);
+    if get_tag_backwards(dir, 0x7ff0_fc00, delete_gtag)?.is_some() {
+        return Err(Error::Noent);
     }
 
     // Per lfs_dir_get: NAME (REG/DIR) or SUPERBLOCK for root id 0.
@@ -326,6 +349,7 @@ mod tests {
     use super::*;
     use crate::block::RamBlockDevice;
     use crate::config::Config;
+    use crate::fs::commit;
     use crate::fs::format;
 
     fn formatted_bd() -> (RamBlockDevice, Config) {
@@ -372,5 +396,77 @@ mod tests {
         assert_eq!(sb.block_size, config.block_size);
         assert_eq!(sb.block_count, config.block_count);
         assert_eq!(sb.name_max, 255);
+    }
+
+    /// Append a second commit (mkdir d0) and verify parse. Validates commit
+    /// machinery produces C-compliant format per lfs.c lfs_dir_commitattr,
+    /// lfs_dir_commitcrc (tags contiguous, CRC covers tag headers + data).
+    #[test]
+    fn fetch_after_append_commit() {
+        let (bd, config) = formatted_bd();
+        let mut root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let new_pair = [2u32, 3];
+        let attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, new_pair),
+            commit::CommitAttr::soft_tail(new_pair),
+        ];
+        commit::dir_commit_append(&bd, &config, &mut root, &attrs).unwrap();
+        bd.sync().unwrap();
+
+        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        assert!(
+            dir.count >= 2,
+            "expected count >= 2, got {} (off={})",
+            dir.count,
+            dir.off
+        );
+
+        let name_gtag = (tag::TYPE_REG << 20) | (1 << 10) | 256;
+        let name_result = get_tag_backwards(&dir, 0x780f_fc00, name_gtag).unwrap();
+        assert!(
+            name_result.is_some(),
+            "NAME(id=1) not found (off={}, etag=0x{:08x})",
+            dir.off,
+            dir.etag
+        );
+
+        let struct_gtag = (tag::TYPE_STRUCT << 20) | (1 << 10) | 8;
+        let struct_result = get_tag_backwards(&dir, 0x700f_fc00, struct_gtag).unwrap();
+        assert!(struct_result.is_some(), "STRUCT(id=1) not found");
+
+        let info = get_entry_info(&dir, 1, 255).unwrap();
+        assert_eq!(info.name().unwrap(), "d0");
+    }
+
+    /// Append rename commit (CREATE 2, NAME 2, DIRSTRUCT 2, DELETE 1) and verify.
+    #[test]
+    fn fetch_after_rename_commit() {
+        let (bd, config) = formatted_bd();
+        let mut root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let d0_pair = [2u32, 3];
+        let mkdir_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, d0_pair),
+            commit::CommitAttr::soft_tail(d0_pair),
+        ];
+        commit::dir_commit_append(&bd, &config, &mut root, &mkdir_attrs).unwrap();
+        root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+
+        let rename_attrs = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"x0"),
+            commit::CommitAttr::dir_struct(2, d0_pair),
+            commit::CommitAttr::delete(1),
+        ];
+        commit::dir_commit_append(&bd, &config, &mut root, &rename_attrs).unwrap();
+        bd.sync().unwrap();
+
+        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        assert!(dir.count >= 2, "count {} off {}", dir.count, dir.off);
+        let info = get_entry_info(&dir, 2, 255).unwrap();
+        assert_eq!(info.name().unwrap(), "x0");
     }
 }
