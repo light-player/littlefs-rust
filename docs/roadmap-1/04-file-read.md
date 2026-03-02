@@ -7,6 +7,9 @@ Implement file reading for inline files (INLINESTRUCT) and CTZ skip-list files (
 Refer to the C implementation /Users/yona/dev/photomancer/oss/littlefs/lfs.c for the implementation details,
 match the C implementation as closely as possible while keeping the Rust code clean and idiomatic.
 
+Implement module-level tests for individual functions to validate compliance with source material,
+in addition to the integration tests.
+
 ## API targets
 
 | API                                                  | Upstream                       | Description                                |
