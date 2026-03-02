@@ -10,6 +10,8 @@ use crate::info::{FileType, Info};
 use crate::superblock::{tag, Superblock};
 use crate::trace;
 
+const BLOCK_NULL: u32 = 0xffff_ffff;
+
 /// Parsed metadata pair state. Holds block data for backward iteration.
 #[derive(Clone)]
 pub struct MdDir {
@@ -17,6 +19,8 @@ pub struct MdDir {
     pub pair: [u32; 2],
     /// Block content (from the chosen block).
     block: alloc::vec::Vec<u8>,
+    /// Revision of the current block (for wear-leveling).
+    pub rev: u32,
     /// Offset of end of last valid commit.
     pub off: usize,
     /// Last tag before CRC (for backward iteration).
@@ -35,12 +39,18 @@ impl MdDir {
         Self {
             pair,
             block: alloc::vec![0; block_size],
+            rev: 0,
             off: 4,
             etag: 0xffff_ffff,
             count: 0,
-            tail: [0xffff_ffff, 0xffff_ffff],
+            tail: [BLOCK_NULL, BLOCK_NULL],
             split: false,
         }
+    }
+
+    /// True if tail is null (no next pair).
+    pub fn tail_is_null(&self) -> bool {
+        self.tail[0] == BLOCK_NULL && self.tail[1] == BLOCK_NULL
     }
 }
 
@@ -118,6 +128,8 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
     let mut tempsplit = false;
     let mut last_off = 0usize;
     let mut last_etag = 0u32;
+    let mut last_tail: [u32; 2] = [0xffff_ffff, 0xffff_ffff];
+    let mut last_split = false;
 
     let mut ptag: u32 = 0xffff_ffff;
     let mut off = 4usize;
@@ -164,6 +176,8 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
 
             last_off = off + dsize;
             last_etag = ptag;
+            last_tail = temptail;
+            last_split = tempsplit;
             // Per lfs.c lfs_dir_fetchmatch: splice gives live count. For dir_read/find
             // we iterate ids 0..count; count must be >= max_id+1 to reach all entries.
             // Only apply max_id when we've seen NAME/SPLICE (avoid count=1 for empty child dirs).
@@ -230,18 +244,19 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
         "fetch_metadata_pair done count={} off={} tail={:?} split={}",
         count,
         last_off,
-        temptail,
-        tempsplit
+        last_tail,
+        last_split
     );
 
     Ok(MdDir {
         pair: [block_idx, pair[1 - r]],
         block: block.to_vec(),
+        rev: dir_rev,
         off: last_off,
         etag: last_etag,
         count,
-        tail: temptail,
-        split: tempsplit,
+        tail: last_tail,
+        split: last_split,
     })
 }
 
@@ -470,6 +485,101 @@ pub fn get_inline_slice(
     Ok(to_read)
 }
 
+/// Callback result for dir_traverse_tags. Continue or stop.
+#[derive(Clone, Copy)]
+pub enum TraverseAction {
+    Continue,
+    Stop,
+}
+
+/// Iterate tags forward through a metadata block, optionally filtered by id range [begin, end).
+/// Calls `cb` with (tag, data_slice) for each tag. Used for commit size and compact.
+/// Per lfs_dir_traverse (lfs.c:912). Simplified: no attrs merge, no FROM_MOVE/FROM_USERATTRS.
+///
+/// When begin < end, only yields tags whose id is in [begin, end). The diff is added to the
+/// id field of the output tag (for compact, diff = -begin so ids are remapped to 0..).
+/// When begin == end, yields nothing (empty range).
+pub fn dir_traverse_tags<F>(
+    dir: &MdDir,
+    begin: u16,
+    end: u16,
+    diff: i32,
+    mut cb: F,
+) -> Result<(), Error>
+where
+    F: FnMut(u32, &[u8]) -> Result<TraverseAction, Error>,
+{
+    let block = &dir.block;
+    let block_size = block.len();
+
+    let mut off = 4usize;
+    let mut ptag: u32 = 0xffff_ffff;
+
+    while off + 4 <= block_size {
+        let stored_tag =
+            u32::from_be_bytes(block[off..off + 4].try_into().map_err(|_| Error::Corrupt)?);
+        let tag = (stored_tag ^ ptag) & 0x7fff_ffff;
+
+        if !tag_isvalid(tag) {
+            break;
+        }
+
+        let dsize = tag_dsize(tag);
+        if off + dsize > block_size {
+            break;
+        }
+
+        let data = if dsize > 4 {
+            &block[off + 4..off + dsize]
+        } else {
+            &[]
+        };
+
+        ptag = tag;
+
+        if tag_type2(tag) == tag::TYPE_CCRC {
+            off += dsize;
+            continue;
+        }
+
+        let id = tag_id(tag);
+        if tag_type1(tag) == tag::TYPE_SPLICE {
+            off += dsize;
+            continue;
+        }
+
+        let id_in_range = begin < end && id >= begin && id < end;
+
+        if !id_in_range {
+            off += dsize;
+            continue;
+        }
+
+        let out_id = (id as i32 + diff).max(0).min(0x3ff) as u16;
+        let out_tag = (tag & 0xffff_fc00) | ((out_id as u32) << 10) | (tag & 0x3ff);
+
+        match cb(out_tag, data)? {
+            TraverseAction::Continue => {}
+            TraverseAction::Stop => return Ok(()),
+        }
+
+        off += dsize;
+    }
+
+    Ok(())
+}
+
+/// Compute byte size of tags in id range [begin, end) from source.
+/// Per lfs_dir_commit_size (lfs.c:1915).
+pub fn dir_traverse_size(dir: &MdDir, begin: u16, end: u16) -> Result<usize, Error> {
+    let mut size = 0usize;
+    dir_traverse_tags(dir, begin, end, 0, |tag, _data| {
+        size += tag_dsize(tag);
+        Ok(TraverseAction::Continue)
+    })?;
+    Ok(size)
+}
+
 /// Get 8-byte struct data (e.g. dir pair) for an id.
 pub fn get_struct(dir: &MdDir, id: u16) -> Result<[u8; 8], Error> {
     let gmask = 0x700f_fc00;
@@ -615,6 +725,22 @@ mod tests {
         let info = get_entry_info(&dir, 2, 255).unwrap();
         assert_eq!(info.name().unwrap(), "x0");
         assert!(get_entry_info(&dir, 1, 255).is_err()); // id 1 deleted -> Noent
+    }
+
+    #[test]
+    fn dir_traverse_size_formatted() {
+        let (bd, config) = formatted_bd();
+        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let size = dir_traverse_size(&dir, 0, 1).unwrap();
+        assert!(size > 0, "formatted root has superblock etc");
+    }
+
+    #[test]
+    fn dir_traverse_size_empty_range() {
+        let (bd, config) = formatted_bd();
+        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let size = dir_traverse_size(&dir, 1, 1).unwrap();
+        assert_eq!(size, 0);
     }
 
     #[test]

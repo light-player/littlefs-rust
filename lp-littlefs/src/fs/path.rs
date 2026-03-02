@@ -198,6 +198,16 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
                 );
                 return Ok((cwd, id, seg));
             }
+            Err(Error::Noent) => {
+                trace!(
+                    "dir_find_for_create noent parent seg={:?} seg_idx={} cwd.pair={:?} cwd.count={}",
+                    seg,
+                    seg_idx,
+                    cwd.pair,
+                    cwd.count
+                );
+                return Err(Error::Noent);
+            }
             Err(e) => return Err(e),
         };
         let info = metadata::get_entry_info(&cwd, found_id, name_max)?;

@@ -18,6 +18,8 @@ pub struct Config {
     /// Number of erase cycles before metadata block relocation for wear leveling.
     /// -1 = disabled.
     pub block_cycles: i32,
+    /// Max metadata size per block. 0 = use block_size. Per lfs.h metadata_max.
+    pub metadata_max: u32,
     /// Size of block caches in bytes. Must be a multiple of read_size and
     /// prog_size, and a factor of block_size.
     pub cache_size: u32,
@@ -52,6 +54,7 @@ impl Config {
             block_size,
             block_count,
             block_cycles: -1,
+            metadata_max: 0,
             cache_size,
             lookahead_size,
             read_buffer: None,

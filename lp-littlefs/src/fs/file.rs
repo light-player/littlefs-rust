@@ -43,7 +43,8 @@ impl File {
     pub fn open<B: BlockDevice>(
         bd: &B,
         config: &Config,
-        root: [u32; 2],
+        root: &mut [u32; 2],
+        lookahead: &mut alloc::Lookahead,
         path: &str,
         name_max: u32,
         inline_max: u32,
@@ -53,7 +54,7 @@ impl File {
         let is_rdonly = !can_write;
 
         let (dir, id, created) = if is_rdonly {
-            let (dir, id) = path::dir_find(bd, config, root, path, name_max)?;
+            let (dir, id) = path::dir_find(bd, config, *root, path, name_max)?;
             if id == 0x3ff {
                 return Err(Error::IsDir);
             }
@@ -63,7 +64,7 @@ impl File {
             }
             (dir, id, false)
         } else {
-            match path::dir_find(bd, config, root, path, name_max) {
+            match path::dir_find(bd, config, *root, path, name_max) {
                 Ok((dir, id)) => {
                     if id == 0x3ff {
                         return Err(Error::IsDir);
@@ -82,7 +83,7 @@ impl File {
                         return Err(Error::Noent);
                     }
                     let (cwd, id, name) =
-                        path::dir_find_for_create(bd, config, root, path, name_max)?;
+                        path::dir_find_for_create(bd, config, *root, path, name_max)?;
                     if name.len() > name_max as usize {
                         return Err(Error::Nametoolong);
                     }
@@ -92,7 +93,15 @@ impl File {
                         commit::CommitAttr::name_reg(id, name.as_bytes()),
                         commit::CommitAttr::inline_struct(id, &[]),
                     ];
-                    commit::dir_commit_append(bd, config, &mut cwd_mut, &attrs)?;
+                    commit::dir_orphaningcommit(
+                        bd,
+                        config,
+                        &mut cwd_mut,
+                        &attrs,
+                        root,
+                        lookahead,
+                        name_max,
+                    )?;
                     bd.sync()?;
                     let dir = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
                     (dir, id, true)
@@ -351,8 +360,9 @@ impl File {
         &mut self,
         bd: &B,
         config: &Config,
-        _root: [u32; 2],
-        _lookahead: &mut alloc::Lookahead,
+        root: &mut [u32; 2],
+        lookahead: &mut alloc::Lookahead,
+        name_max: u32,
     ) -> Result<(), Error> {
         if !self.dirty {
             return Ok(());
@@ -362,7 +372,7 @@ impl File {
 
         if self.inline {
             let mut dir = metadata::fetch_metadata_pair(bd, config, self.mdir.pair)?;
-            commit::dir_commit_append(
+            commit::dir_orphaningcommit(
                 bd,
                 config,
                 &mut dir,
@@ -370,10 +380,13 @@ impl File {
                     self.id,
                     &self.inline_buffer,
                 )],
+                root,
+                lookahead,
+                name_max,
             )?;
         } else {
             let mut dir = metadata::fetch_metadata_pair(bd, config, self.mdir.pair)?;
-            commit::dir_commit_append(
+            commit::dir_orphaningcommit(
                 bd,
                 config,
                 &mut dir,
@@ -382,6 +395,9 @@ impl File {
                     self.ctz_head,
                     self.ctz_size as u32,
                 )],
+                root,
+                lookahead,
+                name_max,
             )?;
         }
 
@@ -397,8 +413,9 @@ impl File {
         &mut self,
         bd: &B,
         config: &Config,
-        _root: [u32; 2],
-        _lookahead: &mut alloc::Lookahead,
+        root: &mut [u32; 2],
+        lookahead: &mut alloc::Lookahead,
+        name_max: u32,
         size: u64,
         inline_max: u32,
     ) -> Result<(), Error> {
@@ -411,7 +428,7 @@ impl File {
                     self.inline_buffer.truncate(size as usize);
                 } else {
                     if self.dirty {
-                        self.sync(bd, config, _root, _lookahead)?;
+                        self.sync(bd, config, root, lookahead, name_max)?;
                     }
                     self.seek(0, crate::info::SeekWhence::Set)?;
                     let mut buf = vec![0u8; size as usize];
@@ -431,7 +448,7 @@ impl File {
                     self.off = 0;
                 }
             } else {
-                self.sync(bd, config, _root, _lookahead)?;
+                self.sync(bd, config, root, lookahead, name_max)?;
                 let (block, _) = ctz::ctz_find(bd, config, self.ctz_head, self.ctz_size, size - 1)?;
                 self.ctz_head = block;
                 self.ctz_size = size;
@@ -445,7 +462,7 @@ impl File {
             let to_fill = (size - old_size) as usize;
             let file_max = 2_147_483_647u32;
             for _ in 0..to_fill {
-                self.write(bd, config, _root, _lookahead, inline_max, file_max, &[0])?;
+                self.write(bd, config, *root, lookahead, inline_max, file_max, &[0])?;
             }
         }
 
@@ -497,11 +514,12 @@ impl File {
         mut self,
         bd: &B,
         config: &Config,
-        root: [u32; 2],
+        root: &mut [u32; 2],
         lookahead: &mut alloc::Lookahead,
+        name_max: u32,
     ) -> Result<(), Error> {
         if self.dirty {
-            self.sync(bd, config, root, lookahead)?;
+            self.sync(bd, config, root, lookahead, name_max)?;
         }
         Ok(())
     }

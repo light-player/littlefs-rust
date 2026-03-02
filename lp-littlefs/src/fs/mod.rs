@@ -8,6 +8,7 @@ mod file;
 mod format;
 mod metadata;
 mod mount;
+mod parent;
 mod path;
 mod traverse;
 
@@ -145,17 +146,18 @@ impl LittleFs {
     }
 
     pub fn file_open<B: BlockDevice>(
-        &self,
+        &mut self,
         bd: &B,
         config: &Config,
         path: &str,
         flags: crate::info::OpenFlags,
     ) -> Result<file::File, Error> {
-        let state = self.require_mounted()?;
+        let state = self.require_mounted_mut()?;
         file::File::open(
             bd,
             config,
-            state.root,
+            &mut state.root,
+            &mut state.lookahead,
             path,
             state.name_max,
             state.inline_max,
@@ -222,7 +224,13 @@ impl LittleFs {
         file: &mut file::File,
     ) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
-        file.sync(bd, config, state.root, &mut state.lookahead)
+        file.sync(
+            bd,
+            config,
+            &mut state.root,
+            &mut state.lookahead,
+            state.name_max,
+        )
     }
 
     pub fn file_truncate<B: BlockDevice>(
@@ -236,8 +244,9 @@ impl LittleFs {
         file.truncate(
             bd,
             config,
-            state.root,
+            &mut state.root,
             &mut state.lookahead,
+            state.name_max,
             size,
             state.inline_max,
         )
@@ -260,7 +269,13 @@ impl LittleFs {
         file: file::File,
     ) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
-        file.close(bd, config, state.root, &mut state.lookahead)
+        file.close(
+            bd,
+            config,
+            &mut state.root,
+            &mut state.lookahead,
+            state.name_max,
+        )
     }
 
     pub fn mkdir<B: BlockDevice>(
@@ -290,22 +305,28 @@ impl LittleFs {
         }
 
         let pred_tail = pred.tail;
-        commit::dir_commit_append(
+        commit::dir_orphaningcommit(
             bd,
             config,
             &mut new_dir,
             &[commit::CommitAttr::soft_tail(pred_tail)],
+            &mut state.root,
+            &mut state.lookahead,
+            state.name_max,
         )?;
 
         let new_pair = new_dir.pair;
 
         if cwd.split {
             let mut pred_mut = metadata::fetch_metadata_pair(bd, config, pred.pair)?;
-            commit::dir_commit_append(
+            commit::dir_orphaningcommit(
                 bd,
                 config,
                 &mut pred_mut,
                 &[commit::CommitAttr::soft_tail(new_pair)],
+                &mut state.root,
+                &mut state.lookahead,
+                state.name_max,
             )?;
         }
 
@@ -317,7 +338,15 @@ impl LittleFs {
         if !cwd_mut.split {
             attrs.push(commit::CommitAttr::soft_tail(new_pair));
         }
-        commit::dir_commit_append(bd, config, &mut cwd_mut, &attrs)?;
+        commit::dir_orphaningcommit(
+            bd,
+            config,
+            &mut cwd_mut,
+            &attrs,
+            &mut state.root,
+            &mut state.lookahead,
+            state.name_max,
+        )?;
 
         state.lookahead.alloc_ckpoint(state.block_count);
 
@@ -352,7 +381,15 @@ impl LittleFs {
         }
 
         let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
-        commit::dir_commit_append(bd, config, &mut cwd_mut, &[commit::CommitAttr::delete(id)])?;
+        commit::dir_orphaningcommit(
+            bd,
+            config,
+            &mut cwd_mut,
+            &[commit::CommitAttr::delete(id)],
+            &mut state.root,
+            &mut state.lookahead,
+            state.name_max,
+        )?;
 
         bd.sync()?;
         Ok(())
@@ -418,7 +455,15 @@ impl LittleFs {
         ];
 
         let mut new_cwd_mut = metadata::fetch_metadata_pair(bd, config, new_cwd.pair)?;
-        commit::dir_commit_append(bd, config, &mut new_cwd_mut, &attrs)?;
+        commit::dir_orphaningcommit(
+            bd,
+            config,
+            &mut new_cwd_mut,
+            &attrs,
+            &mut state.root,
+            &mut state.lookahead,
+            state.name_max,
+        )?;
         trace!("rename commit done, syncing");
 
         bd.sync()?;
@@ -438,7 +483,7 @@ pub fn create_inline_file<B: BlockDevice>(
     path: &str,
     content: &[u8],
 ) -> Result<(), Error> {
-    let root = [0u32, 1];
+    let mut root = [0u32, 1];
     let (cwd, id, name) = path::dir_find_for_create(bd, config, root, path, 255)?;
     let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
     let attrs = [
@@ -446,7 +491,16 @@ pub fn create_inline_file<B: BlockDevice>(
         commit::CommitAttr::name_reg(id, name.as_bytes()),
         commit::CommitAttr::inline_struct(id, content),
     ];
-    commit::dir_commit_append(bd, config, &mut cwd_mut, &attrs)?;
+    let mut lookahead = alloc::Lookahead::new(config);
+    commit::dir_orphaningcommit(
+        bd,
+        config,
+        &mut cwd_mut,
+        &attrs,
+        &mut root,
+        &mut lookahead,
+        255,
+    )?;
     bd.sync()
 }
 

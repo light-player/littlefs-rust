@@ -13,7 +13,8 @@ use crate::superblock::tag;
 use crate::trace;
 
 use super::alloc::{self, Lookahead};
-use super::metadata::MdDir;
+use super::metadata::{dir_traverse_size, dir_traverse_tags, MdDir, TraverseAction};
+use super::parent::{fs_parent, fs_pred};
 
 fn mktag(type_: u32, id: u32, size: u32) -> u32 {
     (type_ << 20) | (id << 10) | size
@@ -185,11 +186,13 @@ pub fn dir_commit_append<B: BlockDevice>(
     let mut crc = 0xffff_ffffu32;
 
     if off == 4 {
+        let new_rev = dir.rev + 1;
         let mut rev_buf = Vec::with_capacity(prog_size);
         rev_buf.resize(prog_size, 0xff);
-        rev_buf[0..4].copy_from_slice(&1u32.to_le_bytes());
+        rev_buf[0..4].copy_from_slice(&new_rev.to_le_bytes());
         bd.prog(block_idx, 0, &rev_buf)?;
-        crc = crc::crc32(crc, &1u32.to_le_bytes());
+        crc = crc::crc32(crc, &new_rev.to_le_bytes());
+        dir.rev = new_rev;
     }
 
     for attr in attrs {
@@ -235,4 +238,492 @@ pub fn dir_commit_append<B: BlockDevice>(
 
     trace!("dir_commit_append done new_off={} count={}", off, dir.count);
     Ok(())
+}
+
+/// Result of dir_compact: Ok(()) or Ok(Relocated) when block was relocated.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CompactResult {
+    Ok,
+    Relocated,
+}
+
+/// Result of dir_relocatingcommit.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum RelocatingResult {
+    Ok,
+    Relocated,
+    Dropped,
+}
+
+fn metadata_max(config: &Config) -> usize {
+    if config.metadata_max != 0 {
+        config.metadata_max as usize
+    } else {
+        config.block_size as usize
+    }
+}
+
+fn dir_needsrelocation(config: &Config, dir: &MdDir) -> bool {
+    if config.block_cycles <= 0 {
+        return false;
+    }
+    let modulus = ((config.block_cycles + 1) | 1) as u32;
+    (dir.rev + 1).is_multiple_of(modulus)
+}
+
+fn pair_eq(a: [u32; 2], b: [u32; 2]) -> bool {
+    a[0] == b[0] && a[1] == b[1]
+}
+
+/// Compact source tags [begin, end) and optional attrs into dir. Writes to dir.pair[1], then swaps.
+/// Attrs are appended after source tags (for relocatingcommit merge).
+/// On Nospc or Corrupt, relocates to a new block and retries.
+/// Returns Relocated if a relocation occurred.
+pub fn dir_compact<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    dir: &mut MdDir,
+    source: &MdDir,
+    begin: u16,
+    end: u16,
+    attrs: &[CommitAttr<'_>],
+    root: [u32; 2],
+    lookahead: &mut Lookahead,
+) -> Result<CompactResult, Error> {
+    let meta_max = metadata_max(config);
+    let prog_size = config.prog_size as usize;
+    let mut relocated = false;
+    let mut tired = dir_needsrelocation(config, dir);
+    const SUPERBLOCK: [u32; 2] = [0, 1];
+
+    dir.rev += 1;
+
+    loop {
+        let block_idx = dir.pair[1];
+
+        bd.erase(block_idx)?;
+
+        let new_rev = dir.rev;
+        let rev_buf = new_rev.to_le_bytes();
+        let mut rev_prog = ::alloc::vec![0xff; prog_size];
+        rev_prog[0..4].copy_from_slice(&rev_buf);
+        if let Err(e) = bd.prog(block_idx, 0, &rev_prog) {
+            if matches!(e, Error::Corrupt) {
+                relocated = true;
+                tired = false;
+            }
+            if pair_eq(dir.pair, SUPERBLOCK) && relocated {
+                return Err(Error::Nospc);
+            }
+            if let Error::Corrupt = e {
+                continue;
+            }
+            return Err(e);
+        }
+
+        let mut off = 4usize;
+        let mut ptag: u32 = 0xffff_ffff;
+        let mut crc = crate::crc::crc32(0xffff_ffff, &rev_buf);
+
+        let traverse_res = dir_traverse_tags(source, begin, end, -(begin as i32), |tag, data| {
+            let dsize = tag_dsize(tag);
+            if off + dsize > meta_max - 8 {
+                return Err(Error::Nospc);
+            }
+            let ntag = (tag & 0x7fff_ffff) ^ ptag;
+            let ntag_be = ntag.to_be_bytes();
+            bd.prog(block_idx, off as u32, &ntag_be).map_err(|e| {
+                if matches!(e, Error::Corrupt) {
+                    Error::Corrupt
+                } else {
+                    e
+                }
+            })?;
+            crc = crate::crc::crc32(crc, &ntag_be);
+            off += 4;
+            if !data.is_empty() {
+                bd.prog(block_idx, off as u32, data)?;
+                crc = crate::crc::crc32(crc, data);
+                off += data.len();
+            }
+            ptag = tag & 0x7fff_ffff;
+            Ok(TraverseAction::Continue)
+        });
+
+        if let Err(e) = traverse_res {
+            if matches!(e, Error::Nospc | Error::Corrupt) {
+                relocated = true;
+                if pair_eq(dir.pair, SUPERBLOCK) {
+                    return Err(Error::Nospc);
+                }
+                let new_block = alloc::alloc(bd, config, root, lookahead)?;
+                dir.pair[1] = new_block;
+                tired = false;
+                continue;
+            }
+            return Err(e);
+        }
+
+        let mut need_relocate = false;
+        for attr in attrs {
+            let dsize = tag_dsize(attr.tag);
+            if off + dsize > meta_max - 8 {
+                need_relocate = true;
+                break;
+            }
+            let data = attr_data_bytes(attr);
+            let ntag = (attr.tag & 0x7fff_ffff) ^ ptag;
+            match bd.prog(block_idx, off as u32, &ntag.to_be_bytes()) {
+                Err(Error::Corrupt) => {
+                    need_relocate = true;
+                    break;
+                }
+                Err(e) => return Err(e),
+                Ok(()) => {}
+            }
+            crc = crate::crc::crc32(crc, &ntag.to_be_bytes());
+            off += 4;
+            if !data.is_empty() {
+                bd.prog(block_idx, off as u32, &data)?;
+                crc = crate::crc::crc32(crc, &data);
+                off += data.len();
+            }
+            ptag = attr.tag & 0x7fff_ffff;
+        }
+        if need_relocate {
+            relocated = true;
+            tired = false;
+            if pair_eq(dir.pair, SUPERBLOCK) {
+                return Err(Error::Nospc);
+            }
+            let new_block = alloc::alloc(bd, config, root, lookahead)?;
+            dir.pair[1] = new_block;
+            continue;
+        }
+
+        if !dir.tail_is_null() {
+            let tail_tag = mktag(
+                if dir.split {
+                    tag::TYPE_HARDTAIL
+                } else {
+                    tag::TYPE_SOFTTAIL
+                },
+                0x3ff,
+                8,
+            );
+            let tail_data = [dir.tail[0].to_le_bytes(), dir.tail[1].to_le_bytes()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>();
+            let dsize = tag_dsize(tail_tag);
+            if off + dsize > meta_max - 8 {
+                relocated = true;
+                if pair_eq(dir.pair, SUPERBLOCK) {
+                    return Err(Error::Nospc);
+                }
+                let new_block = alloc::alloc(bd, config, root, lookahead)?;
+                dir.pair[1] = new_block;
+                tired = false;
+                continue;
+            }
+            let ntag = (tail_tag & 0x7fff_ffff) ^ ptag;
+            bd.prog(block_idx, off as u32, &ntag.to_be_bytes())?;
+            crc = crate::crc::crc32(crc, &ntag.to_be_bytes());
+            off += 4;
+            bd.prog(block_idx, off as u32, &tail_data)?;
+            crc = crate::crc::crc32(crc, &tail_data);
+            off += 8;
+            ptag = tail_tag & 0x7fff_ffff;
+        }
+
+        let crc_tag = mktag(tag::TYPE_CCRC, 0x3ff, 4);
+        let stored_crc_tag = (crc_tag & 0x7fff_ffff) ^ ptag;
+        bd.prog(block_idx, off as u32, &stored_crc_tag.to_be_bytes())?;
+        crc = crate::crc::crc32(crc, &stored_crc_tag.to_be_bytes());
+        off += 4;
+        bd.prog(block_idx, off as u32, &crc.to_le_bytes())?;
+        off += 4;
+
+        dir.pair.swap(0, 1);
+        if attrs.is_empty() {
+            dir.count = end.saturating_sub(begin);
+        }
+        dir.off = off;
+        dir.etag = (crc_tag & 0x7fff_ffff) ^ ((tag_chunk(crc_tag) & 1) as u32) << 31;
+
+        return Ok(if relocated {
+            CompactResult::Relocated
+        } else {
+            CompactResult::Ok
+        });
+    }
+}
+
+/// Split dir: compact source [split, end) into new tail pair; set dir.tail and dir.split.
+pub fn dir_split<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    dir: &mut MdDir,
+    source: &MdDir,
+    split: u16,
+    end: u16,
+    root: [u32; 2],
+    lookahead: &mut Lookahead,
+) -> Result<(), Error> {
+    let mut tail = dir_alloc(bd, config, root, lookahead)?;
+    tail.split = dir.split;
+    tail.tail = dir.tail;
+
+    dir_compact(
+        bd,
+        config,
+        &mut tail,
+        source,
+        split,
+        end,
+        &[],
+        root,
+        lookahead,
+    )?;
+
+    dir.tail = tail.pair;
+    dir.split = true;
+
+    Ok(())
+}
+
+/// Splitting compact: binary-search split point until metadata fits, then compact.
+/// Returns Relocated if dir_compact relocated.
+pub fn dir_splittingcompact<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    dir: &mut MdDir,
+    source: &MdDir,
+    begin: u16,
+    end: u16,
+    attrs: &[CommitAttr<'_>],
+    root: [u32; 2],
+    lookahead: &mut Lookahead,
+) -> Result<CompactResult, Error> {
+    let meta_max = metadata_max(config);
+    let prog_size = config.prog_size as usize;
+
+    let mut split = begin;
+
+    while end.saturating_sub(split) > 1 {
+        let size = dir_traverse_size(source, split, end)?;
+        let cap = (meta_max - 40).min(((meta_max / 2) + prog_size - 1) & !(prog_size - 1));
+        if end - split < 0xff && size <= cap {
+            break;
+        }
+        split = split + (end - split) / 2;
+    }
+
+    if split != begin {
+        let res = dir_split(bd, config, dir, source, split, end, root, lookahead);
+        if let Err(Error::Nospc) = res {
+            trace!("dir_splittingcompact: split failed (Nospc), compact with degraded split");
+        } else {
+            res?;
+            return dir_splittingcompact(
+                bd, config, dir, source, begin, split, attrs, root, lookahead,
+            );
+        }
+    }
+
+    dir_compact(bd, config, dir, source, begin, end, attrs, root, lookahead)
+}
+
+/// Relocating commit: try inline append, else splittingcompact.
+/// Returns Relocated if block was relocated, Dropped if dir was dropped (empty with split pred).
+pub fn dir_relocatingcommit<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    dir: &mut MdDir,
+    _pair: [u32; 2],
+    attrs: &[CommitAttr<'_>],
+    root: [u32; 2],
+    lookahead: &mut Lookahead,
+    pdir: &mut MdDir,
+) -> Result<RelocatingResult, Error> {
+    let mut hasdelete = false;
+    for attr in attrs {
+        apply_attr_to_state(dir, attr);
+        let type3 = (attr.tag >> 20) & 0x7ff;
+        if type3 == tag::TYPE_DELETE {
+            hasdelete = true;
+        }
+    }
+
+    if hasdelete && dir.count == 0 {
+        if let Some((pred, _)) = fs_parent(bd, config, root, dir.pair, 255)? {
+            *pdir = pred;
+            if pdir.split {
+                return Ok(RelocatingResult::Dropped);
+            }
+        }
+    }
+
+    match dir_commit_append(bd, config, dir, attrs) {
+        Ok(()) => return Ok(RelocatingResult::Ok),
+        Err(Error::Nospc) | Err(Error::Corrupt) => {}
+        Err(e) => return Err(e),
+    }
+
+    let source = dir.clone();
+    let res = dir_splittingcompact(
+        bd,
+        config,
+        dir,
+        &source,
+        0,
+        source.count,
+        attrs,
+        root,
+        lookahead,
+    )?;
+
+    Ok(if res == CompactResult::Relocated {
+        RelocatingResult::Relocated
+    } else {
+        RelocatingResult::Ok
+    })
+}
+
+/// Orphaning commit: relocatingcommit plus relocation chain fixup.
+pub fn dir_orphaningcommit<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    dir: &mut MdDir,
+    attrs: &[CommitAttr<'_>],
+    root: &mut [u32; 2],
+    lookahead: &mut Lookahead,
+    name_max: u32,
+) -> Result<bool, Error> {
+    let lpair = dir.pair;
+    let mut ldir = dir.clone();
+    let mut pdir = MdDir::alloc_empty([0, 0], config.block_size as usize);
+    let mut dummy_pdir = MdDir::alloc_empty([0, 0], config.block_size as usize);
+
+    let mut state = dir_relocatingcommit(
+        bd, config, &mut ldir, lpair, attrs, *root, lookahead, &mut pdir,
+    )?;
+
+    if lpair[0] == dir.pair[0] && lpair[1] == dir.pair[1] {
+        *dir = ldir.clone();
+    }
+
+    let mut orphans = false;
+    if state == RelocatingResult::Dropped {
+        let pdir_pair = pdir.pair;
+        let steal_attrs = [if dir.split {
+            CommitAttr::hard_tail(dir.tail)
+        } else {
+            CommitAttr::soft_tail(dir.tail)
+        }];
+        state = dir_relocatingcommit(
+            bd,
+            config,
+            &mut pdir,
+            pdir_pair,
+            &steal_attrs,
+            *root,
+            lookahead,
+            &mut dummy_pdir,
+        )?;
+        ldir = pdir;
+    }
+
+    while state == RelocatingResult::Relocated {
+        state = RelocatingResult::Ok;
+
+        if lpair[0] == root[0] && lpair[1] == root[1] {
+            root[0] = ldir.pair[0];
+            root[1] = ldir.pair[1];
+        }
+
+        if let Some((mut pdir, tag_id)) = fs_parent(bd, config, *root, lpair, name_max)? {
+            let ppair = pdir.pair;
+            let ldir_pair = ldir.pair;
+            let update_attrs = [CommitAttr::dir_struct(tag_id, ldir_pair)];
+            state = dir_relocatingcommit(
+                bd,
+                config,
+                &mut pdir,
+                ppair,
+                &update_attrs,
+                *root,
+                lookahead,
+                &mut dummy_pdir,
+            )?;
+            if state == RelocatingResult::Relocated {
+                ldir = pdir;
+                orphans = true;
+                continue;
+            }
+        }
+
+        if let Some(mut pred) = fs_pred(bd, config, *root, lpair)? {
+            let pred_pair = pred.pair;
+            let update_attrs = [if pred.split {
+                CommitAttr::hard_tail(ldir.pair)
+            } else {
+                CommitAttr::soft_tail(ldir.pair)
+            }];
+            state = dir_relocatingcommit(
+                bd,
+                config,
+                &mut pred,
+                pred_pair,
+                &update_attrs,
+                *root,
+                lookahead,
+                &mut dummy_pdir,
+            )?;
+            ldir = pred;
+        } else {
+            break;
+        }
+    }
+
+    Ok(orphans)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::RamBlockDevice;
+    use crate::config::Config;
+    use crate::fs::alloc::Lookahead;
+    use crate::fs::format;
+    use crate::fs::metadata::fetch_metadata_pair;
+
+    #[test]
+    fn dir_compact_preserves_content() {
+        let config = Config::default_for_tests(128);
+        let bd = RamBlockDevice::new(config.block_size, config.block_count);
+        format::format(&bd, &config).unwrap();
+
+        let root = [0u32, 1];
+        let mut lookahead = Lookahead::new(&config);
+
+        let mut dir = fetch_metadata_pair(&bd, &config, root).unwrap();
+        let source = dir.clone();
+        dir_compact(
+            &bd,
+            &config,
+            &mut dir,
+            &source,
+            0,
+            1,
+            &[],
+            root,
+            &mut lookahead,
+        )
+        .unwrap();
+
+        let refetched = fetch_metadata_pair(&bd, &config, root).unwrap();
+        assert_eq!(refetched.count, 1);
+        assert!(!refetched.split);
+    }
 }
