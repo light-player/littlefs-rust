@@ -372,3 +372,23 @@ fn get_dir_struct(dir: &metadata::MdDir, id: u16) -> Result<[u32; 2], Error> {
         u32::from_le_bytes(bytes[4..8].try_into().unwrap()),
     ])
 }
+
+/// True if new_path is a descendant of old_path (e.g. "a/b" under "a").
+/// Prevents rename-dir-into-itself bug (littlefs#1162).
+pub fn path_is_descendant(old_path: &str, new_path: &str) -> bool {
+    let old_norm = old_path.trim_matches('/');
+    let new_norm = new_path.trim_matches('/');
+    if old_norm.is_empty() || new_norm.len() <= old_norm.len() {
+        return false;
+    }
+    new_norm.starts_with(old_norm) && new_norm.as_bytes().get(old_norm.len()) == Some(&b'/')
+}
+
+/// Last path component. Returns None if path is "/" or empty.
+pub fn path_last_component(path: &str) -> Option<&str> {
+    let trimmed = path.trim_matches('/');
+    if trimmed.is_empty() {
+        return None;
+    }
+    trimmed.rsplit('/').next()
+}

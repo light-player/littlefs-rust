@@ -6,7 +6,7 @@
 mod common;
 
 use common::{dir_entry_names, fresh_fs, init_log};
-use lp_littlefs::{Dir, Error, FileType, Info, OpenFlags};
+use lp_littlefs::{BlockDevice, Dir, Error, FileType, Info, OpenFlags};
 
 // --- test_dirs_root ---
 // Upstream: dir_open("/"), dir_read returns ".", "..", then 0
@@ -143,9 +143,12 @@ fn test_dirs_other_errors() {
         )
         .unwrap();
     lfs.file_close(&bd, &config, file).unwrap();
+    bd.sync().unwrap();
+    lfs.unmount().unwrap();
+    lfs.mount(&bd, &config).unwrap();
 
     assert!(matches!(
-        lfs.mkdir(&bd, &config, "burito"),
+        lfs.mkdir(&bd, &config, "potato"),
         Err(Error::Exist)
     ));
     assert!(matches!(
@@ -174,18 +177,27 @@ fn test_dirs_other_errors() {
         lfs.file_open(&bd, &config, "tomato", OpenFlags::new(OpenFlags::RDONLY)),
         Err(Error::Noent)
     ));
-    let _ = lfs.file_open(&bd, &config, "potato", OpenFlags::new(OpenFlags::RDONLY));
+    assert!(matches!(
+        lfs.file_open(&bd, &config, "potato", OpenFlags::new(OpenFlags::RDONLY)),
+        Err(Error::IsDir)
+    ));
     assert!(matches!(
         lfs.file_open(&bd, &config, "tomato", OpenFlags::new(OpenFlags::WRONLY)),
         Err(Error::Noent)
     ));
-    let _ = lfs.file_open(&bd, &config, "potato", OpenFlags::new(OpenFlags::WRONLY));
-    let _ = lfs.file_open(
-        &bd,
-        &config,
-        "potato",
-        OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT),
-    );
+    assert!(matches!(
+        lfs.file_open(&bd, &config, "potato", OpenFlags::new(OpenFlags::WRONLY)),
+        Err(Error::IsDir)
+    ));
+    assert!(matches!(
+        lfs.file_open(
+            &bd,
+            &config,
+            "potato",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT),
+        ),
+        Err(Error::IsDir)
+    ));
 
     let file = lfs
         .file_open(
@@ -196,8 +208,14 @@ fn test_dirs_other_errors() {
         )
         .unwrap();
     lfs.file_close(&bd, &config, file).unwrap();
-    let _ = lfs.rename(&bd, &config, "tacoto", "potato");
-    let _ = lfs.rename(&bd, &config, "potato", "tacoto");
+    assert!(matches!(
+        lfs.rename(&bd, &config, "tacoto", "potato"),
+        Err(Error::IsDir)
+    ));
+    assert!(matches!(
+        lfs.rename(&bd, &config, "potato", "tacoto"),
+        Err(Error::NotDir)
+    ));
 
     let _ = lfs.mkdir(&bd, &config, "/");
     let _ = lfs.file_open(

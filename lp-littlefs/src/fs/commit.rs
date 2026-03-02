@@ -825,6 +825,49 @@ pub fn dir_orphaningcommit<B: BlockDevice>(
     Ok(orphans)
 }
 
+/// Drop orphan from metadata chain. Steals tail and gstate from orphan into pred.
+/// Per lfs_dir_drop (lfs.c:1859).
+pub fn dir_drop<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    pred: &mut MdDir,
+    orphan: &MdDir,
+    root: &mut [u32; 2],
+    lookahead: &mut Lookahead,
+    _name_max: u32,
+    gstate: &GState,
+    gdisk: &mut GState,
+    gdelta: &mut GState,
+) -> Result<(), Error> {
+    super::gstate::dir_getgstate(orphan, gdelta)?;
+    let tail_attr = if orphan.split {
+        CommitAttr::hard_tail(orphan.tail)
+    } else {
+        CommitAttr::soft_tail(orphan.tail)
+    };
+    let mut dummy = MdDir::alloc_empty([0, 0], config.block_size as usize);
+    let mut gstate_ctx = GStateCtx {
+        gstate,
+        gdisk,
+        gdelta,
+        root: Some(*root),
+        skip_dir_adjust: false,
+    };
+    let mut gstate_opt = Some(&mut gstate_ctx);
+    dir_relocatingcommit(
+        bd,
+        config,
+        pred,
+        pred.pair,
+        &[tail_attr],
+        *root,
+        lookahead,
+        &mut dummy,
+        &mut gstate_opt,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -655,91 +655,183 @@ impl LittleFs {
             u32::from_le_bytes(old_pair[4..8].try_into().unwrap()),
         ];
 
-        let (new_cwd, new_id, new_name) =
-            path::dir_find_for_create(bd, config, state.root, new_path, state.name_max)?;
-        trace!(
-            "rename new_cwd.pair={:?} new_id={} new_name={:?}",
-            new_cwd.pair,
-            new_id,
-            new_name
-        );
+        // Rename dir into itself (littlefs#1162)
+        if matches!(old_info.typ, crate::info::FileType::Dir)
+            && path::path_is_descendant(old_path, new_path)
+        {
+            return Err(Error::Inval);
+        }
+
+        // Trailing slash on new path when source is file -> Notdir
+        if matches!(old_info.typ, crate::info::FileType::Reg)
+            && new_path.trim_end_matches('/') != new_path
+        {
+            return Err(Error::NotDir);
+        }
+
+        let (new_cwd, new_id, new_name, overwrite_dir_orphan) =
+            match path::dir_find(bd, config, state.root, new_path, state.name_max) {
+                Ok((cwd, id)) => {
+                    let name = path::path_last_component(new_path).unwrap_or("").as_bytes();
+                    let new_info = metadata::get_entry_info(&cwd, id, state.name_max)?;
+                    if new_info.typ != old_info.typ {
+                        return Err(if matches!(new_info.typ, crate::info::FileType::Dir) {
+                            Error::IsDir
+                        } else {
+                            Error::NotDir
+                        });
+                    }
+                    let same_pair =
+                        old_cwd.pair[0] == cwd.pair[0] && old_cwd.pair[1] == cwd.pair[1];
+                    if same_pair && id == old_id {
+                        return Ok(());
+                    }
+                    let mut orphan = None;
+                    if matches!(new_info.typ, crate::info::FileType::Dir) {
+                        let prev_pair_bytes = metadata::get_struct(&cwd, id)?;
+                        let prev_pair = [
+                            u32::from_le_bytes(prev_pair_bytes[0..4].try_into().unwrap()),
+                            u32::from_le_bytes(prev_pair_bytes[4..8].try_into().unwrap()),
+                        ];
+                        let prevdir = metadata::fetch_metadata_pair(bd, config, prev_pair)?;
+                        if prevdir.count > 0 || prevdir.split {
+                            return Err(Error::NotEmpty);
+                        }
+                        gstate::preporphans(&mut state.gstate, 1)?;
+                        orphan = Some(prevdir);
+                    }
+                    (cwd, id, name, orphan)
+                }
+                Err(Error::Noent) => {
+                    let (cwd, id, name) = path::dir_find_for_create(
+                        bd,
+                        config,
+                        state.root,
+                        new_path,
+                        state.name_max,
+                    )?;
+                    (cwd, id, name.as_bytes(), None)
+                }
+                Err(e) => return Err(e),
+            };
 
         if new_name.len() > state.name_max as usize {
             return Err(Error::Nametoolong);
         }
 
         let same_pair = old_cwd.pair[0] == new_cwd.pair[0] && old_cwd.pair[1] == new_cwd.pair[1];
-        if !same_pair {
-            return Err(Error::Inval);
+        let mut newoldid = old_id;
+        if same_pair && new_id <= old_id {
+            newoldid = old_id + 1;
         }
 
-        let mut new_id = new_id;
-        if new_id <= old_id {
-            new_id = old_id + 1;
+        if !same_pair {
+            gstate::prepmove(&mut state.gstate, newoldid, old_cwd.pair);
         }
 
         let mut new_cwd_mut = metadata::fetch_metadata_pair(bd, config, new_cwd.pair)?;
 
-        match old_info.typ {
-            crate::info::FileType::Dir => {
-                let attrs = [
-                    commit::CommitAttr::create(new_id),
-                    commit::CommitAttr::name_dir(new_id, new_name.as_bytes()),
-                    commit::CommitAttr::dir_struct(new_id, dir_pair),
-                    commit::CommitAttr::delete(old_id),
-                ];
-                commit::dir_orphaningcommit(
-                    bd,
-                    config,
-                    &mut new_cwd_mut,
-                    &attrs,
-                    &mut state.root,
-                    &mut state.lookahead,
-                    state.name_max,
-                    &state.gstate,
-                    &mut state.gdisk,
-                    &mut state.gdelta,
-                    false,
-                )?;
-            }
+        let (delete_overwrite, delete_old) = if overwrite_dir_orphan.is_some() {
+            (true, false)
+        } else if same_pair {
+            (false, true)
+        } else {
+            (false, false)
+        };
+
+        let inline_data = match old_info.typ {
             crate::info::FileType::Reg => {
-                let (is_inline, head, size) = metadata::get_file_struct(&old_cwd, old_id)?;
-                let inline_data = if is_inline {
-                    let mut buf = ::alloc::vec![0; state.inline_max as usize];
+                let (is_inline, _, _) = metadata::get_file_struct(&old_cwd, old_id)?;
+                if is_inline {
+                    let mut buf = Vec::new();
+                    buf.resize(state.inline_max as usize, 0);
                     let n = metadata::get_inline_slice(&old_cwd, old_id, 0, &mut buf)?;
                     let mut data = Vec::new();
                     data.extend_from_slice(&buf[..n]);
-                    data
+                    Some(data)
                 } else {
-                    Vec::new()
-                };
-                let attrs = if is_inline {
-                    [
-                        commit::CommitAttr::create(new_id),
-                        commit::CommitAttr::name_reg(new_id, new_name.as_bytes()),
-                        commit::CommitAttr::inline_struct(new_id, &inline_data),
-                        commit::CommitAttr::delete(old_id),
-                    ]
-                } else {
-                    [
-                        commit::CommitAttr::create(new_id),
-                        commit::CommitAttr::name_reg(new_id, new_name.as_bytes()),
-                        commit::CommitAttr::ctz_struct(new_id, head, size as u32),
-                        commit::CommitAttr::delete(old_id),
-                    ]
-                };
-                commit::dir_orphaningcommit(
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        let attrs: Vec<commit::CommitAttr> = {
+            let mut v = Vec::new();
+            if delete_overwrite {
+                v.push(commit::CommitAttr::delete(new_id));
+            }
+            v.push(commit::CommitAttr::create(new_id));
+            match old_info.typ {
+                crate::info::FileType::Dir => {
+                    v.push(commit::CommitAttr::name_dir(new_id, new_name));
+                    v.push(commit::CommitAttr::dir_struct(new_id, dir_pair));
+                }
+                crate::info::FileType::Reg => {
+                    let (is_inline, head, size) = metadata::get_file_struct(&old_cwd, old_id)?;
+                    v.push(commit::CommitAttr::name_reg(new_id, new_name));
+                    if is_inline {
+                        v.push(commit::CommitAttr::inline_struct(
+                            new_id,
+                            inline_data.as_ref().unwrap(),
+                        ));
+                    } else {
+                        v.push(commit::CommitAttr::ctz_struct(new_id, head, size as u32));
+                    }
+                }
+            }
+            if delete_old {
+                v.push(commit::CommitAttr::delete(old_id));
+            }
+            v
+        };
+
+        commit::dir_orphaningcommit(
+            bd,
+            config,
+            &mut new_cwd_mut,
+            &attrs,
+            &mut state.root,
+            &mut state.lookahead,
+            state.name_max,
+            &state.gstate,
+            &mut state.gdisk,
+            &mut state.gdelta,
+            false,
+        )?;
+
+        if !same_pair && state.gstate.hasmove() {
+            gstate::prepmove(&mut state.gstate, 0x3ff, [0, 0]);
+            let mut old_cwd_mut = metadata::fetch_metadata_pair(bd, config, old_cwd.pair)?;
+            commit::dir_orphaningcommit(
+                bd,
+                config,
+                &mut old_cwd_mut,
+                &[commit::CommitAttr::delete(old_id)],
+                &mut state.root,
+                &mut state.lookahead,
+                state.name_max,
+                &state.gstate,
+                &mut state.gdisk,
+                &mut state.gdelta,
+                false,
+            )?;
+        }
+
+        if let Some(orphan) = overwrite_dir_orphan {
+            gstate::preporphans(&mut state.gstate, -1)?;
+            if let Some(mut pred) = parent::fs_pred(bd, config, state.root, orphan.pair)? {
+                commit::dir_drop(
                     bd,
                     config,
-                    &mut new_cwd_mut,
-                    &attrs,
+                    &mut pred,
+                    &orphan,
                     &mut state.root,
                     &mut state.lookahead,
                     state.name_max,
                     &state.gstate,
                     &mut state.gdisk,
                     &mut state.gdelta,
-                    false,
                 )?;
             }
         }
