@@ -324,9 +324,20 @@ fn find_name_in_dir_pair<B: BlockDevice>(
     name_max: u32,
     start_id: u16,
 ) -> Result<u16, Error> {
+    trace!(
+        "find_name_in_dir_pair iterating ids {}..{}",
+        start_id,
+        dir.count
+    );
     for id in start_id..dir.count {
         match metadata::get_entry_info(dir, id, name_max) {
             Ok(info) => {
+                trace!(
+                    "find_name_in_dir_pair id={} name={:?} cmp={}",
+                    id,
+                    info.name().ok(),
+                    info.name_bytes() == name_bytes
+                );
                 if info.name_bytes() == name_bytes {
                     trace!("find_name_in_dir_pair match id={}", id);
                     return Ok(id);

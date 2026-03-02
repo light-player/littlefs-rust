@@ -112,6 +112,8 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
     );
 
     let mut tempcount: i32 = 0;
+    let mut max_id: u16 = 0;
+    let mut seen_name_or_splice = false;
     let mut temptail: [u32; 2] = [0xffff_ffff, 0xffff_ffff];
     let mut tempsplit = false;
     let mut last_off = 0usize;
@@ -123,6 +125,7 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
     let mut crc = crc::crc32(0xffff_ffff, &dir_rev.to_le_bytes());
 
     loop {
+        trace!("fetch_metadata_pair loop off={} ptag=0x{:08x}", off, ptag);
         if off + 4 > block_size {
             break;
         }
@@ -130,6 +133,14 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
             u32::from_be_bytes(block[off..off + 4].try_into().map_err(|_| Error::Corrupt)?);
         crc = crc::crc32(crc, &block[off..off + 4]);
         let tag = (stored_tag ^ ptag) & 0x7fff_ffff;
+        trace!(
+            "fetch_metadata_pair tag=0x{:08x} type1={} type2={} id={} dsize={}",
+            tag,
+            tag_type1(tag),
+            tag_type2(tag),
+            tag_id(tag),
+            tag_dsize(tag)
+        );
 
         if !tag_isvalid(tag) {
             break;
@@ -153,7 +164,20 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
 
             last_off = off + dsize;
             last_etag = ptag;
-            tempcount = tempcount.max(0);
+            // Per lfs.c lfs_dir_fetchmatch: splice gives live count. For dir_read/find
+            // we iterate ids 0..count; count must be >= max_id+1 to reach all entries.
+            // Only apply max_id when we've seen NAME/SPLICE (avoid count=1 for empty child dirs).
+            if seen_name_or_splice {
+                tempcount = tempcount.max(0).max(max_id as i32 + 1);
+            } else {
+                tempcount = tempcount.max(0);
+            }
+            trace!(
+                "fetch_metadata_pair CRC tempcount={} max_id={} seen_name_or_splice={}",
+                tempcount,
+                max_id,
+                seen_name_or_splice
+            );
             temptail = [0xffff_ffff, 0xffff_ffff];
             tempsplit = false;
 
@@ -165,11 +189,29 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
         crc = crc::crc32(crc, &block[off + 4..off + dsize]);
 
         if tag_type1(tag) == tag::TYPE_NAME {
-            if tag_id(tag) as i32 >= tempcount {
-                tempcount = tag_id(tag) as i32 + 1;
+            let id = tag_id(tag);
+            seen_name_or_splice = true;
+            max_id = max_id.max(id);
+            if id as i32 >= tempcount {
+                tempcount = id as i32 + 1;
             }
+            trace!(
+                "fetch_metadata_pair NAME id={} tempcount={} max_id={}",
+                id,
+                tempcount,
+                max_id
+            );
         } else if tag_type1(tag) == tag::TYPE_SPLICE {
+            seen_name_or_splice = true;
+            max_id = max_id.max(tag_id(tag));
             tempcount += tag_splice(tag);
+            trace!(
+                "fetch_metadata_pair SPLICE id={} splice={} tempcount={} max_id={}",
+                tag_id(tag),
+                tag_splice(tag),
+                tempcount,
+                max_id
+            );
         } else if tag_type1(tag) == tag::TYPE_TAIL {
             tempsplit = (tag_chunk(tag) & 1) != 0;
             temptail[0] = u32::from_le_bytes(block[off + 4..off + 8].try_into().unwrap());
@@ -224,6 +266,12 @@ pub fn get_tag_backwards(
             u32::from_be_bytes(block[off..off + 4].try_into().map_err(|_| Error::Corrupt)?);
         ntag = (stored ^ tag) & 0x7fff_ffff;
 
+        trace!(
+            "get_tag_backwards off={} tag=0x{:08x} match={}",
+            off,
+            tag,
+            (gmask & tag) == (gmask & gtag)
+        );
         if (gmask & tag) == (gmask & gtag) {
             if tag_isdelete(tag) {
                 return Ok(None);
@@ -506,8 +554,13 @@ mod tests {
         bd.sync().unwrap();
 
         let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
-        assert!(dir.count >= 2, "count {} off {}", dir.count, dir.off);
+        assert!(
+            dir.count >= 3,
+            "rename creates id 2; count must be >= 3 for find/stat, got {}",
+            dir.count
+        );
         let info = get_entry_info(&dir, 2, 255).unwrap();
         assert_eq!(info.name().unwrap(), "x0");
+        assert!(get_entry_info(&dir, 1, 255).is_err()); // id 1 deleted -> Noent
     }
 }
