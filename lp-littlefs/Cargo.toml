@@ -11,5 +11,6 @@ name = "lp_littlefs"
 path = "src/lib.rs"
 
 [features]
-default = []
+default = ["alloc"]
+alloc = []
 std = []

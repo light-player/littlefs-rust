@@ -4,15 +4,26 @@
 
 #![no_std]
 
-/// Placeholder for the LittleFS filesystem implementation.
-pub struct LittleFs;
+extern crate alloc;
+
+mod block;
+mod config;
+mod error;
+mod fs;
+mod superblock;
+
+pub use block::{BlockDevice, RamBlockDevice};
+pub use config::Config;
+pub use error::Error;
+pub use fs::LittleFs;
+pub use superblock::{MAGIC, MAGIC_OFFSET};
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn placeholder() {
-        let _ = LittleFs;
+    fn error_variants() {
+        assert_eq!(Error::Corrupt, Error::Corrupt);
     }
 }
