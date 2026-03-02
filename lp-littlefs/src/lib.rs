@@ -18,8 +18,8 @@ mod trace;
 pub use block::{BlockDevice, CachedBlockDevice, RamBlockDevice};
 pub use config::Config;
 pub use error::Error;
-pub use fs::{Dir, LittleFs};
-pub use info::{FileType, FsInfo, Info};
+pub use fs::{create_inline_file, Dir, File, LittleFs};
+pub use info::{FileType, FsInfo, Info, OpenFlags, SeekWhence};
 pub use superblock::{MAGIC, MAGIC_OFFSET};
 
 #[cfg(test)]

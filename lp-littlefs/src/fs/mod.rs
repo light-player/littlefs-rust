@@ -2,7 +2,9 @@
 
 mod alloc;
 mod commit;
+mod ctz;
 mod dir;
+mod file;
 mod format;
 mod metadata;
 mod mount;
@@ -140,6 +142,55 @@ impl LittleFs {
 
     pub fn dir_close(&self, _dir: Dir) -> Result<(), Error> {
         Ok(())
+    }
+
+    pub fn file_open<B: BlockDevice>(
+        &self,
+        bd: &B,
+        config: &Config,
+        path: &str,
+        flags: crate::info::OpenFlags,
+    ) -> Result<file::File, Error> {
+        let state = self.require_mounted()?;
+        file::File::open(bd, config, state.root, path, state.name_max, flags)
+    }
+
+    pub fn file_read<B: BlockDevice>(
+        &self,
+        bd: &B,
+        config: &Config,
+        file: &mut file::File,
+        buf: &mut [u8],
+    ) -> Result<usize, Error> {
+        self.require_mounted()?;
+        file.read(bd, config, buf)
+    }
+
+    pub fn file_seek<B: BlockDevice>(
+        &self,
+        _bd: &B,
+        _config: &Config,
+        file: &mut file::File,
+        off: i64,
+        whence: crate::info::SeekWhence,
+    ) -> Result<i64, Error> {
+        self.require_mounted()?;
+        file.seek(off, whence)
+    }
+
+    pub fn file_tell(&self, file: &file::File) -> Result<i64, Error> {
+        self.require_mounted()?;
+        Ok(file.tell())
+    }
+
+    pub fn file_size(&self, file: &file::File) -> Result<i64, Error> {
+        self.require_mounted()?;
+        Ok(file.size())
+    }
+
+    pub fn file_close(&self, file: file::File) -> Result<(), Error> {
+        self.require_mounted()?;
+        file.close()
     }
 
     pub fn mkdir<B: BlockDevice>(
@@ -303,6 +354,30 @@ impl LittleFs {
         bd.sync()?;
         Ok(())
     }
+}
+
+/// Open directory handle for iteration.
+#[allow(dead_code)]
+pub use file::File;
+
+/// Create an inline file. Requires a formatted fs (not mounted).
+/// Used by integration tests and for seeding filesystems.
+pub fn create_inline_file<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    path: &str,
+    content: &[u8],
+) -> Result<(), Error> {
+    let root = [0u32, 1];
+    let (cwd, id, name) = path::dir_find_for_create(bd, config, root, path, 255)?;
+    let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
+    let attrs = [
+        commit::CommitAttr::create(id),
+        commit::CommitAttr::name_reg(id, name.as_bytes()),
+        commit::CommitAttr::inline_struct(id, content),
+    ];
+    commit::dir_commit_append(bd, config, &mut cwd_mut, &attrs)?;
+    bd.sync()
 }
 
 /// Open directory handle for iteration.

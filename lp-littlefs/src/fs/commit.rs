@@ -71,6 +71,14 @@ impl<'a> CommitAttr<'a> {
         }
     }
 
+    pub fn inline_struct(id: u16, data: &'a [u8]) -> Self {
+        let size = data.len().min(0x3fe);
+        Self {
+            tag: mktag(tag::TYPE_INLINESTRUCT, id as u32, size as u32),
+            data: CommitData::Slice(&data[..size]),
+        }
+    }
+
     pub fn soft_tail(pair: [u32; 2]) -> Self {
         Self {
             tag: mktag(tag::TYPE_SOFTTAIL, 0x3ff, 8),

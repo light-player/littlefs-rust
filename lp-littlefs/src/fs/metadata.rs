@@ -417,6 +417,59 @@ pub fn read_superblock<B: BlockDevice>(
     Ok(sb)
 }
 
+/// Resolve file struct (inline or CTZ) for a regular file.
+///
+/// Returns (is_inline, head_block, size). For inline: head is BLOCK_INLINE (0xffff_fffe).
+pub fn get_file_struct(dir: &MdDir, id: u16) -> Result<(bool, u32, u64), Error> {
+    let gmask = 0x700f_fc00;
+    let gtag = (tag::TYPE_STRUCT << 20) | ((id as u32) << 10);
+    let result = get_tag_backwards(dir, gmask, gtag)?;
+    let (struct_tag, struct_off, struct_size) = result.ok_or(Error::Noent)?;
+    let block = &dir.block;
+    let type3 = tag_type3(struct_tag);
+
+    if type3 == tag::TYPE_INLINESTRUCT {
+        return Ok((true, 0xffff_fffe, struct_size as u64));
+    }
+    if type3 == tag::TYPE_CTZSTRUCT {
+        if struct_size != 8 || struct_off + 8 > block.len() {
+            return Err(Error::Corrupt);
+        }
+        let head = u32::from_le_bytes(block[struct_off..struct_off + 4].try_into().unwrap());
+        let size = u32::from_le_bytes(block[struct_off + 4..struct_off + 8].try_into().unwrap());
+        return Ok((false, head, size as u64));
+    }
+    Err(Error::Noent)
+}
+
+/// Read a slice of inline file data.
+///
+/// Per lfs_dir_getslice (lfs.c:719). Finds INLINESTRUCT tag for id and copies
+/// up to `buffer.len()` bytes from offset `offset` into `buffer`. Returns bytes read.
+pub fn get_inline_slice(
+    dir: &MdDir,
+    id: u16,
+    offset: usize,
+    buffer: &mut [u8],
+) -> Result<usize, Error> {
+    let gmask = 0x7ff0_fc00;
+    let gtag = (tag::TYPE_INLINESTRUCT << 20) | ((id as u32) << 10);
+    let result = get_tag_backwards(dir, gmask, gtag)?;
+    let (_, data_off, size) = result.ok_or(Error::Noent)?;
+    let data_size = size as usize;
+    if offset >= data_size {
+        return Ok(0);
+    }
+    let avail = data_size - offset;
+    let to_read = core::cmp::min(buffer.len(), avail);
+    let block = &dir.block;
+    if data_off + offset + to_read > block.len() {
+        return Err(Error::Corrupt);
+    }
+    buffer[..to_read].copy_from_slice(&block[data_off + offset..data_off + offset + to_read]);
+    Ok(to_read)
+}
+
 /// Get 8-byte struct data (e.g. dir pair) for an id.
 pub fn get_struct(dir: &MdDir, id: u16) -> Result<[u8; 8], Error> {
     let gmask = 0x700f_fc00;
@@ -562,5 +615,29 @@ mod tests {
         let info = get_entry_info(&dir, 2, 255).unwrap();
         assert_eq!(info.name().unwrap(), "x0");
         assert!(get_entry_info(&dir, 1, 255).is_err()); // id 1 deleted -> Noent
+    }
+
+    #[test]
+    fn get_inline_slice_reads_file_data() {
+        let (bd, config) = formatted_bd();
+        let mut root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let content = b"Hello World!\0";
+        let attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_reg(1, b"hello"),
+            commit::CommitAttr::inline_struct(1, content),
+        ];
+        commit::dir_commit_append(&bd, &config, &mut root, &attrs).unwrap();
+        bd.sync().unwrap();
+
+        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let mut buf = [0u8; 32];
+        let n = get_inline_slice(&dir, 1, 0, &mut buf).unwrap();
+        assert_eq!(n, content.len());
+        assert_eq!(&buf[..n], content);
+
+        let n2 = get_inline_slice(&dir, 1, 6, &mut buf).unwrap();
+        assert_eq!(n2, content.len() - 6);
+        assert_eq!(&buf[..n2], b"World!\0");
     }
 }

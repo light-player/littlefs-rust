@@ -2,6 +2,33 @@
 //!
 //! Per lfs.h struct lfs_info (lines 297–310) and lfs_fsinfo (lines 313–332).
 
+/// Open flags for file_open. Per lfs.h LFS_O_RDONLY etc.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OpenFlags(pub u32);
+
+impl OpenFlags {
+    pub const RDONLY: u32 = 1;
+
+    pub fn new(flags: u32) -> Self {
+        Self(flags)
+    }
+
+    pub fn contains(&self, flag: u32) -> bool {
+        (self.0 & flag) != 0
+    }
+}
+
+/// Seek whence. Per lfs.h LFS_SEEK_SET etc.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeekWhence {
+    /// From start of file
+    Set = 0,
+    /// From current position
+    Cur = 1,
+    /// From end of file
+    End = 2,
+}
+
 /// File type: regular file or directory.
 /// Per lfs.h enum lfs_type LFS_TYPE_REG (0x001), LFS_TYPE_DIR (0x002).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
