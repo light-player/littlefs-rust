@@ -44,3 +44,7 @@ Open flags used: WRONLY, RDWR, CREAT, EXCL, TRUNC, APPEND. Upstream `lfs_open_fl
 - `lfs_ctz_extend` logic for appending blocks
 - Truncate: traverse and free blocks; update struct tag
 - File cache/prog buffer handling consistent with block cache
+
+## Validation
+
+Run `just fci` to format, fix, and validate the code before committing.

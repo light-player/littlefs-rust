@@ -45,3 +45,7 @@ match the C implementation as closely as possible while keeping the Rust code cl
 - Global state (gstate) in fs-level struct
 - Deorphan in mount path and mkconsistent
 - GC: compact metadata, allocator refill
+
+## Validation
+
+Run `just fci` to format, fix, and validate the code before committing.

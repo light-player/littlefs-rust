@@ -42,3 +42,7 @@ match the C implementation as closely as possible while keeping the Rust code cl
 
 - CTZ traversal (`lfs_ctz_find`, `lfs_ctz_index`) in dedicated module
 - Inline read in metadata/dir layer
+
+## Validation
+
+Run `just fci` to format, fix, and validate the code before committing.

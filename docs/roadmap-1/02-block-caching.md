@@ -29,3 +29,7 @@ No dedicated cache test. Use existing `test_superblocks_format`, `test_superbloc
 
 - Caching layer between LittleFs and BlockDevice
 - Prefer granular modules (e.g. `cache.rs` or under `block/`)
+
+## Validation
+
+Run `just fci` to format, fix, and validate the code before committing.

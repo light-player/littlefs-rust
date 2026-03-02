@@ -43,3 +43,7 @@ match the C implementation as closely as possible while keeping the Rust code cl
 
 - Directory commit, compact, split in dedicated module(s)
 - Allocation (lookahead) separate from metadata
+
+## Validation
+
+Run `just fci` to format, fix, and validate the code before committing.
