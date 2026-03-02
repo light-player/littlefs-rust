@@ -3,18 +3,10 @@
 //! Corresponds to upstream test_superblocks.toml
 //! Source: https://github.com/littlefs-project/littlefs/blob/master/tests/test_superblocks.toml
 
-use lp_littlefs::{
-    BlockDevice, CachedBlockDevice, Config, FsInfo, LittleFs, RamBlockDevice, MAGIC, MAGIC_OFFSET,
-};
+mod common;
 
-fn default_config() -> Config {
-    Config::default_for_tests(128)
-}
-
-fn cached_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
-    let ram = RamBlockDevice::new(config.block_size, config.block_count);
-    CachedBlockDevice::new(ram, config).unwrap()
-}
+use common::{cached_bd, default_config};
+use lp_littlefs::{BlockDevice, FsInfo, LittleFs, MAGIC, MAGIC_OFFSET};
 
 // --- test_superblocks_format ---
 // Upstream: lfs_format(&lfs, cfg) => 0

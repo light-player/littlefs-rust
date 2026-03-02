@@ -49,3 +49,105 @@ fn test_bd_one_block() {
         }
     }
 }
+
+// --- test_bd_two_block ---
+// Upstream: prog block 0, read block 0, prog block 1, read block 1, re-read block 0.
+#[test]
+fn test_bd_two_block() {
+    let (block_size, block_count) = default_geometry();
+    let bd = RamBlockDevice::new(block_size, block_count);
+
+    let read_size = 16u32;
+    let prog_size = 16u32;
+    let buf_len = read_size.max(prog_size) as usize;
+    let mut buffer = vec![0u8; buf_len];
+
+    for block in [0u32, 1u32] {
+        bd.erase(block).unwrap();
+        for i in (0..block_size).step_by(prog_size as usize) {
+            for j in 0..prog_size {
+                buffer[j as usize] = ((block as u64 + i as u64 + j as u64) % 251) as u8;
+            }
+            bd.prog(block, i, &buffer[..prog_size as usize]).unwrap();
+        }
+    }
+
+    for block in [0u32, 1u32] {
+        for i in (0..block_size).step_by(read_size as usize) {
+            bd.read(block, i, &mut buffer[..read_size as usize])
+                .unwrap();
+            for j in 0..read_size {
+                assert_eq!(
+                    buffer[j as usize],
+                    ((block as u64 + i as u64 + j as u64) % 251) as u8,
+                    "block {block}, offset {i}, byte {j}"
+                );
+            }
+        }
+    }
+
+    for i in (0..block_size).step_by(read_size as usize) {
+        bd.read(0, i, &mut buffer[..read_size as usize]).unwrap();
+        for j in 0..read_size {
+            assert_eq!(
+                buffer[j as usize],
+                ((i + j) % 251) as u8,
+                "re-read block 0, offset {i}, byte {j}"
+            );
+        }
+    }
+}
+
+// --- test_bd_last_block ---
+// Upstream: prog block 0, read block 0, prog block_count-1, read block_count-1.
+#[test]
+fn test_bd_last_block() {
+    let (block_size, block_count) = default_geometry();
+    let bd = RamBlockDevice::new(block_size, block_count);
+
+    let read_size = 16u32;
+    let prog_size = 16u32;
+    let buf_len = read_size.max(prog_size) as usize;
+    let mut buffer = vec![0u8; buf_len];
+    let last_block = block_count - 1;
+
+    bd.erase(0).unwrap();
+    for i in (0..block_size).step_by(prog_size as usize) {
+        for j in 0..prog_size {
+            buffer[j as usize] = ((i + j) % 251) as u8;
+        }
+        bd.prog(0, i, &buffer[..prog_size as usize]).unwrap();
+    }
+
+    for i in (0..block_size).step_by(read_size as usize) {
+        bd.read(0, i, &mut buffer[..read_size as usize]).unwrap();
+        for j in 0..read_size {
+            assert_eq!(
+                buffer[j as usize],
+                ((i + j) % 251) as u8,
+                "block 0, offset {i}, byte {j}"
+            );
+        }
+    }
+
+    bd.erase(last_block).unwrap();
+    for i in (0..block_size).step_by(prog_size as usize) {
+        for j in 0..prog_size {
+            buffer[j as usize] = ((last_block as u64 + i as u64 + j as u64) % 251) as u8;
+        }
+        bd.prog(last_block, i, &buffer[..prog_size as usize])
+            .unwrap();
+    }
+
+    for i in (0..block_size).step_by(read_size as usize) {
+        bd.read(last_block, i, &mut buffer[..read_size as usize])
+            .unwrap();
+        for j in 0..read_size {
+            assert_eq!(
+                buffer[j as usize],
+                ((last_block as u64 + i as u64 + j as u64) % 251) as u8,
+                "block {last_block}, offset {i}, byte {j}"
+            );
+        }
+    }
+}

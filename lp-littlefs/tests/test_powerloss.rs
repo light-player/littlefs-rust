@@ -5,16 +5,10 @@
 //!
 //! Run with: RUST_LOG=trace cargo test test_powerloss --features trace
 
-use lp_littlefs::{BlockDevice, CachedBlockDevice, Config, LittleFs, OpenFlags, RamBlockDevice};
+mod common;
 
-fn default_config() -> Config {
-    Config::default_for_tests(128)
-}
-
-fn cached_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
-    let ram = RamBlockDevice::new(config.block_size, config.block_count);
-    CachedBlockDevice::new(ram, config).unwrap()
-}
+use common::{cached_bd, default_config};
+use lp_littlefs::{BlockDevice, LittleFs, OpenFlags};
 
 // --- test_powerloss_only_rev ---
 // Upstream: write rev+1 to one block of dir pair; mount picks higher rev, read/write still works.

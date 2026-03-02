@@ -3,20 +3,10 @@
 //! Corresponds to upstream test_relocations.toml
 //! Validates dir_compact, dir_split, and orphaningcommit.
 
-use lp_littlefs::{CachedBlockDevice, Config, LittleFs, OpenFlags, RamBlockDevice};
+mod common;
 
-fn init_log() {
-    let _ = env_logger::builder().is_test(true).try_init();
-}
-
-fn default_config() -> Config {
-    Config::default_for_tests(128)
-}
-
-fn make_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
-    let ram = RamBlockDevice::new(config.block_size, config.block_count);
-    CachedBlockDevice::new(ram, config).unwrap()
-}
+use common::{cached_bd, default_config, init_log};
+use lp_littlefs::{LittleFs, OpenFlags};
 
 /// Fill FS, create many files in child dir. Triggers compaction/split when
 /// metadata block overflows.
@@ -24,7 +14,7 @@ fn make_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
 fn test_relocations_dangling_split_dir() {
     init_log();
     let config = default_config();
-    let bd = make_bd(&config);
+    let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();
@@ -58,7 +48,7 @@ fn test_relocations_dangling_split_dir() {
 fn test_relocations_outdated_head() {
     init_log();
     let config = default_config();
-    let bd = make_bd(&config);
+    let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();

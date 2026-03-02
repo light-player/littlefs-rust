@@ -3,21 +3,10 @@
 //! Per upstream test_orphans.toml, test_powerloss.toml.
 //! Phase 06: mkconsistent persists gstate; remount without orphans.
 
-use lp_littlefs::{BlockDevice, CachedBlockDevice, Config, LittleFs, RamBlockDevice};
+mod common;
 
-fn default_config() -> Config {
-    Config::default_for_tests(128)
-}
-
-#[allow(dead_code)]
-fn cached_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
-    let ram = RamBlockDevice::new(config.block_size, config.block_count);
-    CachedBlockDevice::new(ram, config).unwrap()
-}
-
-fn uncached_bd(config: &Config) -> RamBlockDevice {
-    RamBlockDevice::new(config.block_size, config.block_count)
-}
+use common::{default_config, init_log, uncached_bd};
+use lp_littlefs::{BlockDevice, LittleFs};
 
 // --- test_orphans_mkconsistent_no_orphans ---
 // With lazy force_consistency, mkdir/remove run deorphan first. So preporphans(1)
@@ -25,7 +14,7 @@ fn uncached_bd(config: &Config) -> RamBlockDevice {
 // and persists; remount shows no orphans.
 #[test]
 fn test_orphans_mkconsistent_no_orphans() {
-    let _ = env_logger::builder().is_test(true).try_init();
+    init_log();
     let config = default_config();
     let bd = uncached_bd(&config);
     let mut lfs = LittleFs::new();
