@@ -6,6 +6,7 @@ use crate::block::BlockDevice;
 use crate::config::Config;
 use crate::error::Error;
 use crate::info::FileType;
+use crate::trace;
 
 use super::metadata;
 
@@ -17,6 +18,7 @@ pub fn dir_find<B: BlockDevice>(
     path: &str,
     name_max: u32,
 ) -> Result<(metadata::MdDir, u16), Error> {
+    trace!("dir_find path={:?} root={:?}", path, root);
     if path.is_empty() {
         return Err(Error::Inval);
     }
@@ -29,10 +31,12 @@ pub fn dir_find<B: BlockDevice>(
     };
 
     if segments.is_empty() {
+        trace!("dir_find segments empty -> root");
         let dir = metadata::fetch_metadata_pair(bd, config, root)?;
         return Ok((dir, 0x3ff));
     }
 
+    trace!("dir_find segments={:?}", segments);
     let mut stack: alloc::vec::Vec<(metadata::MdDir, u16)> = alloc::vec![];
     let mut cwd = metadata::fetch_metadata_pair(bd, config, root)?;
     let mut tag_id: u16 = 0x3ff;
@@ -83,10 +87,12 @@ pub fn dir_find<B: BlockDevice>(
         }
 
         let found_id = find_name_in_dir(bd, config, &cwd, seg, name_max)?;
+        trace!("dir_find seg={:?} found_id={}", seg, found_id);
         let info = metadata::get_entry_info(&cwd, found_id, name_max)?;
 
         if seg_idx + 1 >= segments.len() {
             tag_id = found_id;
+            trace!("dir_find done -> ({:?}, {})", cwd.pair, tag_id);
             break;
         }
 
@@ -119,6 +125,7 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
     path: &'a str,
     name_max: u32,
 ) -> Result<(metadata::MdDir, u16, &'a str), Error> {
+    trace!("dir_find_for_create path={:?} root={:?}", path, root);
     if path.is_empty() {
         return Err(Error::Inval);
     }
@@ -184,6 +191,11 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
             Ok(id) => id,
             Err(Error::Noent) if seg_idx + 1 >= segments.len() => {
                 let id = find_insertion_id(&cwd, seg, name_max)?;
+                trace!(
+                    "dir_find_for_create noent last seg -> insert id={} name={:?}",
+                    id,
+                    seg
+                );
                 return Ok((cwd, id, seg));
             }
             Err(e) => return Err(e),
@@ -221,6 +233,12 @@ fn find_insertion_id(dir: &metadata::MdDir, name: &str, name_max: u32) -> Result
         0
     };
 
+    trace!(
+        "find_insertion_id name={:?} dir.count={} start_id={}",
+        name,
+        dir.count,
+        start_id
+    );
     for id in start_id..dir.count {
         match metadata::get_entry_info(dir, id, name_max) {
             Ok(info) => {
@@ -233,6 +251,7 @@ fn find_insertion_id(dir: &metadata::MdDir, name: &str, name_max: u32) -> Result
             Err(e) => return Err(e),
         }
     }
+    trace!("find_insertion_id -> dir.count={}", dir.count);
     Ok(dir.count)
 }
 
@@ -273,13 +292,27 @@ fn find_name_in_dir<B: BlockDevice>(
         0
     };
 
+    trace!(
+        "find_name_in_dir name={:?} dir.pair={:?} count={} start_id={}",
+        name,
+        dir.pair,
+        dir.count,
+        start_id
+    );
     match find_name_in_dir_pair(bd, config, dir, name_bytes, name_max, start_id) {
-        Ok(id) => Ok(id),
+        Ok(id) => {
+            trace!("find_name_in_dir found id={}", id);
+            Ok(id)
+        }
         Err(Error::Noent) if dir.split => {
             let next_dir = metadata::fetch_metadata_pair(bd, config, dir.tail)?;
+            trace!("find_name_in_dir split, trying tail");
             find_name_in_dir(bd, config, &next_dir, name, name_max)
         }
-        other => other,
+        other => {
+            trace!("find_name_in_dir Noent (no split)");
+            other
+        }
     }
 }
 
@@ -295,6 +328,7 @@ fn find_name_in_dir_pair<B: BlockDevice>(
         match metadata::get_entry_info(dir, id, name_max) {
             Ok(info) => {
                 if info.name_bytes() == name_bytes {
+                    trace!("find_name_in_dir_pair match id={}", id);
                     return Ok(id);
                 }
             }
@@ -302,6 +336,11 @@ fn find_name_in_dir_pair<B: BlockDevice>(
             Err(e) => return Err(e),
         }
     }
+    trace!(
+        "find_name_in_dir_pair Noent after scanning {}-{}",
+        start_id,
+        dir.count
+    );
     Err(Error::Noent)
 }
 

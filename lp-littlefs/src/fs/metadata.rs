@@ -8,6 +8,7 @@ use crate::crc;
 use crate::error::Error;
 use crate::info::{FileType, Info};
 use crate::superblock::{tag, Superblock};
+use crate::trace;
 
 /// Parsed metadata pair state. Holds block data for backward iteration.
 #[derive(Clone)]
@@ -82,6 +83,7 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
     config: &Config,
     pair: [u32; 2],
 ) -> Result<MdDir, Error> {
+    trace!("fetch_metadata_pair pair={:?}", pair);
     let block_size = config.block_size as usize;
     if config.block_count != 0 && (pair[0] >= config.block_count || pair[1] >= config.block_count) {
         return Err(Error::Corrupt);
@@ -102,6 +104,12 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
     };
     let block = &blocks[r];
     let block_idx = pair[r];
+    trace!(
+        "fetch_metadata_pair picked block r={} block_idx={} revs={:?}",
+        r,
+        block_idx,
+        revs
+    );
 
     let mut tempcount: i32 = 0;
     let mut temptail: [u32; 2] = [0xffff_ffff, 0xffff_ffff];
@@ -176,6 +184,13 @@ pub fn fetch_metadata_pair<B: BlockDevice>(
     }
 
     let count = if tempcount < 0 { 0 } else { tempcount as u16 };
+    trace!(
+        "fetch_metadata_pair done count={} off={} tail={:?} split={}",
+        count,
+        last_off,
+        temptail,
+        tempsplit
+    );
 
     Ok(MdDir {
         pair: [block_idx, pair[1 - r]],
@@ -224,6 +239,12 @@ pub fn get_tag_backwards(
 /// Get entry info for id. Returns NAME (name+type) and STRUCT (size).
 /// Skips entries that have a DELETE tag (most recent in backward order).
 pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error> {
+    trace!(
+        "get_entry_info id={} dir.pair={:?} count={}",
+        id,
+        dir.pair,
+        dir.count
+    );
     if id == 0x3ff {
         let mut info = Info::new(FileType::Dir, 0);
         info.set_name(b"/");
@@ -234,16 +255,25 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
     // backward iteration sees most-recent tags first.
     let delete_gtag = (tag::TYPE_DELETE << 20) | ((id as u32) << 10);
     if get_tag_backwards(dir, 0x7ff0_fc00, delete_gtag)?.is_some() {
+        trace!("get_entry_info id={} DELETE found -> Noent", id);
         return Err(Error::Noent);
     }
 
     // Per lfs_dir_get: NAME (REG/DIR) or SUPERBLOCK for root id 0.
-    let gmask = 0x780f_fc00;
-    let name_gtag = (tag::TYPE_REG << 20) | ((id as u32) << 10) | (name_max + 1);
+    // LFS_TYPE_NAME with mask 0x780 matches both REG (0x001) and DIR (0x002) name tags.
+    let gmask = 0x780ffc00;
+    let name_gtag = (tag::TYPE_NAME << 20) | ((id as u32) << 10) | (name_max + 1);
     let name_result = get_tag_backwards(dir, gmask, name_gtag)?;
 
     let (name_tag, name_off, name_tag_size) = match name_result {
-        Some((tag, off, size)) => (tag, off, size),
+        Some((tag, off, size)) => {
+            trace!(
+                "get_entry_info id={} NAME found type3=0x{:03x}",
+                id,
+                (tag >> 20) & 0x7ff
+            );
+            (tag, off, size)
+        }
         None if id == 0 => {
             // Root superblock: name comes from SUPERBLOCK tag, type is Dir
             let sb_gtag = (tag::TYPE_SUPERBLOCK << 20) | 8;
@@ -264,7 +294,15 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
             info.set_name(&name_buf[..nul]);
             return Ok(info);
         }
-        None => return Err(Error::Noent),
+        None => {
+            trace!(
+                "get_entry_info id={} NAME not found -> Noent (gmask=0x{:08x} gtag=0x{:08x})",
+                id,
+                gmask,
+                name_gtag
+            );
+            return Err(Error::Noent);
+        }
     };
 
     let block = &dir.block;
@@ -279,7 +317,10 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
     let struct_result = get_tag_backwards(dir, 0x700f_fc00, struct_gtag)?;
     let (struct_tag, struct_off, _) = match struct_result {
         Some(x) => x,
-        None => return Err(Error::Noent),
+        None => {
+            trace!("get_entry_info id={} STRUCT not found -> Noent", id);
+            return Err(Error::Noent);
+        }
     };
 
     let size = if tag_type3(struct_tag) == tag::TYPE_CTZSTRUCT {

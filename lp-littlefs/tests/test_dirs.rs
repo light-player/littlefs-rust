@@ -5,6 +5,12 @@
 
 use lp_littlefs::{CachedBlockDevice, Config, Dir, FileType, Info, LittleFs, RamBlockDevice};
 
+/// Initialize logger for trace output. Run tests with:
+/// RUST_LOG=lp_littlefs=trace cargo test --features trace test_dirs
+fn init_log() {
+    let _ = env_logger::builder().is_test(true).try_init();
+}
+
 fn default_config() -> Config {
     Config::default_for_tests(128)
 }
@@ -18,6 +24,7 @@ fn cached_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
 // Upstream: dir_open("/"), dir_read returns ".", "..", then 0
 #[test]
 fn test_dirs_root() {
+    init_log();
     let config = default_config();
     let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
@@ -44,6 +51,7 @@ fn test_dirs_root() {
 // --- test_dirs_one_mkdir ---
 #[test]
 fn test_dirs_one_mkdir() {
+    init_log();
     let config = default_config();
     let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
@@ -69,6 +77,7 @@ fn test_dirs_one_mkdir() {
 // Upstream: mkdir N dirs, dir_read lists them
 #[test]
 fn test_dirs_many_creation() {
+    init_log();
     let config = default_config();
     let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
@@ -105,6 +114,7 @@ fn test_dirs_many_creation() {
 // Upstream: mkdir N, remove all, dir_read empty
 #[test]
 fn test_dirs_many_removal() {
+    init_log();
     let config = default_config();
     let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
@@ -131,6 +141,7 @@ fn test_dirs_many_removal() {
 // --- test_dirs_one_rename ---
 #[test]
 fn test_dirs_one_rename() {
+    init_log();
     let config = default_config();
     let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();
@@ -158,6 +169,7 @@ fn test_dirs_one_rename() {
 // Ignored: rename with multiple entries needs further investigation
 #[test]
 fn test_dirs_many_rename() {
+    init_log();
     let config = default_config();
     let bd = cached_bd(&config);
     let mut lfs = LittleFs::new();

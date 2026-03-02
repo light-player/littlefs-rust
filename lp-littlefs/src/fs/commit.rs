@@ -10,6 +10,7 @@ use crate::config::Config;
 use crate::crc;
 use crate::error::Error;
 use crate::superblock::tag;
+use crate::trace;
 
 use super::alloc::{self, Lookahead};
 use super::metadata::MdDir;
@@ -149,6 +150,12 @@ pub fn dir_commit_append<B: BlockDevice>(
     dir: &mut MdDir,
     attrs: &[CommitAttr<'_>],
 ) -> Result<(), Error> {
+    trace!(
+        "dir_commit_append pair={:?} n_attrs={} off={}",
+        dir.pair,
+        attrs.len(),
+        dir.off
+    );
     let block_size = config.block_size as usize;
     let prog_size = config.prog_size as usize;
     let block_idx = dir.pair[0];
@@ -206,5 +213,6 @@ pub fn dir_commit_append<B: BlockDevice>(
     dir.off = off;
     dir.etag = (crc_tag & 0x7fff_ffff) ^ ((tag_chunk(crc_tag) & 1) as u32) << 31;
 
+    trace!("dir_commit_append done new_off={} count={}", off, dir.count);
     Ok(())
 }

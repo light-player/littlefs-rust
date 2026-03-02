@@ -13,6 +13,7 @@ mod error;
 mod fs;
 mod info;
 mod superblock;
+mod trace;
 
 pub use block::{BlockDevice, CachedBlockDevice, RamBlockDevice};
 pub use config::Config;

@@ -15,6 +15,7 @@ use crate::block::BlockDevice;
 use crate::config::Config;
 use crate::error::Error;
 use crate::info::{FsInfo, Info};
+use crate::trace;
 
 pub struct LittleFs {
     mounted: Option<mount::MountState>,
@@ -67,8 +68,10 @@ impl LittleFs {
     }
 
     pub fn stat<B: BlockDevice>(&self, bd: &B, config: &Config, path: &str) -> Result<Info, Error> {
+        trace!("stat path={:?}", path);
         let state = self.require_mounted()?;
         let (dir, id) = path::dir_find(bd, config, state.root, path, state.name_max)?;
+        trace!("stat dir_find returned id={}", id);
 
         if id == 0x3ff {
             let mut info = Info::new(crate::info::FileType::Dir, 0);
@@ -145,9 +148,11 @@ impl LittleFs {
         config: &Config,
         path: &str,
     ) -> Result<(), Error> {
+        trace!("mkdir path={:?}", path);
         let state = self.require_mounted_mut()?;
         let (cwd, id, name) =
             path::dir_find_for_create(bd, config, state.root, path, state.name_max)?;
+        trace!("mkdir cwd.pair={:?} id={} name={:?}", cwd.pair, id, name);
 
         let name_len = name.len();
         if name_len > state.name_max as usize {
@@ -239,8 +244,10 @@ impl LittleFs {
         old_path: &str,
         new_path: &str,
     ) -> Result<(), Error> {
+        trace!("rename old={:?} new={:?}", old_path, new_path);
         let state = self.require_mounted_mut()?;
         let (old_cwd, old_id) = path::dir_find(bd, config, state.root, old_path, state.name_max)?;
+        trace!("rename old_cwd.pair={:?} old_id={}", old_cwd.pair, old_id);
 
         if old_id == 0x3ff {
             return Err(Error::Inval);
@@ -255,6 +262,12 @@ impl LittleFs {
 
         let (new_cwd, new_id, new_name) =
             path::dir_find_for_create(bd, config, state.root, new_path, state.name_max)?;
+        trace!(
+            "rename new_cwd.pair={:?} new_id={} new_name={:?}",
+            new_cwd.pair,
+            new_id,
+            new_name
+        );
 
         if new_name.len() > state.name_max as usize {
             return Err(Error::Nametoolong);
@@ -265,6 +278,13 @@ impl LittleFs {
         }
 
         let same_pair = old_cwd.pair[0] == new_cwd.pair[0] && old_cwd.pair[1] == new_cwd.pair[1];
+        trace!(
+            "rename same_pair={} attrs: create={} name_dir={} dir_struct delete={}",
+            same_pair,
+            new_id,
+            new_id,
+            old_id
+        );
         if !same_pair {
             return Err(Error::Inval);
         }
@@ -278,6 +298,7 @@ impl LittleFs {
 
         let mut new_cwd_mut = metadata::fetch_metadata_pair(bd, config, new_cwd.pair)?;
         commit::dir_commit_append(bd, config, &mut new_cwd_mut, &attrs)?;
+        trace!("rename commit done, syncing");
 
         bd.sync()?;
         Ok(())

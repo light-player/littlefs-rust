@@ -4,6 +4,7 @@ use crate::block::BlockDevice;
 use crate::config::Config;
 use crate::error::Error;
 use crate::info::{FileType, Info};
+use crate::trace;
 
 use super::metadata;
 
@@ -39,12 +40,14 @@ pub fn dir_read<B: BlockDevice>(
 
         match metadata::get_entry_info(&dir.mdir, dir.id, name_max) {
             Ok(entry_info) => {
+                trace!("dir_read id={} name={:?}", dir.id, entry_info.name().ok());
                 *info = entry_info;
                 dir.id += 1;
                 dir.pos += 1;
                 return Ok(1);
             }
             Err(Error::Noent) => {
+                trace!("dir_read id={} Noent skip", dir.id);
                 dir.id += 1;
                 continue;
             }
