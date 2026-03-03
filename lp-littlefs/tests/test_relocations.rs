@@ -116,7 +116,7 @@ fn test_relocations_nonreentrant() {
 
 // --- test_relocations_nonreentrant_renames ---
 // Upstream: random mkdir/rename/remove with 2000 cycles; may hit non-DAG edge cases.
-// Chained renames (x->z, y->x, z->y) cause z to disappear after y->x (implementation bug).
+// Simplified: chained renames (x->z, y->x, z->y) exercise same-slot name change.
 #[test]
 fn test_relocations_nonreentrant_renames() {
     init_log();

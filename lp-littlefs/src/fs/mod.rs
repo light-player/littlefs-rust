@@ -850,7 +850,8 @@ impl LittleFs {
 
         let (delete_overwrite, delete_old) = if overwrite_dir_orphan.is_some() {
             (true, false)
-        } else if same_pair {
+        } else if same_pair && new_id != old_id {
+            // When new_id == old_id we're reusing the same slot (name change only); skip DELETE.
             (false, true)
         } else {
             (false, false)
@@ -898,7 +899,7 @@ impl LittleFs {
                 }
             }
             if delete_old {
-                v.push(commit::CommitAttr::delete(old_id));
+                v.push(commit::CommitAttr::delete(newoldid));
             }
             v
         };
