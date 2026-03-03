@@ -1,6 +1,6 @@
 //! Path resolution for littlefs.
 //!
-//! Per lfs_dir_find (lfs.c 1483-1590).
+//! Per lfs_dir_find (lfs.c:1483–1590).
 
 use crate::block::BlockDevice;
 use crate::error::Error;
@@ -11,6 +11,7 @@ use super::bdcache::BdContext;
 use super::metadata;
 
 /// Find entry at path. Returns (MdDir, id) where id is 0x3ff for root.
+/// Per lfs_dir_find (lfs.c:1483–1590).
 pub fn dir_find<B: BlockDevice>(
     ctx: &BdContext<'_, B>,
     root: [u32; 2],
@@ -118,6 +119,7 @@ pub fn dir_find<B: BlockDevice>(
 /// Returns (parent_dir, id, name) when the path does not exist and can be created.
 /// Returns Err(Exist) when the final component already exists.
 /// Returns Err(Noent) when a parent component does not exist.
+/// C: lfs_dir_find + lfs_path_islast for create path.
 pub fn dir_find_for_create<'a, B: BlockDevice>(
     ctx: &BdContext<'_, B>,
     root: [u32; 2],
@@ -225,6 +227,7 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
 }
 
 /// Find the id slot where a new name would be inserted to maintain alphabetical order.
+/// C: lfs_min(lfs_tag_id(besttag), dir->count) from lfs_dir_fetchmatch (lfs.c:1370).
 fn find_insertion_id(dir: &metadata::MdDir, name: &str, name_max: u32) -> Result<u16, Error> {
     let name_bytes = name.as_bytes();
     let start_id = if dir.pair[0] == 0 || dir.pair[0] == 1 {
@@ -294,6 +297,7 @@ fn find_name_in_dir<B: BlockDevice>(
     }
 }
 
+/// Per lfs_dir_find_match (lfs.c:1453).
 fn find_name_in_dir_pair(
     dir: &metadata::MdDir,
     name_bytes: &[u8],
@@ -337,4 +341,250 @@ pub fn path_last_component(path: &str) -> Option<&str> {
         return None;
     }
     trimmed.rsplit('/').next()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::RamBlockDevice;
+    use crate::config::Config;
+    use crate::fs::bdcache::{self, BdContext};
+    use crate::fs::commit;
+    use crate::fs::format;
+    use core::cell::RefCell;
+
+    fn formatted_bd() -> (RamBlockDevice, Config) {
+        let config = Config::default_for_tests(128);
+        let bd = RamBlockDevice::new(config.block_size, config.block_count);
+        format::format(&bd, &config).unwrap();
+        (bd, config)
+    }
+
+    #[test]
+    fn dir_find_root() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let (dir, id) = dir_find(&ctx, [0, 1], "/", 255).unwrap();
+        assert_eq!(id, 0x3ff);
+        assert_eq!(dir.pair, [0, 1]);
+    }
+
+    #[test]
+    fn dir_find_single() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let d0_pair = [2u32, 3];
+        let attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, d0_pair),
+            commit::CommitAttr::soft_tail(d0_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let (dir, id) = dir_find(&ctx, [0, 1], "d0", 255).unwrap();
+        assert_eq!(id, 1);
+        assert_eq!(dir.pair, [0, 1]);
+    }
+
+    #[test]
+    fn dir_find_nested() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let p_pair = [2u32, 3];
+        let c_pair = [4u32, 5];
+        let mkdir_p = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"p"),
+            commit::CommitAttr::dir_struct(1, p_pair),
+            commit::CommitAttr::soft_tail(p_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_p, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let block_size = config.block_size as usize;
+        let mut p_dir = metadata::MdDir::alloc_empty(p_pair, block_size);
+        let mkdir_c = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"c"),
+            commit::CommitAttr::dir_struct(1, c_pair),
+            commit::CommitAttr::soft_tail(c_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut p_dir, &mkdir_c, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let (dir, id) = dir_find(&ctx, [0, 1], "p/c", 255).unwrap();
+        assert_eq!(id, 1);
+        assert_eq!(dir.pair, p_pair);
+    }
+
+    #[test]
+    fn dir_find_dotdot_cancel() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let a_pair = [2u32, 3];
+        let b_pair = [4u32, 5];
+        let attrs_a = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"a"),
+            commit::CommitAttr::dir_struct(1, a_pair),
+            commit::CommitAttr::soft_tail(a_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &attrs_a, &mut None).unwrap();
+        let mut root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let attrs_b = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"b"),
+            commit::CommitAttr::dir_struct(2, b_pair),
+            commit::CommitAttr::soft_tail(b_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &attrs_b, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let (dir, id) = dir_find(&ctx, [0, 1], "a/../b", 255).unwrap();
+        assert_eq!(id, 2);
+        assert_eq!(dir.pair, [0, 1]);
+    }
+
+    #[test]
+    fn dir_find_after_rename() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let d0_pair = [2u32, 3];
+        let mkdir_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, d0_pair),
+            commit::CommitAttr::soft_tail(d0_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let rename_attrs = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"x0"),
+            commit::CommitAttr::dir_struct(2, d0_pair),
+            commit::CommitAttr::delete(1),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let (_dir, id) = dir_find(&ctx, [0, 1], "x0", 255).unwrap();
+        assert_eq!(id, 2);
+        assert!(dir_find(&ctx, [0, 1], "d0", 255).is_err());
+    }
+
+    #[test]
+    fn dir_find_for_create_new_append() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let a_pair = [2u32, 3];
+        let b_pair = [4u32, 5];
+        let attrs_a = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"a"),
+            commit::CommitAttr::dir_struct(1, a_pair),
+            commit::CommitAttr::soft_tail(a_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &attrs_a, &mut None).unwrap();
+        root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let attrs_b = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"b"),
+            commit::CommitAttr::dir_struct(2, b_pair),
+            commit::CommitAttr::soft_tail(b_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &attrs_b, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let (dir, id, name) = dir_find_for_create(&ctx, [0, 1], "z", 255).unwrap();
+        assert_eq!(id, 3);
+        assert_eq!(name, "z");
+        assert_eq!(dir.pair, [0, 1]);
+    }
+
+    #[test]
+    fn dir_find_for_create_new_insert() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let a_pair = [2u32, 3];
+        let c_pair = [4u32, 5];
+        let attrs_a = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"a"),
+            commit::CommitAttr::dir_struct(1, a_pair),
+            commit::CommitAttr::soft_tail(a_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &attrs_a, &mut None).unwrap();
+        root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let attrs_c = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"c"),
+            commit::CommitAttr::dir_struct(2, c_pair),
+            commit::CommitAttr::soft_tail(c_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &attrs_c, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let (dir, id, name) = dir_find_for_create(&ctx, [0, 1], "b", 255).unwrap();
+        assert_eq!(id, 2, "b inserts between a and c at id 2");
+        assert_eq!(name, "b");
+        assert_eq!(dir.pair, [0, 1]);
+    }
+
+    #[test]
+    fn dir_find_for_create_exists() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = metadata::fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let a_pair = [2u32, 3];
+        let attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"a"),
+            commit::CommitAttr::dir_struct(1, a_pair),
+            commit::CommitAttr::soft_tail(a_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        assert!(matches!(
+            dir_find_for_create(&ctx, [0, 1], "a", 255),
+            Err(Error::Exist)
+        ));
+    }
+
+    #[test]
+    fn dir_find_for_create_parent_noent() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+
+        assert!(matches!(
+            dir_find_for_create(&ctx, [0, 1], "nonexistent/x", 255),
+            Err(Error::Noent)
+        ));
+    }
 }
