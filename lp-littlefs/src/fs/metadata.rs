@@ -101,7 +101,7 @@ fn tag_isvalid(t: u32) -> bool {
 
 /// Fetch and parse a metadata pair. Picks block by revision, scans commits.
 /// If the higher-rev block fails CRC (e.g. partial write), tries the other block.
-/// Per lfs.c lfs_dir_fetchmatch.
+/// Per lfs_dir_fetchmatch (lfs.c:1107).
 pub fn fetch_metadata_pair<B: BlockDevice>(
     ctx: &BdContext<'_, B>,
     pair: [u32; 2],
@@ -298,8 +298,8 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
 }
 
 /// Iterate backward to find tag matching (gmask, gtag). Returns (tag, data_offset, size) or None.
-/// Applies splice gdiff per lfs_dir_getslice: when we see SPLICE (type1=4), adjust effective
-/// search tag so logical ids shift correctly (e.g. CREATE at id 1 shifts older id 1 to id 2).
+/// Applies splice gdiff per lfs_dir_getslice (lfs.c:719–783): splice/gdiff at 750–761,
+/// "found where we were created" at 753–756.
 pub fn get_tag_backwards(
     dir: &MdDir,
     gmask: u32,
@@ -321,16 +321,22 @@ pub fn get_tag_backwards(
         ntag = (stored ^ tag) & 0x7fff_ffff;
 
         // Per lfs_dir_getslice (lfs.c:750-761). Synthetic moves (726-734) omitted—
-        // would require gstate/gdisk context.
+        // would require gstate/gdisk context. C adds gdiff for all type1==SPLICE;
+        // we add for CREATE and pure SPLICE (positive splice) but not DELETE, because
+        // DELETE -1 breaks rename (CREATE 2, NAME 2, DELETE 1) when searching for id 2.
+        // See lfs.c:759-760.
         if tag_id(gmask) != 0
             && tag_type1(tag) == tag::TYPE_SPLICE
             && tag_id(tag) <= tag_id(gtag.wrapping_sub(gdiff))
         {
-            // "Found where we were created" (lfs.c:753-756): return before gdiff add so
-            // CREATE never corrupts gdiff. Only add for pure SPLICE (0x400); CREATE and
-            // DELETE use chunk differently and would corrupt the id search.
-            if tag_type3(tag) == tag::TYPE_SPLICE {
-                gdiff = gdiff.wrapping_add((tag_splice(tag) as u32) << 10);
+            // "Found where we were created" (lfs.c:753-756): return before gdiff add.
+            if tag == ((tag::TYPE_CREATE << 20) | ((tag_id(gtag.wrapping_sub(gdiff)) as u32) << 10))
+            {
+                return Ok(None);
+            }
+            let splice = tag_splice(tag);
+            if splice > 0 {
+                gdiff = gdiff.wrapping_add((splice as u32) << 10);
             }
         }
 
@@ -353,6 +359,7 @@ pub fn get_tag_backwards(
 
 /// Get entry info for id. Returns NAME (name+type) and STRUCT (size).
 /// Skips entries that have a DELETE tag (most recent in backward order).
+/// Per lfs_dir_getinfo (lfs.c:1413–1445).
 pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error> {
     if id == 0x3ff {
         let mut info = Info::new(FileType::Dir, 0);
@@ -548,7 +555,7 @@ pub enum TraverseAction {
 
 /// Iterate tags forward through a metadata block, optionally filtered by id range [begin, end).
 /// Calls `cb` with (tag, data_slice) for each tag. Used for commit size and compact.
-/// Per lfs_dir_traverse (lfs.c:912). Simplified: no attrs merge, no FROM_MOVE/FROM_USERATTRS.
+/// Per lfs_dir_traverse (lfs.c:914). Simplified: no attrs merge, no FROM_MOVE/FROM_USERATTRS.
 ///
 /// When begin < end, only yields tags whose id is in [begin, end). The diff is added to the
 /// id field of the output tag (for compact, diff = -begin so ids are remapped to 0..).
@@ -716,6 +723,57 @@ mod tests {
         assert_eq!(sb.block_size, config.block_size);
         assert_eq!(sb.block_count, config.block_count);
         assert_eq!(sb.name_max, 255);
+    }
+
+    /// Insert-before scenario: mkdir potato (id 1), then file burito (id 1, overwrites).
+    /// get_entry_info(2) must find "potato" via gdiff from CREATE 1 in second commit.
+    /// Exercises lfs_dir_getslice gdiff for positive splice (lfs.c:750-761).
+    #[test]
+    fn get_entry_info_id2_after_insert_before() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let child_pair = [2u32, 3];
+
+        let mkdir_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"potato"),
+            commit::CommitAttr::dir_struct(1, child_pair),
+            commit::CommitAttr::soft_tail(child_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+
+        let file_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_reg(1, b"burito"),
+            commit::CommitAttr::inline_struct(1, &[]),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &file_attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        assert!(
+            dir.count >= 3,
+            "count must be >= 3 to iterate id 2; got {}",
+            dir.count
+        );
+
+        let info1 = get_entry_info(&dir, 1, 255).unwrap();
+        assert_eq!(
+            info1.name().unwrap(),
+            "burito",
+            "id 1 is most recent (burito)"
+        );
+
+        let info2 = get_entry_info(&dir, 2, 255).unwrap();
+        assert_eq!(
+            info2.name().unwrap(),
+            "potato",
+            "id 2 must find potato via gdiff from CREATE 1"
+        );
     }
 
     /// Append a second commit (mkdir d0) and verify parse. Validates commit
@@ -955,6 +1013,131 @@ mod tests {
         let info = get_entry_info(&dir, 2, 255).unwrap();
         assert_eq!(info.name().unwrap(), "x0");
         assert!(get_entry_info(&dir, 1, 255).is_err()); // id 1 deleted -> Noent
+    }
+
+    /// Validate splice gdiff: CREATE+NAME+DELETE (rename) scenario;
+    /// searching for CREATE returns None; searching for NAME/STRUCT finds id 2.
+    #[test]
+    fn get_tag_backwards_splice_gdiff_only() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let d0_pair = [2u32, 3];
+        let mkdir_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, d0_pair),
+            commit::CommitAttr::soft_tail(d0_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+
+        let rename_attrs = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"x0"),
+            commit::CommitAttr::dir_struct(2, d0_pair),
+            commit::CommitAttr::delete(1),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let create_gtag = (tag::TYPE_CREATE << 20) | (2 << 10) | 0;
+        let r = get_tag_backwards(&dir, 0x7ff0_fc00, create_gtag).unwrap();
+        assert!(
+            r.is_none(),
+            "CREATE 2 must return None (found where we were created)"
+        );
+        let name_gtag = (tag::TYPE_NAME << 20) | (2 << 10) | 256;
+        let r = get_tag_backwards(&dir, 0x780f_fc00, name_gtag).unwrap();
+        assert!(r.is_some(), "NAME 2 must be found after splice gdiff");
+    }
+
+    /// Empty child dir: only SOFTTAIL, no NAME/SPLICE. count must not be forced to 1.
+    #[test]
+    fn get_tag_backwards_empty_child_dir() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut lookahead = crate::fs::alloc::Lookahead::new(&config);
+        crate::fs::alloc::alloc_scan(&ctx, [0, 1], &mut lookahead).unwrap();
+        let mut child = commit::dir_alloc(&ctx, [0, 1], &mut lookahead).unwrap();
+        let null_pair = [0xffff_ffffu32, 0xffff_ffff];
+        let attrs = [commit::CommitAttr::soft_tail(null_pair)];
+        commit::dir_commit_append(&ctx, &mut child, &attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let dir = fetch_metadata_pair(&ctx, child.pair).unwrap();
+        assert_eq!(
+            dir.count, 0,
+            "empty child (SOFTTAIL only) must have count 0"
+        );
+        let gmask = 0x780f_fc00;
+        let name_gtag = (tag::TYPE_NAME << 20) | (1 << 10) | 256;
+        let r = get_tag_backwards(&dir, gmask, name_gtag).unwrap();
+        assert!(r.is_none(), "non-existent id must return None");
+    }
+
+    /// After format both blocks have equal rev; fetch must use block 0.
+    #[test]
+    fn fetch_revs_equal_uses_block0() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        assert_eq!(dir.pair[0], 0, "when revs equal, pair[0] must be block 0");
+    }
+
+    /// Corrupt block 0 CRC; fetch must fall back to block 1 and succeed.
+    #[test]
+    fn fetch_alternate_block_on_crc_fail() {
+        let (bd, config) = formatted_bd();
+        let prog_size = config.prog_size as usize;
+        let mut sector = alloc::vec![0u8; prog_size];
+        bd.read(0, 24, &mut sector).unwrap();
+        sector[0] ^= 0xff;
+        bd.prog(0, 24, &sector).unwrap();
+
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        assert!(
+            dir.pair[0] == 1,
+            "after block 0 CRC failure, must use block 1; got pair[0]={}",
+            dir.pair[0]
+        );
+        assert_eq!(dir.count, 1);
+        assert_eq!(
+            get_entry_info(&dir, 0, 255).unwrap().name().unwrap(),
+            "littlefs"
+        );
+    }
+
+    /// Empty child dir: mkdir then fetch child pair with minimal commit. count == 0.
+    #[test]
+    fn fetch_empty_child_dir() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut lookahead = crate::fs::alloc::Lookahead::new(&config);
+        crate::fs::alloc::alloc_scan(&ctx, [0, 1], &mut lookahead).unwrap();
+        let mut child = commit::dir_alloc(&ctx, [0, 1], &mut lookahead).unwrap();
+        let null_pair = [0xffff_ffffu32, 0xffff_ffff];
+        let attrs = [commit::CommitAttr::soft_tail(null_pair)];
+        commit::dir_commit_append(&ctx, &mut child, &attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let dir = fetch_metadata_pair(&ctx, child.pair).unwrap();
+        assert_eq!(
+            dir.count, 0,
+            "empty child (only SOFTTAIL, no NAME/SPLICE) must have count 0"
+        );
     }
 
     #[test]
