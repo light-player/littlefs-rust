@@ -1,33 +1,23 @@
 //! Format implementation.
 //!
 //! Writes initial superblock to metadata pair (blocks 0, 1) per SPEC.md.
+//! Uses dir_commit_append + dir_compact for C-compatible CRC layout.
 
 use core::cell::RefCell;
 
 use crate::block::BlockDevice;
 use crate::config::Config;
-use crate::crc;
 use crate::error::Error;
-use crate::superblock::{tag, Superblock, DISK_VERSION};
+use crate::superblock::{Superblock, DISK_VERSION};
 
 use super::bdcache;
+use super::commit;
+use super::metadata;
 
 /// LFS_NAME_MAX, LFS_FILE_MAX, LFS_ATTR_MAX from lfs.h
 const NAME_MAX: u32 = 255;
 const FILE_MAX: u32 = 2_147_483_647;
 const ATTR_MAX: u32 = 1022;
-
-fn mktag(type_: u32, id: u32, size: u32) -> u32 {
-    (type_ << 20) | (id << 10) | size
-}
-
-fn to_be32(x: u32) -> [u8; 4] {
-    x.to_be_bytes()
-}
-
-fn to_le32(x: u32) -> [u8; 4] {
-    x.to_le_bytes()
-}
 
 pub fn format<B: BlockDevice>(bd: &B, config: &Config) -> Result<(), Error> {
     if config.block_count == 0 {
@@ -39,37 +29,11 @@ pub fn format<B: BlockDevice>(bd: &B, config: &Config) -> Result<(), Error> {
     let ctx = bdcache::BdContext::new(bd, config, &rcache, &pcache);
 
     let block_size = config.block_size as usize;
-    let prog_size = config.prog_size as usize;
+    let root = [0u32, 1];
 
-    let mut block = alloc::vec![0xff; block_size];
+    ctx.erase(0)?;
+    ctx.erase(1)?;
 
-    // Revision 1 (LE)
-    block[0..4].copy_from_slice(&to_le32(1));
-
-    let mut ptag: u32 = 0xffff_ffff;
-    let mut off = 4usize;
-    let mut crc = crc::crc32(0xffff_ffff, &block[0..4]);
-
-    // CREATE id 0 size 0
-    let tag_create = mktag(tag::TYPE_CREATE, 0, 0);
-    let stored_tag = (tag_create & 0x7fff_ffff) ^ ptag;
-    block[off..off + 4].copy_from_slice(&to_be32(stored_tag));
-    crc = crc::crc32(crc, &block[off..off + 4]);
-    ptag = tag_create & 0x7fff_ffff;
-    off += 4;
-
-    // SUPERBLOCK id 0 size 8, data "littlefs"
-    let tag_sb = mktag(tag::TYPE_SUPERBLOCK, 0, 8);
-    let stored_tag = (tag_sb & 0x7fff_ffff) ^ ptag;
-    block[off..off + 4].copy_from_slice(&to_be32(stored_tag));
-    crc = crc::crc32(crc, &block[off..off + 4]);
-    ptag = tag_sb & 0x7fff_ffff;
-    off += 4;
-    block[off..off + 8].copy_from_slice(b"littlefs");
-    crc = crc::crc32(crc, b"littlefs");
-    off += 8;
-
-    // INLINESTRUCT id 0 size 24, superblock
     let superblock = Superblock {
         version: DISK_VERSION,
         block_size: config.block_size,
@@ -92,42 +56,26 @@ pub fn format<B: BlockDevice>(bd: &B, config: &Config) -> Result<(), Error> {
     .try_into()
     .unwrap();
 
-    let tag_struct = mktag(tag::TYPE_INLINESTRUCT, 0, Superblock::SIZE as u32);
-    let stored_tag = (tag_struct & 0x7fff_ffff) ^ ptag;
-    block[off..off + 4].copy_from_slice(&to_be32(stored_tag));
-    crc = crc::crc32(crc, &block[off..off + 4]);
-    ptag = tag_struct & 0x7fff_ffff;
-    off += 4;
-    block[off..off + Superblock::SIZE].copy_from_slice(&sb_bytes);
-    crc = crc::crc32(crc, &sb_bytes);
-    off += Superblock::SIZE;
+    let mut dir = metadata::MdDir::alloc_empty(root, block_size);
+    let attrs = [
+        commit::CommitAttr::create(0),
+        commit::CommitAttr::superblock_magic(),
+        commit::CommitAttr::inline_struct(0, &sb_bytes),
+    ];
 
-    // Pad to prog_size for CRC tag+value. Need CRC tag (4) + CRC (4) = 8.
-    off = (off + prog_size - 1) & !(prog_size - 1);
-    if off + 8 > block_size {
-        return Err(Error::Nospc);
-    }
+    commit::dir_commit_append(&ctx, &mut dir, &attrs, &mut None, DISK_VERSION)?;
+    bdcache::bd_sync(bd, config, &rcache, &pcache)?;
 
-    // CRC tag - LFS_TYPE_CCRC = 0x500. Size is noff - (commit->off+4).
-    // Simplified: use TYPE_CRC (0x500), id 0x3ff, size 4.
-    let tag_crc = mktag(tag::TYPE_CRC, 0x3ff, 4);
-    let stored_crc_tag = (tag_crc & 0x7fff_ffff) ^ ptag;
-    block[off..off + 4].copy_from_slice(&to_be32(stored_crc_tag));
-    crc = crc::crc32(crc, &block[off..off + 4]);
-    off += 4;
-    block[off..off + 4].copy_from_slice(&to_le32(crc));
-    off += 4;
-
-    // Pad remainder with 0xff
-    block[off..].fill(0xff);
-
-    // Erase and prog blocks 0 and 1
-    ctx.erase(0)?;
+    // Mirror block 0 to block 1 so both have identical content (rev 1).
+    // C format uses dir_compact which swaps; we copy instead to keep both rev 1
+    // for consistent fetch behavior when revs are equal.
+    let mut block = alloc::vec![0xff; block_size];
+    ctx.read(0, 0, &mut block)?;
     ctx.erase(1)?;
-    for i in (0..block_size).step_by(prog_size) {
-        ctx.prog(0, i as u32, &block[i..i + prog_size])?;
-        ctx.prog(1, i as u32, &block[i..i + prog_size])?;
+    for i in (0..block_size).step_by(config.prog_size as usize) {
+        ctx.prog(1, i as u32, &block[i..i + config.prog_size as usize])?;
     }
     bdcache::bd_sync(bd, config, &rcache, &pcache)?;
+
     Ok(())
 }

@@ -118,6 +118,14 @@ impl<'a> CommitAttr<'a> {
         }
     }
 
+    /// SUPERBLOCK tag with "littlefs" magic. Per lfs.c LFS_TYPE_SUPERBLOCK.
+    pub fn superblock_magic() -> Self {
+        Self {
+            tag: mktag(tag::TYPE_SUPERBLOCK, 0, 8),
+            data: CommitData::Slice(crate::superblock::MAGIC),
+        }
+    }
+
     /// MOVESTATE tag for gstate persistence. Per lfs.c LFS_TYPE_MOVESTATE.
     pub fn movestate(gstate: &super::gstate::GState) -> Self {
         Self {
