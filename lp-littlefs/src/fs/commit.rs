@@ -195,10 +195,11 @@ pub fn dir_commit_append<B: BlockDevice>(
     gstate_ctx: &mut Option<&mut GStateCtx<'_>>,
 ) -> Result<(), Error> {
     trace!(
-        "dir_commit_append pair={:?} n_attrs={} off={}",
+        "dir_commit_append pair={:?} writing to block={} at off={} n_attrs={}",
         dir.pair,
-        attrs.len(),
-        dir.off
+        dir.pair[0],
+        dir.off,
+        attrs.len()
     );
     let block_size = ctx.config.block_size as usize;
     let prog_size = ctx.config.prog_size as usize;
@@ -704,6 +705,11 @@ pub fn dir_orphaningcommit<B: BlockDevice>(
     gdelta: &mut GState,
     skip_dir_adjust: bool,
 ) -> Result<bool, Error> {
+    trace!(
+        "dir_orphaningcommit pair={:?} n_attrs={}",
+        dir.pair,
+        attrs.len()
+    );
     let lpair = dir.pair;
     let mut ldir = dir.clone();
     let mut pdir = MdDir::alloc_empty([0, 0], ctx.config.block_size as usize);

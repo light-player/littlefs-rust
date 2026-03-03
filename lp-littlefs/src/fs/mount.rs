@@ -131,6 +131,7 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
     gstate::ensure_valid(&mut gstate);
     let gdisk = gstate;
 
+    trace!("mount done root={:?}", root);
     Ok(MountState {
         root,
         block_size: sb.block_size,

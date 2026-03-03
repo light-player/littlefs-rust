@@ -27,7 +27,7 @@ fn test_superblocks_mount() {
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 }
 
 // --- test_fs_size_traverse ---
@@ -66,7 +66,7 @@ fn test_fs_mkconsistent() {
     lfs.mount(&bd, &config).unwrap();
     lfs.mkdir(&bd, &config, "d0").unwrap();
     lfs.fs_mkconsistent(&bd, &config).unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     let info = lfs.stat(&bd, &config, "d0").unwrap();

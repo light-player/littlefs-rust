@@ -5,6 +5,8 @@ mod bdcache;
 mod commit;
 mod consistent;
 mod ctz;
+#[cfg(feature = "trace")]
+mod debug;
 mod dir;
 mod file;
 mod format;
@@ -50,8 +52,11 @@ impl LittleFs {
         Ok(())
     }
 
-    pub fn unmount(&mut self) -> Result<(), Error> {
-        trace!("unmount");
+    pub fn unmount<B: BlockDevice>(&mut self, bd: &B, config: &Config) -> Result<(), Error> {
+        if let Some(state) = &self.mounted {
+            trace!("unmount bd_sync then drop caches");
+            bdcache::bd_sync(bd, config, &state.rcache, &state.pcache)?;
+        }
         self.mounted = None;
         Ok(())
     }
@@ -176,6 +181,19 @@ impl LittleFs {
         Ok(state.gstate.hasorphans())
     }
 
+    /// Dump root metadata state and entry list. For debugging. Requires `trace` feature.
+    #[cfg(feature = "trace")]
+    pub fn fs_debug_dump<B: BlockDevice>(
+        &self,
+        bd: &B,
+        config: &Config,
+    ) -> Result<::alloc::string::String, Error> {
+        let state = self.require_mounted()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
+        let dir = metadata::fetch_metadata_pair(&ctx, state.root)?;
+        debug::fs_debug_dump_impl(&dir, state.name_max)
+    }
+
     /// Deorphan, complete moves, persist gstate. Per lfs_fs_mkconsistent (lfs.h:529).
     pub fn fs_mkconsistent<B: BlockDevice>(
         &mut self,
@@ -219,6 +237,7 @@ impl LittleFs {
             )?;
         }
 
+        trace!("fs_mkconsistent done, bd_sync");
         bdcache::bd_sync(bd, config, &state.rcache, &state.pcache)?;
         Ok(())
     }
@@ -312,8 +331,9 @@ impl LittleFs {
     ) -> Result<file::File, Error> {
         let state = self.require_mounted_mut()?;
         let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
-        if flags.contains(crate::info::OpenFlags::WRONLY)
-            || flags.contains(crate::info::OpenFlags::RDWR)
+        if (flags.contains(crate::info::OpenFlags::WRONLY)
+            || flags.contains(crate::info::OpenFlags::RDWR))
+            && !flags.contains(crate::info::OpenFlags::CREAT)
         {
             consistent::force_consistency(
                 &ctx,
@@ -558,6 +578,7 @@ impl LittleFs {
 
         state.lookahead.alloc_ckpoint(state.block_count);
 
+        trace!("mkdir done, bd_sync root={:?}", state.root);
         bdcache::bd_sync(bd, config, &state.rcache, &state.pcache)?;
         Ok(())
     }
@@ -615,6 +636,7 @@ impl LittleFs {
             false,
         )?;
 
+        trace!("remove done, bd_sync");
         bdcache::bd_sync(bd, config, &state.rcache, &state.pcache)?;
         Ok(())
     }

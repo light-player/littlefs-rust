@@ -54,14 +54,14 @@ fn test_powerloss_only_rev() {
         assert_eq!(&rbuf[..5], b"hello");
     }
     lfs.file_close(&bd, &config, file).unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     let dir = lfs.dir_open(&bd, &config, "notebook").unwrap();
     let pair = dir.pair();
     let rev = dir.revision();
     drop(dir);
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     let mut block_buf = vec![0u8; config.block_size as usize];
     bd.read(pair[1], 0, &mut block_buf).unwrap();
@@ -126,5 +126,5 @@ fn test_powerloss_only_rev() {
         assert_eq!(&rbuf[..7], b"goodbye");
     }
     lfs.file_close(&bd, &config, file).unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 }

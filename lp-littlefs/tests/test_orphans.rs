@@ -30,7 +30,7 @@ fn test_orphans_mkconsistent_no_orphans() {
         !lfs.fs_has_orphans(&bd, &config).unwrap(),
         "force_consistency before mkdir clears orphans"
     );
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     assert!(
@@ -42,7 +42,7 @@ fn test_orphans_mkconsistent_no_orphans() {
         !lfs.fs_has_orphans(&bd, &config).unwrap(),
         "after mkconsistent, gstate should have no orphans (same mount)"
     );
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     bd.sync().unwrap();
     lfs.mount(&bd, &config).unwrap();
@@ -50,5 +50,5 @@ fn test_orphans_mkconsistent_no_orphans() {
         !lfs.fs_has_orphans(&bd, &config).unwrap(),
         "after remount, gstate persisted to disk should have no orphans"
     );
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 }

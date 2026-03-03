@@ -86,6 +86,12 @@ impl File {
                         return Err(Error::Noent);
                     }
                     let (cwd, id, name) = path::dir_find_for_create(ctx, *root, path, name_max)?;
+                    crate::trace!(
+                        "file_open CREAT dir_orphaningcommit pair={:?} id={} name={:?}",
+                        cwd.pair,
+                        id,
+                        name
+                    );
                     if name.len() > name_max as usize {
                         return Err(Error::Nametoolong);
                     }
@@ -529,6 +535,7 @@ impl File {
         gdelta: &mut GState,
     ) -> Result<(), Error> {
         if self.dirty {
+            crate::trace!("file_close dirty -> sync");
             self.sync(ctx, root, lookahead, name_max, gstate, gdisk, gdelta)?;
         }
         Ok(())

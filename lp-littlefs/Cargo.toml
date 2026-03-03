@@ -21,3 +21,5 @@ default = ["alloc"]
 alloc = []
 std = []
 trace = ["log"]
+# Extra verbose cache traces. Use with trace: RUST_LOG=lp_littlefs=trace cargo test --features trace,trace_cache
+trace_cache = ["trace"]

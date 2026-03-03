@@ -79,7 +79,7 @@ fn test_files_simple() {
     let n = fs.file_write(&bd, &config, &mut file, data).unwrap();
     assert_eq!(n, data.len());
     fs.file_close(&bd, &config, file).unwrap();
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
 
     fs.mount(&bd, &config).unwrap();
     let mut file = fs
@@ -126,7 +126,7 @@ fn test_fs_gc() {
     fs.file_write(&bd, &config, &mut f, b"hello").unwrap();
     fs.file_close(&bd, &config, f).unwrap();
     fs.fs_gc(&bd, &config).unwrap();
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
     let info = fs.stat(&bd, &config, "d/x").unwrap();
     assert_eq!(info.name().unwrap(), "x");
@@ -159,7 +159,7 @@ fn test_files_append() {
     fs.file_write(&bd, &config, &mut file, b"bbbb").unwrap();
     fs.file_close(&bd, &config, file).unwrap();
 
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
     let mut file = fs
@@ -227,7 +227,7 @@ fn test_files_large() {
     let data_65: Vec<u8> = (0..65).collect();
     fs.file_write(&bd, &config, &mut file, &data_65).unwrap();
     fs.file_close(&bd, &config, file).unwrap();
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
     let mut file = fs
         .file_open(&bd, &config, "small", OpenFlags::new(OpenFlags::RDONLY))
@@ -237,7 +237,7 @@ fn test_files_large() {
     assert_eq!(n, 65, "65-byte file (inline->CTZ) should read back");
     assert_eq!(&buf[..65], &data_65[..]);
     fs.file_close(&bd, &config, file).unwrap();
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
 
     // Now test 1024 bytes (multi-block CTZ) - reuse bd, fresh format
     fs.format(&bd, &config).unwrap();
@@ -262,7 +262,7 @@ fn test_files_large() {
     }
     fs.file_close(&bd, &config, file).unwrap();
 
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
     let mut file = fs
@@ -313,7 +313,7 @@ fn test_files_rewrite() {
     fs.file_write(&bd, &config, &mut file, &data2).unwrap();
     fs.file_close(&bd, &config, file).unwrap();
 
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
     // Read: first 50 bytes are new (100..150), bytes 50..64 are old (50..64)
@@ -336,7 +336,7 @@ fn test_files_rewrite() {
     fs.file_write(&bd, &config, &mut file, &data3).unwrap();
     fs.file_close(&bd, &config, file).unwrap();
 
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
     let mut file = fs
@@ -369,7 +369,7 @@ fn test_files_many() {
         fs.file_close(&bd, &config, file).unwrap();
     }
 
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
     for i in 0..8u8 {
@@ -410,7 +410,7 @@ fn test_truncate_simple() {
     assert_eq!(fs.file_size(&file).unwrap(), LARGE_SIZE as i64);
     fs.file_close(&bd, &config, file).unwrap();
 
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
     let mut file = fs
@@ -422,7 +422,7 @@ fn test_truncate_simple() {
     assert_eq!(fs.file_size(&file).unwrap(), MEDIUM_SIZE as i64);
     fs.file_close(&bd, &config, file).unwrap();
 
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
     let mut file = fs
@@ -467,7 +467,7 @@ fn test_seek_read() {
     }
     fs.file_close(&bd, &config, file).unwrap();
 
-    fs.unmount().unwrap();
+    fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
     let mut file = fs
@@ -561,7 +561,7 @@ fn test_files_many_power_cycle() {
         fs.file_write(&bd, &config, &mut file, content.as_bytes())
             .unwrap();
         fs.file_close(&bd, &config, file).unwrap();
-        fs.unmount().unwrap();
+        fs.unmount(&bd, &config).unwrap();
 
         fs.mount(&bd, &config).unwrap();
         let mut file = fs
@@ -571,6 +571,6 @@ fn test_files_many_power_cycle() {
         let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
         fs.file_close(&bd, &config, file).unwrap();
         assert_eq!(&buf[..n], content.as_bytes(), "file {name}");
-        fs.unmount().unwrap();
+        fs.unmount(&bd, &config).unwrap();
     }
 }

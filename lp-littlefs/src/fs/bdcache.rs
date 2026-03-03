@@ -150,7 +150,7 @@ pub fn bd_read<B: BlockDevice>(
     let cache_size = config.cache_size;
 
     let mut size = buffer.len() as u32;
-    crate::trace!("cache read block={} off={} len={}", block, off, size);
+    crate::trace_cache!("cache read block={} off={} len={}", block, off, size);
     if off + size > block_size {
         return Err(Error::Corrupt);
     }
@@ -171,7 +171,7 @@ pub fn bd_read<B: BlockDevice>(
             && off < pcache_ref.off + pcache_ref.size
         {
             if off >= pcache_ref.off {
-                crate::trace!("cache read HIT pcache block={}", block);
+                crate::trace_cache!("cache read HIT pcache block={}", block);
                 let in_cache = (off - pcache_ref.off) as usize;
                 let avail = pcache_ref.size as usize - in_cache;
                 diff = diff.min(avail as u32);
@@ -189,7 +189,7 @@ pub fn bd_read<B: BlockDevice>(
         let rcache_ref = rcache.borrow();
         if rcache_ref.block == block && off < rcache_ref.off + rcache_ref.size {
             if off >= rcache_ref.off {
-                crate::trace!("cache read HIT rcache block={}", block);
+                crate::trace_cache!("cache read HIT rcache block={}", block);
                 let in_cache = (off - rcache_ref.off) as usize;
                 let avail = rcache_ref.size as usize - in_cache;
                 diff = diff.min(avail as u32);
@@ -205,7 +205,7 @@ pub fn bd_read<B: BlockDevice>(
         drop(rcache_ref);
 
         if size >= hint && off.is_multiple_of(read_size) && size >= read_size {
-            crate::trace!("cache read MISS passthrough block={} off={}", block, off);
+            crate::trace_cache!("cache read MISS passthrough block={} off={}", block, off);
             diff = aligndown(diff, read_size);
             bd.read(block, off, &mut buffer[pos..][..diff as usize])?;
             pos += diff as usize;
@@ -249,7 +249,7 @@ pub fn bd_prog<B: BlockDevice>(
     let prog_size = config.prog_size;
     let cache_size = config.cache_size;
 
-    crate::trace!("cache prog block={} off={} len={}", block, off, data.len());
+    crate::trace_cache!("cache prog block={} off={} len={}", block, off, data.len());
     let mut size = data.len() as u32;
     let mut off = off;
     let mut pos = 0usize;
@@ -267,6 +267,7 @@ pub fn bd_prog<B: BlockDevice>(
             size -= diff;
             pcache_mut.size = pcache_mut.size.max(off - pcache_mut.off);
             if pcache_mut.size == cache_size {
+                crate::trace_cache!("cache prog FULL flush pcache block={}", pcache_mut.block);
                 drop(pcache_mut);
                 bd_flush(bd, config, rcache, pcache)?;
                 continue;
@@ -275,11 +276,21 @@ pub fn bd_prog<B: BlockDevice>(
         }
 
         if pcache_mut.block != BLOCK_NULL {
+            crate::trace_cache!(
+                "cache prog EVICT flush pcache block={} (switching to block={})",
+                pcache_mut.block,
+                block
+            );
             drop(pcache_mut);
             bd_flush(bd, config, rcache, pcache)?;
             continue;
         }
 
+        crate::trace_cache!(
+            "cache prog LOAD block={} off={}",
+            block,
+            aligndown(off, prog_size)
+        );
         pcache_mut.block = block;
         pcache_mut.off = aligndown(off, prog_size);
         let load_size = (cache_size as usize).min((block_size - pcache_mut.off) as usize);
@@ -297,7 +308,10 @@ pub fn bd_sync<B: BlockDevice>(
     rcache: &RefCell<ReadCache>,
     pcache: &RefCell<ProgCache>,
 ) -> Result<(), Error> {
-    crate::trace!("cache sync");
+    {
+        let _pcache = pcache.borrow();
+        crate::trace_cache!("bd_sync pcache_block={}", _pcache.block);
+    }
     bd_drop_rcache(rcache);
     bd_flush(bd, config, rcache, pcache)?;
     bd.sync()

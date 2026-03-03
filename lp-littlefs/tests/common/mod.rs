@@ -24,7 +24,8 @@ pub fn uncached_bd(config: &Config) -> RamBlockDevice {
 }
 
 /// Initialize logger for trace output.
-/// Run tests with: RUST_LOG=lp_littlefs=trace cargo test --features trace
+/// Run with: RUST_LOG=lp_littlefs=trace cargo test --features trace
+/// For cache traces: --features trace,trace_cache
 pub fn init_log() {
     let _ = env_logger::builder().is_test(true).try_init();
 }

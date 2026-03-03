@@ -131,14 +131,20 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
     revs[0] = u32::from_le_bytes(blocks[0][0..4].try_into().unwrap());
     revs[1] = u32::from_le_bytes(blocks[1][0..4].try_into().unwrap());
 
-    // Pick block with higher revision (sequence compare).
-    let r = if (revs[0] as i32).wrapping_sub(revs[1] as i32) >= 0 {
+    // Pick block with higher revision (sequence compare). When equal, prefer block 0
+    // so we consistently append to the same block. Per lfs_dir_fetchmatch.
+    let r = if (revs[0] as i32).wrapping_sub(revs[1] as i32) > 0 {
         0
-    } else {
+    } else if (revs[1] as i32).wrapping_sub(revs[0] as i32) > 0 {
         1
+    } else {
+        trace!(
+            "fetch_metadata_pair revs equal revs={:?}, using block 0",
+            revs
+        );
+        0
     };
 
-    // Try higher-rev block first; if no valid commits (e.g. partial prog), try other. Per lfs_dir_fetchmatch.
     for attempt in 0..2 {
         let r_use = if attempt == 0 { r } else { 1 - r };
         let block = &blocks[r_use];
@@ -169,7 +175,6 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
         let mut crc = crc::crc32(0xffff_ffff, &dir_rev.to_le_bytes());
 
         loop {
-            trace!("fetch_metadata_pair loop off={} ptag=0x{:08x}", off, ptag);
             if off + 4 > block_size {
                 break;
             }
@@ -177,14 +182,6 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
                 u32::from_be_bytes(block[off..off + 4].try_into().map_err(|_| Error::Corrupt)?);
             crc = crc::crc32(crc, &block[off..off + 4]);
             let tag = (stored_tag ^ ptag) & 0x7fff_ffff;
-            trace!(
-                "fetch_metadata_pair tag=0x{:08x} type1={} type2={} id={} dsize={}",
-                tag,
-                tag_type1(tag),
-                tag_type2(tag),
-                tag_id(tag),
-                tag_dsize(tag)
-            );
 
             if !tag_isvalid(tag) {
                 break;
@@ -221,12 +218,6 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
                 } else {
                     tempcount = tempcount.max(0);
                 }
-                trace!(
-                    "fetch_metadata_pair CRC tempcount={} max_id={} seen_name_or_splice={}",
-                    tempcount,
-                    max_id,
-                    seen_name_or_splice
-                );
                 temptail = [0xffff_ffff, 0xffff_ffff];
                 tempsplit = false;
 
@@ -244,23 +235,10 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
                 if id as i32 >= tempcount {
                     tempcount = id as i32 + 1;
                 }
-                trace!(
-                    "fetch_metadata_pair NAME id={} tempcount={} max_id={}",
-                    id,
-                    tempcount,
-                    max_id
-                );
             } else if tag_type1(tag) == tag::TYPE_SPLICE {
                 seen_name_or_splice = true;
                 max_id = max_id.max(tag_id(tag));
                 tempcount += tag_splice(tag);
-                trace!(
-                    "fetch_metadata_pair SPLICE id={} splice={} tempcount={} max_id={}",
-                    tag_id(tag),
-                    tag_splice(tag),
-                    tempcount,
-                    max_id
-                );
             } else if tag_type1(tag) == tag::TYPE_TAIL {
                 tempsplit = (tag_chunk(tag) & 1) != 0;
                 temptail[0] = u32::from_le_bytes(block[off + 4..off + 8].try_into().unwrap());
@@ -290,7 +268,8 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
                 last_off.is_multiple_of(prog_size) && dv < 0x0002_0001
             };
             trace!(
-                "fetch_metadata_pair done count={} off={} tail={:?} split={} erased={}",
+                "fetch_metadata_pair done block_idx={} count={} off={} tail={:?} split={} erased={}",
+                block_idx,
                 count,
                 last_off,
                 last_tail,
@@ -319,7 +298,8 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
 }
 
 /// Iterate backward to find tag matching (gmask, gtag). Returns (tag, data_offset, size) or None.
-/// Simplified: no synthetic move / splice gdiff for Phase 01.
+/// Applies splice gdiff per lfs_dir_getslice: when we see SPLICE (type1=4), adjust effective
+/// search tag so logical ids shift correctly (e.g. CREATE at id 1 shifts older id 1 to id 2).
 pub fn get_tag_backwards(
     dir: &MdDir,
     gmask: u32,
@@ -328,6 +308,7 @@ pub fn get_tag_backwards(
     let block = &dir.block;
     let mut off = dir.off;
     let mut ntag = dir.etag;
+    let mut gdiff = 0u32;
 
     while off >= 4 + tag_dsize(ntag) {
         off -= tag_dsize(ntag);
@@ -339,19 +320,32 @@ pub fn get_tag_backwards(
             u32::from_be_bytes(block[off..off + 4].try_into().map_err(|_| Error::Corrupt)?);
         ntag = (stored ^ tag) & 0x7fff_ffff;
 
-        trace!(
-            "get_tag_backwards off={} tag=0x{:08x} match={}",
-            off,
-            tag,
-            (gmask & tag) == (gmask & gtag)
-        );
-        if (gmask & tag) == (gmask & gtag) {
+        // Per lfs_dir_getslice (lfs.c:750-761). Synthetic moves (726-734) omitted—
+        // would require gstate/gdisk context.
+        if tag_id(gmask) != 0
+            && tag_type1(tag) == tag::TYPE_SPLICE
+            && tag_id(tag) <= tag_id(gtag.wrapping_sub(gdiff))
+        {
+            // "Found where we were created" (lfs.c:753-756): return before gdiff add so
+            // CREATE never corrupts gdiff. Only add for pure SPLICE (0x400); CREATE and
+            // DELETE use chunk differently and would corrupt the id search.
+            if tag_type3(tag) == tag::TYPE_SPLICE {
+                gdiff = gdiff.wrapping_add((tag_splice(tag) as u32) << 10);
+            }
+        }
+
+        if (gmask & tag) == (gmask & gtag.wrapping_sub(gdiff)) {
+            // Found where we were created: matched CREATE, no content (lfs.c:753-756).
+            let eff_id = tag_id(gtag.wrapping_sub(gdiff));
+            if tag == ((tag::TYPE_CREATE << 20) | ((eff_id as u32) << 10)) {
+                return Ok(None);
+            }
             if tag_isdelete(tag) {
                 return Ok(None);
             }
             let data_off = off + 4;
             let size = tag_size(tag);
-            return Ok(Some((tag, data_off, size)));
+            return Ok(Some((tag.wrapping_add(gdiff), data_off, size)));
         }
     }
     Ok(None)
@@ -360,12 +354,6 @@ pub fn get_tag_backwards(
 /// Get entry info for id. Returns NAME (name+type) and STRUCT (size).
 /// Skips entries that have a DELETE tag (most recent in backward order).
 pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error> {
-    trace!(
-        "get_entry_info id={} dir.pair={:?} count={}",
-        id,
-        dir.pair,
-        dir.count
-    );
     if id == 0x3ff {
         let mut info = Info::new(FileType::Dir, 0);
         info.set_name(b"/");
@@ -376,7 +364,6 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
     // backward iteration sees most-recent tags first.
     let delete_gtag = (tag::TYPE_DELETE << 20) | ((id as u32) << 10);
     if get_tag_backwards(dir, 0x7ff0_fc00, delete_gtag)?.is_some() {
-        trace!("get_entry_info id={} DELETE found -> Noent", id);
         return Err(Error::Noent);
     }
 
@@ -387,14 +374,7 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
     let name_result = get_tag_backwards(dir, gmask, name_gtag)?;
 
     let (name_tag, name_off, name_tag_size) = match name_result {
-        Some((tag, off, size)) => {
-            trace!(
-                "get_entry_info id={} NAME found type3=0x{:03x}",
-                id,
-                (tag >> 20) & 0x7ff
-            );
-            (tag, off, size)
-        }
+        Some((tag, off, size)) => (tag, off, size),
         None if id == 0 => {
             // Root superblock: name comes from SUPERBLOCK tag, type is Dir
             let sb_gtag = (tag::TYPE_SUPERBLOCK << 20) | 8;
@@ -415,15 +395,7 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
             info.set_name(&name_buf[..nul]);
             return Ok(info);
         }
-        None => {
-            trace!(
-                "get_entry_info id={} NAME not found -> Noent (gmask=0x{:08x} gtag=0x{:08x})",
-                id,
-                gmask,
-                name_gtag
-            );
-            return Err(Error::Noent);
-        }
+        None => return Err(Error::Noent),
     };
 
     let block = &dir.block;
@@ -438,10 +410,7 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
     let struct_result = get_tag_backwards(dir, 0x700f_fc00, struct_gtag)?;
     let (struct_tag, struct_off, _) = match struct_result {
         Some(x) => x,
-        None => {
-            trace!("get_entry_info id={} STRUCT not found -> Noent", id);
-            return Err(Error::Noent);
-        }
+        None => return Err(Error::Noent),
     };
 
     let size = if tag_type3(struct_tag) == tag::TYPE_CTZSTRUCT {
@@ -792,6 +761,162 @@ mod tests {
 
         let info = get_entry_info(&dir, 1, 255).unwrap();
         assert_eq!(info.name().unwrap(), "d0");
+    }
+
+    /// Directly test get_tag_backwards for NAME 2 in rename scenario.
+    #[test]
+    fn get_tag_backwards_name2_after_rename() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let d0_pair = [2u32, 3];
+        let mkdir_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, d0_pair),
+            commit::CommitAttr::soft_tail(d0_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+
+        let rename_attrs = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"x0"),
+            commit::CommitAttr::dir_struct(2, d0_pair),
+            commit::CommitAttr::delete(1),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let gmask = 0x780ffc00;
+        let name_gtag = (tag::TYPE_NAME << 20) | (2 << 10) | 256;
+        let r = get_tag_backwards(&dir, gmask, name_gtag).unwrap();
+        assert!(
+            r.is_some(),
+            "NAME 2 must be found; dir.off={} etag=0x{:08x} count={}",
+            dir.off,
+            dir.etag,
+            dir.count
+        );
+    }
+
+    /// Find STRUCT 2 after rename (same setup as get_tag_backwards_name2_after_rename).
+    #[test]
+    fn get_tag_backwards_struct2_after_rename() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let d0_pair = [2u32, 3];
+        let mkdir_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, d0_pair),
+            commit::CommitAttr::soft_tail(d0_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+
+        let rename_attrs = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"x0"),
+            commit::CommitAttr::dir_struct(2, d0_pair),
+            commit::CommitAttr::delete(1),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let gmask = 0x700ffc00;
+        let struct_gtag = (tag::TYPE_STRUCT << 20) | (2 << 10) | 8;
+        let r = get_tag_backwards(&dir, gmask, struct_gtag).unwrap();
+        assert!(
+            r.is_some(),
+            "STRUCT 2 must be found; dir.off={} etag=0x{:08x}",
+            dir.off,
+            dir.etag
+        );
+    }
+
+    /// Find DELETE 1 after rename (same setup).
+    #[test]
+    fn get_tag_backwards_delete1_after_rename() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let d0_pair = [2u32, 3];
+        let mkdir_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, d0_pair),
+            commit::CommitAttr::soft_tail(d0_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+
+        let rename_attrs = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"x0"),
+            commit::CommitAttr::dir_struct(2, d0_pair),
+            commit::CommitAttr::delete(1),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let gmask = 0x700ffc00;
+        let delete_gtag = (tag::TYPE_DELETE << 20) | (1 << 10);
+        let r = get_tag_backwards(&dir, gmask, delete_gtag).unwrap();
+        assert!(
+            r.is_some(),
+            "DELETE 1 must be found; dir.off={} etag=0x{:08x}",
+            dir.off,
+            dir.etag
+        );
+    }
+
+    /// Search for CREATE 2 should return None (found where we were created). Per lfs_dir_getslice.
+    #[test]
+    fn get_tag_backwards_create2_noent() {
+        let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let d0_pair = [2u32, 3];
+        let mkdir_attrs = [
+            commit::CommitAttr::create(1),
+            commit::CommitAttr::name_dir(1, b"d0"),
+            commit::CommitAttr::dir_struct(1, d0_pair),
+            commit::CommitAttr::soft_tail(d0_pair),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+
+        let rename_attrs = [
+            commit::CommitAttr::create(2),
+            commit::CommitAttr::name_dir(2, b"x0"),
+            commit::CommitAttr::dir_struct(2, d0_pair),
+            commit::CommitAttr::delete(1),
+        ];
+        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
+
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
+        let gmask = 0x7ff0fc00;
+        let create_gtag = (tag::TYPE_CREATE << 20) | (2 << 10) | 0;
+        let r = get_tag_backwards(&dir, gmask, create_gtag).unwrap();
+        assert!(
+            r.is_none(),
+            "CREATE 2 search must return None (found where we were created); got {:?}",
+            r
+        );
     }
 
     /// Append rename commit (CREATE 2, NAME 2, DIRSTRUCT 2, DELETE 1) and verify.

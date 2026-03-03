@@ -126,9 +126,102 @@ fn test_dirs_many_rename() {
     assert_eq!(names, ["x0", "x1", "x2", "x3", "x4"]);
 }
 
+// --- test_dirs_debug_dump ---
+// fs_debug_dump prints root state. Requires trace feature.
+#[test]
+#[cfg(feature = "trace")]
+fn test_dirs_debug_dump() {
+    init_log();
+    let (bd, config, mut lfs) = fresh_fs();
+    let dump0 = lfs.fs_debug_dump(&bd, &config).unwrap();
+    assert!(dump0.contains("pair="));
+    assert!(dump0.contains("entries:"));
+    lfs.mkdir(&bd, &config, "potato").unwrap();
+    let dump1 = lfs.fs_debug_dump(&bd, &config).unwrap();
+    assert!(dump1.contains("potato"), "dump after mkdir: {}", dump1);
+}
+
+// --- test_dirs_mkdir_remount ---
+// Minimal: mkdir, unmount, mount, mkdir same name should fail with Exist.
+#[test]
+fn test_dirs_mkdir_remount() {
+    init_log();
+    let (bd, config, mut lfs) = fresh_fs();
+    lfs.mkdir(&bd, &config, "potato").unwrap();
+    lfs.unmount(&bd, &config).unwrap();
+    lfs.mount(&bd, &config).unwrap();
+    assert!(
+        matches!(lfs.mkdir(&bd, &config, "potato"), Err(Error::Exist)),
+        "mkdir potato should return Exist after remount"
+    );
+}
+
+// --- test_dirs_mkdir_file_open_remount ---
+// mkdir, file_open CREAT (no write), drop file without close, unmount, mount.
+// Verifies file_open's commit alone persists.
+#[test]
+fn test_dirs_mkdir_file_open_remount() {
+    init_log();
+    let (bd, config, mut lfs) = fresh_fs();
+    lfs.mkdir(&bd, &config, "potato").unwrap();
+    let _file = lfs
+        .file_open(
+            &bd,
+            &config,
+            "burito",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
+        )
+        .unwrap();
+    // Verify both exist before unmount. Use file_close to ensure sync.
+    lfs.file_close(&bd, &config, _file).unwrap();
+    let names_before = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
+    assert!(
+        names_before.contains(&"potato".to_string()),
+        "potato before unmount, got: {:?}",
+        names_before
+    );
+    assert!(
+        names_before.contains(&"burito".to_string()),
+        "burito before unmount, got: {:?}",
+        names_before
+    );
+    lfs.unmount(&bd, &config).unwrap();
+    lfs.mount(&bd, &config).unwrap();
+    assert!(
+        matches!(lfs.mkdir(&bd, &config, "potato"), Err(Error::Exist)),
+        "potato should exist after remount"
+    );
+    assert!(
+        matches!(lfs.mkdir(&bd, &config, "burito"), Err(Error::Exist)),
+        "burito should exist after remount"
+    );
+}
+
+// --- test_dirs_file_only_remount ---
+// Just file_open CREAT (no mkdir), remount. Baseline: does file create alone persist?
+#[test]
+fn test_dirs_file_only_remount() {
+    init_log();
+    let (bd, config, mut lfs) = fresh_fs();
+    let _file = lfs
+        .file_open(
+            &bd,
+            &config,
+            "burito",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
+        )
+        .unwrap();
+    drop(_file);
+    lfs.unmount(&bd, &config).unwrap();
+    lfs.mount(&bd, &config).unwrap();
+    assert!(
+        matches!(lfs.mkdir(&bd, &config, "burito"), Err(Error::Exist)),
+        "burito should exist after remount"
+    );
+}
+
 // --- test_dirs_other_errors ---
 // Upstream: LFS_ERR_EXIST, NOENT, NOTDIR, ISDIR, rename edge cases, root path errors
-// TODO: Fails after cache moved to FS layer—persisted metadata not visible after remount.
 #[test]
 fn test_dirs_other_errors() {
     init_log();
@@ -144,7 +237,7 @@ fn test_dirs_other_errors() {
         )
         .unwrap();
     lfs.file_close(&bd, &config, file).unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();
 
     assert!(matches!(
@@ -239,7 +332,7 @@ fn test_dirs_other_errors() {
     assert!(names.contains(&"tacoto".to_string()));
     assert_eq!(names.len(), 3);
 
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     let names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
@@ -247,7 +340,7 @@ fn test_dirs_other_errors() {
     assert!(names.contains(&"potato".to_string()));
     assert!(names.contains(&"tacoto".to_string()));
 
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();
     let names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
     assert!(names.contains(&"burito".to_string()));
@@ -273,30 +366,30 @@ fn test_dirs_nested() {
         )
         .unwrap();
     lfs.file_close(&bd, &config, file).unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     lfs.mkdir(&bd, &config, "potato/baked").unwrap();
     lfs.mkdir(&bd, &config, "potato/sweet").unwrap();
     lfs.mkdir(&bd, &config, "potato/fried").unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     assert!(matches!(
         lfs.remove(&bd, &config, "potato"),
         Err(Error::NotEmpty)
     ));
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     lfs.rename(&bd, &config, "potato", "coldpotato").unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     lfs.rename(&bd, &config, "coldpotato", "warmpotato")
         .unwrap();
     lfs.rename(&bd, &config, "warmpotato", "hotpotato").unwrap();
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     assert!(matches!(
@@ -357,7 +450,7 @@ fn test_dirs_recursive_remove() {
         lfs.remove(&bd, &config, "prickly-pear"),
         Err(Error::Noent)
     ));
-    lfs.unmount().unwrap();
+    lfs.unmount(&bd, &config).unwrap();
 
     lfs.mount(&bd, &config).unwrap();
     assert!(matches!(
