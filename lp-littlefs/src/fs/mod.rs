@@ -844,7 +844,7 @@ impl LittleFs {
                         Error::NotDir
                     });
                 }
-                let same_pair = old_cwd.pair[0] == cwd.pair[0] && old_cwd.pair[1] == cwd.pair[1];
+                let same_pair = gstate::pair_issync(old_cwd.pair, cwd.pair);
                 if same_pair && id == old_id {
                     return Ok(());
                 }
@@ -881,7 +881,7 @@ impl LittleFs {
             return Err(Error::Nametoolong);
         }
 
-        let same_pair = old_cwd.pair[0] == new_cwd.pair[0] && old_cwd.pair[1] == new_cwd.pair[1];
+        let same_pair = gstate::pair_issync(old_cwd.pair, new_cwd.pair);
         let mut newoldid = old_id;
         if same_pair && new_id <= old_id {
             newoldid = old_id + 1;

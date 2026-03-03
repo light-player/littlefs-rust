@@ -57,9 +57,7 @@ impl GState {
     /// True if move targets this pair. Per lfs_gstate_hasmovehere.
     /// Uses pair_issync: [a,b] matches [b,a].
     pub fn hasmovehere(&self, pair: [u32; 2]) -> bool {
-        self.hasmove()
-            && ((self.pair[0] == pair[0] && self.pair[1] == pair[1])
-                || (self.pair[0] == pair[1] && self.pair[1] == pair[0]))
+        self.hasmove() && pair_issync(self.pair, pair)
     }
 
     /// Decode from little-endian. Per lfs_gstate_fromle32.
@@ -88,6 +86,12 @@ impl GState {
         out[8..12].copy_from_slice(&self.pair[1].to_le_bytes());
         out
     }
+}
+
+/// True if pairs refer to the same metadata block. Per lfs_pair_issync.
+/// [a,b] matches [a,b] and [b,a].
+pub fn pair_issync(a: [u32; 2], b: [u32; 2]) -> bool {
+    (a[0] == b[0] && a[1] == b[1]) || (a[0] == b[1] && a[1] == b[0])
 }
 
 fn tag_type1(t: u32) -> u32 {
