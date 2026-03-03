@@ -1,0 +1,13 @@
+[package]
+name = "lp-littlefs-c-align"
+version = "0.1.0"
+edition = "2021"
+description = "C ↔ Rust format alignment tests for lp-littlefs"
+license = "BSD-3-Clause"
+
+[dependencies]
+lp-littlefs = { path = "../lp-littlefs" }
+littlefs2-sys = { version = "0.3", features = ["malloc"] }
+
+[dev-dependencies]
+env_logger = "0.10"
