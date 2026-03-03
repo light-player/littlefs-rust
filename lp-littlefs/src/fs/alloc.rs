@@ -107,7 +107,7 @@ pub(crate) fn alloc_scan<B: BlockDevice>(
 
     lookahead.buffer.fill(0);
 
-    traverse::fs_traverse(ctx, root, true, |block| {
+    traverse::fs_traverse(ctx, root, true, None, |block| {
         let off = (block
             .wrapping_sub(lookahead.start)
             .wrapping_add(block_count))

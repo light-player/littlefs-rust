@@ -202,11 +202,11 @@ fn deorphan<B: BlockDevice>(
             let dir = metadata::fetch_metadata_pair(ctx, pdir.tail)?;
 
             if !pdir.split {
-                let parent_opt = parent::fs_parent(ctx, *root, pdir.tail, name_max)?;
+                let parent_opt = parent::fs_parent(ctx, *root, pdir.tail, name_max, Some(gdisk))?;
 
                 if pass == 0 {
                     if let Some((ref parent_dir, tag_id)) = parent_opt {
-                        let bytes = metadata::get_struct(parent_dir, tag_id)?;
+                        let bytes = metadata::get_struct(parent_dir, tag_id, Some(gdisk))?;
                         let expected_pair = [
                             u32::from_le_bytes(bytes[0..4].try_into().unwrap()),
                             u32::from_le_bytes(bytes[4..8].try_into().unwrap()),

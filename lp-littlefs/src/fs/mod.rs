@@ -158,7 +158,7 @@ impl LittleFs {
     {
         let state = self.require_mounted()?;
         let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
-        traverse::fs_traverse(&ctx, state.root, false, cb)
+        traverse::fs_traverse(&ctx, state.root, false, Some(&state.gdisk), cb)
     }
 
     /// Number of allocated blocks. Per lfs_fs_size (lfs.h:510).
@@ -193,7 +193,7 @@ impl LittleFs {
         let state = self.require_mounted()?;
         let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         let dir = metadata::fetch_metadata_pair(&ctx, state.root)?;
-        debug::fs_debug_dump_impl(&dir, state.name_max)
+        debug::fs_debug_dump_impl(&dir, state.name_max, Some(&state.gdisk))
     }
 
     /// Deorphan, complete moves, persist gstate. Per lfs_fs_mkconsistent (lfs.h:529).
@@ -292,7 +292,7 @@ impl LittleFs {
         trace!("stat path={:?}", path);
         let state = self.require_mounted()?;
         let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
-        let (dir, id) = path::dir_find(&ctx, state.root, path, state.name_max)?;
+        let (dir, id) = path::dir_find(&ctx, state.root, path, state.name_max, Some(&state.gdisk))?;
         trace!("stat dir_find returned id={}", id);
 
         if id == 0x3ff {
@@ -301,7 +301,7 @@ impl LittleFs {
             return Ok(info);
         }
 
-        let info = metadata::get_entry_info(&dir, id, state.name_max)?;
+        let info = metadata::get_entry_info(&dir, id, state.name_max, Some(&state.gdisk), false)?;
 
         if path.ends_with('/') && info.typ != crate::info::FileType::Dir {
             return Err(Error::NotDir);
@@ -319,10 +319,11 @@ impl LittleFs {
         trace!("dir_open path={:?}", path);
         let state = self.require_mounted()?;
         let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
-        let (dir, id) = path::dir_find(&ctx, state.root, path, state.name_max)?;
+        let (dir, id) = path::dir_find(&ctx, state.root, path, state.name_max, Some(&state.gdisk))?;
 
         if id != 0x3ff {
-            let info = metadata::get_entry_info(&dir, id, state.name_max)?;
+            let info =
+                metadata::get_entry_info(&dir, id, state.name_max, Some(&state.gdisk), false)?;
             if info.typ != crate::info::FileType::Dir {
                 return Err(Error::NotDir);
             }
@@ -331,7 +332,7 @@ impl LittleFs {
         let pair = if id == 0x3ff {
             state.root
         } else {
-            let bytes = metadata::get_struct(&dir, id)?;
+            let bytes = metadata::get_struct(&dir, id, Some(&state.gdisk))?;
             [
                 u32::from_le_bytes(bytes[0..4].try_into().unwrap()),
                 u32::from_le_bytes(bytes[4..8].try_into().unwrap()),
@@ -341,6 +342,8 @@ impl LittleFs {
         trace!("dir_open fetch_metadata_pair pair={:?}", pair);
         let md = metadata::fetch_metadata_pair(&ctx, pair)?;
         let is_root = pair[0] == 0 || pair[0] == 1;
+        // True when we opened the root (path "/" or id 0x3ff); needed for synthetic move in split chain.
+        let is_root_dir = id == 0x3ff;
 
         Ok(Dir {
             head: pair,
@@ -348,6 +351,7 @@ impl LittleFs {
             id: if is_root { 1 } else { 0 },
             pos: 0,
             is_root,
+            is_root_dir,
             name_max: state.name_max,
         })
     }
@@ -361,7 +365,14 @@ impl LittleFs {
     ) -> Result<u32, Error> {
         let state = self.require_mounted()?;
         let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
-        dir::dir_read(&ctx, dir, info, dir.name_max)
+        dir::dir_read(
+            &ctx,
+            dir,
+            info,
+            dir.name_max,
+            Some(&state.gdisk),
+            dir.is_root_dir,
+        )
     }
 
     pub fn dir_close(&self, _dir: Dir) -> Result<(), Error> {
@@ -477,7 +488,7 @@ impl LittleFs {
     ) -> Result<usize, Error> {
         let state = self.require_mounted()?;
         let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
-        file.read(&ctx, buf)
+        file.read(&ctx, buf, Some(&state.gdisk))
     }
 
     pub fn file_seek<B: BlockDevice>(
@@ -616,7 +627,8 @@ impl LittleFs {
             state.attr_max,
             state.disk_version,
         )?;
-        let (cwd, id, name) = path::dir_find_for_create(&ctx, state.root, path, state.name_max)?;
+        let (cwd, id, name) =
+            path::dir_find_for_create(&ctx, state.root, path, state.name_max, Some(&state.gdisk))?;
         trace!("mkdir cwd.pair={:?} id={} name={:?}", cwd.pair, id, name);
 
         let name_len = name.len();
@@ -717,15 +729,15 @@ impl LittleFs {
             state.attr_max,
             state.disk_version,
         )?;
-        let (cwd, id) = path::dir_find(&ctx, state.root, path, state.name_max)?;
+        let (cwd, id) = path::dir_find(&ctx, state.root, path, state.name_max, Some(&state.gdisk))?;
 
         if id == 0x3ff {
             return Err(Error::Inval);
         }
 
-        let info = metadata::get_entry_info(&cwd, id, state.name_max)?;
+        let info = metadata::get_entry_info(&cwd, id, state.name_max, Some(&state.gdisk), false)?;
         if info.typ == crate::info::FileType::Dir {
-            let pair = metadata::get_struct(&cwd, id)?;
+            let pair = metadata::get_struct(&cwd, id, Some(&state.gdisk))?;
             let dir_pair = [
                 u32::from_le_bytes(pair[0..4].try_into().unwrap()),
                 u32::from_le_bytes(pair[4..8].try_into().unwrap()),
@@ -779,15 +791,22 @@ impl LittleFs {
             state.attr_max,
             state.disk_version,
         )?;
-        let (old_cwd, old_id) = path::dir_find(&ctx, state.root, old_path, state.name_max)?;
+        let (old_cwd, old_id) = path::dir_find(
+            &ctx,
+            state.root,
+            old_path,
+            state.name_max,
+            Some(&state.gdisk),
+        )?;
         trace!("rename old_cwd.pair={:?} old_id={}", old_cwd.pair, old_id);
 
         if old_id == 0x3ff {
             return Err(Error::Inval);
         }
 
-        let old_info = metadata::get_entry_info(&old_cwd, old_id, state.name_max)?;
-        let old_pair = metadata::get_struct(&old_cwd, old_id)?;
+        let old_info =
+            metadata::get_entry_info(&old_cwd, old_id, state.name_max, Some(&state.gdisk), false)?;
+        let old_pair = metadata::get_struct(&old_cwd, old_id, Some(&state.gdisk))?;
         let dir_pair = [
             u32::from_le_bytes(old_pair[0..4].try_into().unwrap()),
             u32::from_le_bytes(old_pair[4..8].try_into().unwrap()),
@@ -807,46 +826,56 @@ impl LittleFs {
             return Err(Error::NotDir);
         }
 
-        let (new_cwd, new_id, new_name, overwrite_dir_orphan) =
-            match path::dir_find(&ctx, state.root, new_path, state.name_max) {
-                Ok((cwd, id)) => {
-                    let name = path::path_last_component(new_path).unwrap_or("").as_bytes();
-                    let new_info = metadata::get_entry_info(&cwd, id, state.name_max)?;
-                    if new_info.typ != old_info.typ {
-                        return Err(if matches!(new_info.typ, crate::info::FileType::Dir) {
-                            Error::IsDir
-                        } else {
-                            Error::NotDir
-                        });
-                    }
-                    let same_pair =
-                        old_cwd.pair[0] == cwd.pair[0] && old_cwd.pair[1] == cwd.pair[1];
-                    if same_pair && id == old_id {
-                        return Ok(());
-                    }
-                    let mut orphan = None;
-                    if matches!(new_info.typ, crate::info::FileType::Dir) {
-                        let prev_pair_bytes = metadata::get_struct(&cwd, id)?;
-                        let prev_pair = [
-                            u32::from_le_bytes(prev_pair_bytes[0..4].try_into().unwrap()),
-                            u32::from_le_bytes(prev_pair_bytes[4..8].try_into().unwrap()),
-                        ];
-                        let prevdir = metadata::fetch_metadata_pair(&ctx, prev_pair)?;
-                        if prevdir.count > 0 || prevdir.split {
-                            return Err(Error::NotEmpty);
-                        }
-                        gstate::preporphans(&mut state.gstate, 1)?;
-                        orphan = Some(prevdir);
-                    }
-                    (cwd, id, name, orphan)
+        let (new_cwd, new_id, new_name, overwrite_dir_orphan) = match path::dir_find(
+            &ctx,
+            state.root,
+            new_path,
+            state.name_max,
+            Some(&state.gdisk),
+        ) {
+            Ok((cwd, id)) => {
+                let name = path::path_last_component(new_path).unwrap_or("").as_bytes();
+                let new_info =
+                    metadata::get_entry_info(&cwd, id, state.name_max, Some(&state.gdisk), false)?;
+                if new_info.typ != old_info.typ {
+                    return Err(if matches!(new_info.typ, crate::info::FileType::Dir) {
+                        Error::IsDir
+                    } else {
+                        Error::NotDir
+                    });
                 }
-                Err(Error::Noent) => {
-                    let (cwd, id, name) =
-                        path::dir_find_for_create(&ctx, state.root, new_path, state.name_max)?;
-                    (cwd, id, name.as_bytes(), None)
+                let same_pair = old_cwd.pair[0] == cwd.pair[0] && old_cwd.pair[1] == cwd.pair[1];
+                if same_pair && id == old_id {
+                    return Ok(());
                 }
-                Err(e) => return Err(e),
-            };
+                let mut orphan = None;
+                if matches!(new_info.typ, crate::info::FileType::Dir) {
+                    let prev_pair_bytes = metadata::get_struct(&cwd, id, Some(&state.gdisk))?;
+                    let prev_pair = [
+                        u32::from_le_bytes(prev_pair_bytes[0..4].try_into().unwrap()),
+                        u32::from_le_bytes(prev_pair_bytes[4..8].try_into().unwrap()),
+                    ];
+                    let prevdir = metadata::fetch_metadata_pair(&ctx, prev_pair)?;
+                    if prevdir.count > 0 || prevdir.split {
+                        return Err(Error::NotEmpty);
+                    }
+                    gstate::preporphans(&mut state.gstate, 1)?;
+                    orphan = Some(prevdir);
+                }
+                (cwd, id, name, orphan)
+            }
+            Err(Error::Noent) => {
+                let (cwd, id, name) = path::dir_find_for_create(
+                    &ctx,
+                    state.root,
+                    new_path,
+                    state.name_max,
+                    Some(&state.gdisk),
+                )?;
+                (cwd, id, name.as_bytes(), None)
+            }
+            Err(e) => return Err(e),
+        };
 
         if new_name.len() > state.name_max as usize {
             return Err(Error::Nametoolong);
@@ -875,11 +904,18 @@ impl LittleFs {
 
         let inline_data = match old_info.typ {
             crate::info::FileType::Reg => {
-                let (is_inline, _, _) = metadata::get_file_struct(&old_cwd, old_id)?;
+                let (is_inline, _, _) =
+                    metadata::get_file_struct(&old_cwd, old_id, Some(&state.gdisk))?;
                 if is_inline {
                     let mut buf = Vec::new();
                     buf.resize(state.inline_max as usize, 0);
-                    let n = metadata::get_inline_slice(&old_cwd, old_id, 0, &mut buf)?;
+                    let n = metadata::get_inline_slice(
+                        &old_cwd,
+                        old_id,
+                        0,
+                        &mut buf,
+                        Some(&state.gdisk),
+                    )?;
                     let mut data = Vec::new();
                     data.extend_from_slice(&buf[..n]);
                     Some(data)
@@ -902,7 +938,8 @@ impl LittleFs {
                     v.push(commit::CommitAttr::dir_struct(new_id, dir_pair));
                 }
                 crate::info::FileType::Reg => {
-                    let (is_inline, head, size) = metadata::get_file_struct(&old_cwd, old_id)?;
+                    let (is_inline, head, size) =
+                        metadata::get_file_struct(&old_cwd, old_id, Some(&state.gdisk))?;
                     v.push(commit::CommitAttr::name_reg(new_id, new_name));
                     if is_inline {
                         v.push(commit::CommitAttr::inline_struct(
@@ -996,7 +1033,7 @@ pub fn create_inline_file<B: BlockDevice>(
     let ctx = BdContext::new(bd, config, &rcache, &pcache);
 
     let mut root = [0u32, 1];
-    let (cwd, id, name) = path::dir_find_for_create(&ctx, root, path, 255)?;
+    let (cwd, id, name) = path::dir_find_for_create(&ctx, root, path, 255, None)?;
     let mut cwd_mut = metadata::fetch_metadata_pair(&ctx, cwd.pair)?;
     let attrs = [
         commit::CommitAttr::create(id),
@@ -1031,6 +1068,8 @@ pub struct Dir {
     pub(crate) id: u16,
     pub(crate) pos: u32,
     pub(crate) is_root: bool,
+    /// True when this Dir was opened for the root (path "/"); needed for synthetic move chain check.
+    pub(crate) is_root_dir: bool,
     pub(crate) name_max: u32,
 }
 

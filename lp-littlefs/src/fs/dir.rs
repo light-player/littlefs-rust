@@ -17,6 +17,8 @@ pub fn dir_read<B: BlockDevice>(
     dir: &mut super::Dir,
     info: &mut Info,
     name_max: u32,
+    gdisk: Option<&super::gstate::GState>,
+    is_root_dir: bool,
 ) -> Result<u32, Error> {
     if dir.pos == 0 {
         *info = Info::new(FileType::Dir, 0);
@@ -40,7 +42,7 @@ pub fn dir_read<B: BlockDevice>(
             dir.id = 0;
         }
 
-        match metadata::get_entry_info(&dir.mdir, dir.id, name_max) {
+        match metadata::get_entry_info(&dir.mdir, dir.id, name_max, gdisk, is_root_dir) {
             Ok(entry_info) => {
                 trace!("dir_read id={} name={:?}", dir.id, entry_info.name().ok());
                 *info = entry_info;

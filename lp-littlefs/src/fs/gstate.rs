@@ -55,8 +55,11 @@ impl GState {
     }
 
     /// True if move targets this pair. Per lfs_gstate_hasmovehere.
+    /// Uses pair_issync: [a,b] matches [b,a].
     pub fn hasmovehere(&self, pair: [u32; 2]) -> bool {
-        self.hasmove() && self.pair[0] == pair[0] && self.pair[1] == pair[1]
+        self.hasmove()
+            && ((self.pair[0] == pair[0] && self.pair[1] == pair[1])
+                || (self.pair[0] == pair[1] && self.pair[1] == pair[0]))
     }
 
     /// Decode from little-endian. Per lfs_gstate_fromle32.

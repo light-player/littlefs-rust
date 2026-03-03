@@ -75,6 +75,7 @@ pub fn fs_parent<B: BlockDevice>(
     root: [u32; 2],
     pair: [u32; 2],
     name_max: u32,
+    gdisk: Option<&super::gstate::GState>,
 ) -> Result<Option<(MdDir, u16)>, Error> {
     let mut tail = root;
     let mut tortoise = ([BLOCK_NULL, BLOCK_NULL], 1u32, 1u32);
@@ -85,7 +86,7 @@ pub fn fs_parent<B: BlockDevice>(
         let dir = fetch_metadata_pair(ctx, tail)?;
 
         for id in 0..dir.count {
-            let info = match get_entry_info(&dir, id, name_max) {
+            let info = match get_entry_info(&dir, id, name_max, gdisk, false) {
                 Ok(i) => i,
                 Err(Error::Noent) => continue,
                 Err(e) => return Err(e),
@@ -93,7 +94,7 @@ pub fn fs_parent<B: BlockDevice>(
             if info.typ != FileType::Dir {
                 continue;
             }
-            let bytes = match get_struct(&dir, id) {
+            let bytes = match get_struct(&dir, id, gdisk) {
                 Ok(b) => b,
                 Err(Error::Noent) => continue,
                 Err(e) => return Err(e),
@@ -227,7 +228,7 @@ mod tests {
         .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let parent = fs_parent(&ctx, root, new_pair, 255).unwrap();
+        let parent = fs_parent(&ctx, root, new_pair, 255, None).unwrap();
         assert!(parent.is_some());
         let (p, id) = parent.unwrap();
         assert_eq!(id, 1);

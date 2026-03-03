@@ -816,7 +816,8 @@ pub fn dir_relocatingcommit<B: BlockDevice>(
     }
 
     if hasdelete && dir.count == 0 {
-        if let Some((pred, _)) = fs_parent(ctx, root, dir.pair, 255)? {
+        let gdisk = gstate_ctx.as_ref().map(|g| &*g.gdisk);
+        if let Some((pred, _)) = fs_parent(ctx, root, dir.pair, 255, gdisk)? {
             *pdir = pred;
             if pdir.split {
                 return Ok(RelocatingResult::Dropped);
@@ -934,8 +935,9 @@ pub fn dir_orphaningcommit<B: BlockDevice>(
             root[1] = ldir.pair[1];
         }
 
+        let gdisk = gstate_opt.as_ref().map(|g| &*g.gdisk);
         let _parent_state =
-            if let Some((mut pdir, tag_id)) = fs_parent(ctx, *root, lpair, name_max)? {
+            if let Some((mut pdir, tag_id)) = fs_parent(ctx, *root, lpair, name_max, gdisk)? {
                 let ppair = pdir.pair;
                 let ldir_pair = ldir.pair;
                 let update_attrs = [CommitAttr::dir_struct(tag_id, ldir_pair)];

@@ -7,6 +7,7 @@ use crate::crc;
 use crate::error::Error;
 
 use super::bdcache::BdContext;
+use super::gstate::GState;
 use crate::info::{FileType, Info};
 use crate::superblock::{tag, Superblock};
 use crate::trace;
@@ -298,16 +299,31 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
 
 /// Iterate backward to find tag matching (gmask, gtag). Returns (tag, data_offset, size) or None.
 /// Applies splice gdiff per lfs_dir_getslice (lfs.c:719–783): splice/gdiff at 750–761,
-/// "found where we were created" at 753–756.
+/// synthetic moves at 726–734, "found where we were created" at 753–756.
 pub fn get_tag_backwards(
     dir: &MdDir,
     gmask: u32,
     gtag: u32,
+    gdisk: Option<&GState>,
 ) -> Result<Option<(u32, usize, u32)>, Error> {
     let block = &dir.block;
     let mut off = dir.off;
     let mut ntag = dir.etag;
     let mut gdiff = 0u32;
+
+    // Synthetic moves (lfs.c:726-734): pending DELETE for move_id in this pair.
+    if let Some(g) = gdisk {
+        if g.hasmovehere(dir.pair) && tag_id(gmask) != 0 {
+            let move_id = ((g.tag >> 10) & 0x3ff) as u16;
+            let search_id = tag_id(gtag);
+            if move_id == search_id {
+                return Ok(None);
+            }
+            if move_id < search_id {
+                gdiff = gdiff.wrapping_sub(1 << 10);
+            }
+        }
+    }
 
     while off >= 4 + tag_dsize(ntag) {
         off -= tag_dsize(ntag);
@@ -359,17 +375,41 @@ pub fn get_tag_backwards(
 /// Get entry info for id. Returns NAME (name+type) and STRUCT (size).
 /// Skips entries that have a DELETE tag (most recent in backward order).
 /// Per lfs_dir_getinfo (lfs.c:1413–1445).
-pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error> {
+pub fn get_entry_info(
+    dir: &MdDir,
+    id: u16,
+    name_max: u32,
+    gdisk: Option<&GState>,
+    // When true (iterating root), apply synthetic move if gdisk has one, even when
+    // move targets a different block in the split chain.
+    move_applies_to_chain: bool,
+) -> Result<Info, Error> {
     if id == 0x3ff {
         let mut info = Info::new(FileType::Dir, 0);
         info.set_name(b"/");
         return Ok(info);
     }
 
+    // Synthetic move: if gdisk has move for this id, treat as Noent.
+    // move_applies_to_chain: when iterating root, move may target a different block in the chain.
+    if let Some(g) = gdisk {
+        let move_applies = if move_applies_to_chain {
+            g.hasmove()
+        } else {
+            g.hasmovehere(dir.pair)
+        };
+        if move_applies {
+            let move_id = ((g.tag >> 10) & 0x3ff) as u16;
+            if move_id == id {
+                return Err(Error::Noent);
+            }
+        }
+    }
+
     // If entry was deleted, return Noent. Check DELETE before NAME since
     // backward iteration sees most-recent tags first.
     let delete_gtag = (tag::TYPE_DELETE << 20) | ((id as u32) << 10);
-    if get_tag_backwards(dir, 0x7ff0_fc00, delete_gtag)?.is_some() {
+    if get_tag_backwards(dir, 0x7ff0_fc00, delete_gtag, gdisk)?.is_some() {
         return Err(Error::Noent);
     }
 
@@ -377,14 +417,14 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
     // LFS_TYPE_NAME with mask 0x780 matches both REG (0x001) and DIR (0x002) name tags.
     let gmask = 0x780ffc00;
     let name_gtag = (tag::TYPE_NAME << 20) | ((id as u32) << 10) | (name_max + 1);
-    let name_result = get_tag_backwards(dir, gmask, name_gtag)?;
+    let name_result = get_tag_backwards(dir, gmask, name_gtag, gdisk)?;
 
     let (name_tag, name_off, name_tag_size) = match name_result {
         Some((tag, off, size)) => (tag, off, size),
         None if id == 0 => {
             // Root superblock: name comes from SUPERBLOCK tag, type is Dir
             let sb_gtag = (tag::TYPE_SUPERBLOCK << 20) | 8;
-            let sb_result = get_tag_backwards(dir, 0x7ff0_fc00, sb_gtag)?;
+            let sb_result = get_tag_backwards(dir, 0x7ff0_fc00, sb_gtag, gdisk)?;
             let (sb_tag, sb_off, sb_size) = match sb_result {
                 Some(x) => x,
                 None => return Err(Error::Noent),
@@ -413,7 +453,7 @@ pub fn get_entry_info(dir: &MdDir, id: u16, name_max: u32) -> Result<Info, Error
     let typ = FileType::from_type3(tag_type3(name_tag)).ok_or(Error::Corrupt)?;
 
     let struct_gtag = (tag::TYPE_STRUCT << 20) | ((id as u32) << 10) | 8;
-    let struct_result = get_tag_backwards(dir, 0x700f_fc00, struct_gtag)?;
+    let struct_result = get_tag_backwards(dir, 0x700f_fc00, struct_gtag, gdisk)?;
     let (struct_tag, struct_off, _) = match struct_result {
         Some(x) => x,
         None => return Err(Error::Noent),
@@ -446,7 +486,7 @@ pub fn get_superblock_from_dir(dir: &MdDir) -> Option<Superblock> {
     }
     let gmask = 0x7ff0_fc00;
     let gtag = (tag::TYPE_INLINESTRUCT << 20) | Superblock::SIZE as u32;
-    let (_, off, size) = get_tag_backwards(dir, gmask, gtag).ok()??;
+    let (_, off, size) = get_tag_backwards(dir, gmask, gtag, None).ok()??;
     if size != Superblock::SIZE as u32 {
         return None;
     }
@@ -473,7 +513,7 @@ pub fn read_superblock<B: BlockDevice>(
     let dir = fetch_metadata_pair(ctx, root)?;
     let gmask = 0x7ff0_fc00;
     let gtag = (tag::TYPE_INLINESTRUCT << 20) | Superblock::SIZE as u32;
-    let result = get_tag_backwards(&dir, gmask, gtag)?;
+    let result = get_tag_backwards(&dir, gmask, gtag, None)?;
     let (_, off, _) = result.ok_or(Error::Corrupt)?;
 
     let block = &dir.block;
@@ -494,10 +534,14 @@ pub fn read_superblock<B: BlockDevice>(
 /// Resolve file struct (inline or CTZ) for a regular file.
 ///
 /// Returns (is_inline, head_block, size). For inline: head is BLOCK_INLINE (0xffff_fffe).
-pub fn get_file_struct(dir: &MdDir, id: u16) -> Result<(bool, u32, u64), Error> {
+pub fn get_file_struct(
+    dir: &MdDir,
+    id: u16,
+    gdisk: Option<&GState>,
+) -> Result<(bool, u32, u64), Error> {
     let gmask = 0x700f_fc00;
     let gtag = (tag::TYPE_STRUCT << 20) | ((id as u32) << 10);
-    let result = get_tag_backwards(dir, gmask, gtag)?;
+    let result = get_tag_backwards(dir, gmask, gtag, gdisk)?;
     let (struct_tag, struct_off, struct_size) = result.ok_or(Error::Noent)?;
     let block = &dir.block;
     let type3 = tag_type3(struct_tag);
@@ -525,10 +569,11 @@ pub fn get_inline_slice(
     id: u16,
     offset: usize,
     buffer: &mut [u8],
+    gdisk: Option<&GState>,
 ) -> Result<usize, Error> {
     let gmask = 0x7ff0_fc00;
     let gtag = (tag::TYPE_INLINESTRUCT << 20) | ((id as u32) << 10);
-    let result = get_tag_backwards(dir, gmask, gtag)?;
+    let result = get_tag_backwards(dir, gmask, gtag, gdisk)?;
     let (_, data_off, size) = result.ok_or(Error::Noent)?;
     let data_size = size as usize;
     if offset >= data_size {
@@ -645,10 +690,10 @@ pub fn dir_traverse_size(dir: &MdDir, begin: u16, end: u16) -> Result<usize, Err
 }
 
 /// Get 8-byte struct data (e.g. dir pair) for an id.
-pub fn get_struct(dir: &MdDir, id: u16) -> Result<[u8; 8], Error> {
+pub fn get_struct(dir: &MdDir, id: u16, gdisk: Option<&GState>) -> Result<[u8; 8], Error> {
     let gmask = 0x700f_fc00;
     let gtag = (tag::TYPE_STRUCT << 20) | ((id as u32) << 10) | 8;
-    let result = get_tag_backwards(dir, gmask, gtag)?;
+    let result = get_tag_backwards(dir, gmask, gtag, gdisk)?;
     let (_, off, _) = result.ok_or(Error::Noent)?;
 
     let block = &dir.block;
@@ -698,7 +743,7 @@ mod tests {
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let gmask = 0x7ff0_fc00;
         let gtag = (tag::TYPE_INLINESTRUCT << 20) | Superblock::SIZE as u32;
-        let r = get_tag_backwards(&dir, gmask, gtag).unwrap();
+        let r = get_tag_backwards(&dir, gmask, gtag, None).unwrap();
         assert!(r.is_some());
         let (_t, off, size) = r.unwrap();
         assert_eq!(size, Superblock::SIZE as u32);
@@ -712,7 +757,7 @@ mod tests {
         let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
         let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
-        let info = get_entry_info(&dir, 0, 255).unwrap();
+        let info = get_entry_info(&dir, 0, 255, None, false).unwrap();
         assert_eq!(info.name().unwrap(), "littlefs");
     }
 
@@ -778,14 +823,14 @@ mod tests {
             dir.count
         );
 
-        let info1 = get_entry_info(&dir, 1, 255).unwrap();
+        let info1 = get_entry_info(&dir, 1, 255, None, false).unwrap();
         assert_eq!(
             info1.name().unwrap(),
             "burito",
             "id 1 is most recent (burito)"
         );
 
-        let info2 = get_entry_info(&dir, 2, 255).unwrap();
+        let info2 = get_entry_info(&dir, 2, 255, None, false).unwrap();
         assert_eq!(
             info2.name().unwrap(),
             "potato",
@@ -829,7 +874,7 @@ mod tests {
         );
 
         let name_gtag = (tag::TYPE_REG << 20) | (1 << 10) | 256;
-        let name_result = get_tag_backwards(&dir, 0x780f_fc00, name_gtag).unwrap();
+        let name_result = get_tag_backwards(&dir, 0x780f_fc00, name_gtag, None).unwrap();
         assert!(
             name_result.is_some(),
             "NAME(id=1) not found (off={}, etag=0x{:08x})",
@@ -838,10 +883,10 @@ mod tests {
         );
 
         let struct_gtag = (tag::TYPE_STRUCT << 20) | (1 << 10) | 8;
-        let struct_result = get_tag_backwards(&dir, 0x700f_fc00, struct_gtag).unwrap();
+        let struct_result = get_tag_backwards(&dir, 0x700f_fc00, struct_gtag, None).unwrap();
         assert!(struct_result.is_some(), "STRUCT(id=1) not found");
 
-        let info = get_entry_info(&dir, 1, 255).unwrap();
+        let info = get_entry_info(&dir, 1, 255, None, false).unwrap();
         assert_eq!(info.name().unwrap(), "d0");
     }
 
@@ -889,7 +934,7 @@ mod tests {
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let gmask = 0x780ffc00;
         let name_gtag = (tag::TYPE_NAME << 20) | (2 << 10) | 256;
-        let r = get_tag_backwards(&dir, gmask, name_gtag).unwrap();
+        let r = get_tag_backwards(&dir, gmask, name_gtag, None).unwrap();
         assert!(
             r.is_some(),
             "NAME 2 must be found; dir.off={} etag=0x{:08x} count={}",
@@ -943,7 +988,7 @@ mod tests {
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let gmask = 0x700ffc00;
         let struct_gtag = (tag::TYPE_STRUCT << 20) | (2 << 10) | 8;
-        let r = get_tag_backwards(&dir, gmask, struct_gtag).unwrap();
+        let r = get_tag_backwards(&dir, gmask, struct_gtag, None).unwrap();
         assert!(
             r.is_some(),
             "STRUCT 2 must be found; dir.off={} etag=0x{:08x}",
@@ -996,7 +1041,7 @@ mod tests {
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let gmask = 0x700ffc00;
         let delete_gtag = (tag::TYPE_DELETE << 20) | (1 << 10);
-        let r = get_tag_backwards(&dir, gmask, delete_gtag).unwrap();
+        let r = get_tag_backwards(&dir, gmask, delete_gtag, None).unwrap();
         assert!(
             r.is_some(),
             "DELETE 1 must be found; dir.off={} etag=0x{:08x}",
@@ -1049,7 +1094,7 @@ mod tests {
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let gmask = 0x7ff0fc00;
         let create_gtag = (tag::TYPE_CREATE << 20) | (2 << 10) | 0;
-        let r = get_tag_backwards(&dir, gmask, create_gtag).unwrap();
+        let r = get_tag_backwards(&dir, gmask, create_gtag, None).unwrap();
         assert!(
             r.is_none(),
             "CREATE 2 search must return None (found where we were created); got {:?}",
@@ -1104,9 +1149,9 @@ mod tests {
             "rename creates id 2; count must be >= 3 for find/stat, got {}",
             dir.count
         );
-        let info = get_entry_info(&dir, 2, 255).unwrap();
+        let info = get_entry_info(&dir, 2, 255, None, false).unwrap();
         assert_eq!(info.name().unwrap(), "x0");
-        assert!(get_entry_info(&dir, 1, 255).is_err()); // id 1 deleted -> Noent
+        assert!(get_entry_info(&dir, 1, 255, None, false).is_err()); // id 1 deleted -> Noent
     }
 
     /// Validate splice gdiff: CREATE+NAME+DELETE (rename) scenario;
@@ -1153,13 +1198,13 @@ mod tests {
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let create_gtag = (tag::TYPE_CREATE << 20) | (2 << 10) | 0;
-        let r = get_tag_backwards(&dir, 0x7ff0_fc00, create_gtag).unwrap();
+        let r = get_tag_backwards(&dir, 0x7ff0_fc00, create_gtag, None).unwrap();
         assert!(
             r.is_none(),
             "CREATE 2 must return None (found where we were created)"
         );
         let name_gtag = (tag::TYPE_NAME << 20) | (2 << 10) | 256;
-        let r = get_tag_backwards(&dir, 0x780f_fc00, name_gtag).unwrap();
+        let r = get_tag_backwards(&dir, 0x780f_fc00, name_gtag, None).unwrap();
         assert!(r.is_some(), "NAME 2 must be found after splice gdiff");
     }
 
@@ -1192,7 +1237,7 @@ mod tests {
         );
         let gmask = 0x780f_fc00;
         let name_gtag = (tag::TYPE_NAME << 20) | (1 << 10) | 256;
-        let r = get_tag_backwards(&dir, gmask, name_gtag).unwrap();
+        let r = get_tag_backwards(&dir, gmask, name_gtag, None).unwrap();
         assert!(r.is_none(), "non-existent id must return None");
     }
 
@@ -1228,7 +1273,10 @@ mod tests {
         );
         assert_eq!(dir.count, 1);
         assert_eq!(
-            get_entry_info(&dir, 0, 255).unwrap().name().unwrap(),
+            get_entry_info(&dir, 0, 255, None, false)
+                .unwrap()
+                .name()
+                .unwrap(),
             "littlefs"
         );
     }
@@ -1309,11 +1357,11 @@ mod tests {
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let mut buf = [0u8; 32];
-        let n = get_inline_slice(&dir, 1, 0, &mut buf).unwrap();
+        let n = get_inline_slice(&dir, 1, 0, &mut buf, None).unwrap();
         assert_eq!(n, content.len());
         assert_eq!(&buf[..n], content);
 
-        let n2 = get_inline_slice(&dir, 1, 6, &mut buf).unwrap();
+        let n2 = get_inline_slice(&dir, 1, 6, &mut buf, None).unwrap();
         assert_eq!(n2, content.len() - 6);
         assert_eq!(&buf[..n2], b"World!\0");
     }

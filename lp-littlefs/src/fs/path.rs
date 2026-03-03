@@ -8,6 +8,7 @@ use crate::info::FileType;
 use crate::trace;
 
 use super::bdcache::BdContext;
+use super::gstate::GState;
 use super::metadata;
 
 /// Find entry at path. Returns (MdDir, id) where id is 0x3ff for root.
@@ -17,6 +18,7 @@ pub fn dir_find<B: BlockDevice>(
     root: [u32; 2],
     path: &str,
     name_max: u32,
+    gdisk: Option<&GState>,
 ) -> Result<(metadata::MdDir, u16), Error> {
     if path.is_empty() {
         return Err(Error::Inval);
@@ -83,8 +85,8 @@ pub fn dir_find<B: BlockDevice>(
             continue;
         }
 
-        let found_id = find_name_in_dir(ctx, &cwd, seg, name_max)?;
-        let info = metadata::get_entry_info(&cwd, found_id, name_max)?;
+        let found_id = find_name_in_dir(ctx, &cwd, seg, name_max, gdisk)?;
+        let info = metadata::get_entry_info(&cwd, found_id, name_max, gdisk, false)?;
 
         if seg_idx + 1 >= segments.len() {
             tag_id = found_id;
@@ -105,7 +107,7 @@ pub fn dir_find<B: BlockDevice>(
         if found_id == 0x3ff {
             cwd = metadata::fetch_metadata_pair(ctx, root)?;
         } else {
-            let pair = get_dir_struct(&cwd, found_id)?;
+            let pair = get_dir_struct(&cwd, found_id, gdisk)?;
             cwd = metadata::fetch_metadata_pair(ctx, pair)?;
         }
         tag_id = found_id;
@@ -125,6 +127,7 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
     root: [u32; 2],
     path: &'a str,
     name_max: u32,
+    gdisk: Option<&GState>,
 ) -> Result<(metadata::MdDir, u16, &'a str), Error> {
     if path.is_empty() {
         return Err(Error::Inval);
@@ -187,10 +190,10 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
             continue;
         }
 
-        let found_id = match find_name_in_dir(ctx, &cwd, seg, name_max) {
+        let found_id = match find_name_in_dir(ctx, &cwd, seg, name_max, gdisk) {
             Ok(id) => id,
             Err(Error::Noent) if seg_idx + 1 >= segments.len() => {
-                let id = find_insertion_id(&cwd, seg, name_max)?;
+                let id = find_insertion_id(&cwd, seg, name_max, gdisk)?;
                 trace!(
                     "dir_find_for_create path={:?} -> insert id={} name={:?}",
                     path,
@@ -202,7 +205,7 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
             Err(Error::Noent) => return Err(Error::Noent),
             Err(e) => return Err(e),
         };
-        let info = metadata::get_entry_info(&cwd, found_id, name_max)?;
+        let info = metadata::get_entry_info(&cwd, found_id, name_max, gdisk, false)?;
 
         if seg_idx + 1 >= segments.len() {
             return Err(Error::Exist);
@@ -216,7 +219,7 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
         if found_id == 0x3ff {
             cwd = metadata::fetch_metadata_pair(ctx, root)?;
         } else {
-            let pair = get_dir_struct(&cwd, found_id)?;
+            let pair = get_dir_struct(&cwd, found_id, gdisk)?;
             cwd = metadata::fetch_metadata_pair(ctx, pair)?;
         }
         tag_id = found_id;
@@ -228,7 +231,12 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
 
 /// Find the id slot where a new name would be inserted to maintain alphabetical order.
 /// C: lfs_min(lfs_tag_id(besttag), dir->count) from lfs_dir_fetchmatch (lfs.c:1370).
-fn find_insertion_id(dir: &metadata::MdDir, name: &str, name_max: u32) -> Result<u16, Error> {
+fn find_insertion_id(
+    dir: &metadata::MdDir,
+    name: &str,
+    name_max: u32,
+    gdisk: Option<&GState>,
+) -> Result<u16, Error> {
     let name_bytes = name.as_bytes();
     let start_id = if dir.pair[0] == 0 || dir.pair[0] == 1 {
         1
@@ -237,7 +245,7 @@ fn find_insertion_id(dir: &metadata::MdDir, name: &str, name_max: u32) -> Result
     };
 
     for id in start_id..dir.count {
-        match metadata::get_entry_info(dir, id, name_max) {
+        match metadata::get_entry_info(dir, id, name_max, gdisk, false) {
             Ok(info) => {
                 let cmp = info.name_bytes().cmp(name_bytes);
                 if cmp == core::cmp::Ordering::Greater || cmp == core::cmp::Ordering::Equal {
@@ -275,6 +283,7 @@ fn find_name_in_dir<B: BlockDevice>(
     dir: &metadata::MdDir,
     name: &str,
     name_max: u32,
+    gdisk: Option<&GState>,
 ) -> Result<u16, Error> {
     let name_bytes = name.as_bytes();
     if name_bytes.len() > name_max as usize {
@@ -287,11 +296,11 @@ fn find_name_in_dir<B: BlockDevice>(
         0
     };
 
-    match find_name_in_dir_pair(dir, name_bytes, name_max, start_id) {
+    match find_name_in_dir_pair(dir, name_bytes, name_max, start_id, gdisk) {
         Ok(id) => Ok(id),
         Err(Error::Noent) if dir.split => {
             let next_dir = metadata::fetch_metadata_pair(ctx, dir.tail)?;
-            find_name_in_dir(ctx, &next_dir, name, name_max)
+            find_name_in_dir(ctx, &next_dir, name, name_max, gdisk)
         }
         other => other,
     }
@@ -303,9 +312,10 @@ fn find_name_in_dir_pair(
     name_bytes: &[u8],
     name_max: u32,
     start_id: u16,
+    gdisk: Option<&GState>,
 ) -> Result<u16, Error> {
     for id in start_id..dir.count {
-        match metadata::get_entry_info(dir, id, name_max) {
+        match metadata::get_entry_info(dir, id, name_max, gdisk, false) {
             Ok(info) if info.name_bytes() == name_bytes => return Ok(id),
             Ok(_) => {}
             Err(Error::Noent) => continue,
@@ -315,8 +325,12 @@ fn find_name_in_dir_pair(
     Err(Error::Noent)
 }
 
-fn get_dir_struct(dir: &metadata::MdDir, id: u16) -> Result<[u32; 2], Error> {
-    let bytes = metadata::get_struct(dir, id)?;
+fn get_dir_struct(
+    dir: &metadata::MdDir,
+    id: u16,
+    gdisk: Option<&GState>,
+) -> Result<[u32; 2], Error> {
+    let bytes = metadata::get_struct(dir, id, gdisk)?;
     Ok([
         u32::from_le_bytes(bytes[0..4].try_into().unwrap()),
         u32::from_le_bytes(bytes[4..8].try_into().unwrap()),
@@ -366,7 +380,7 @@ mod tests {
         let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
         let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
         let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
-        let (dir, id) = dir_find(&ctx, [0, 1], "/", 255).unwrap();
+        let (dir, id) = dir_find(&ctx, [0, 1], "/", 255, None).unwrap();
         assert_eq!(id, 0x3ff);
         assert_eq!(dir.pair, [0, 1]);
     }
@@ -395,7 +409,7 @@ mod tests {
         .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let (dir, id) = dir_find(&ctx, [0, 1], "d0", 255).unwrap();
+        let (dir, id) = dir_find(&ctx, [0, 1], "d0", 255, None).unwrap();
         assert_eq!(id, 1);
         assert_eq!(dir.pair, [0, 1]);
     }
@@ -443,7 +457,7 @@ mod tests {
         .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let (dir, id) = dir_find(&ctx, [0, 1], "p/c", 255).unwrap();
+        let (dir, id) = dir_find(&ctx, [0, 1], "p/c", 255, None).unwrap();
         assert_eq!(id, 1);
         assert_eq!(dir.pair, p_pair);
     }
@@ -488,7 +502,7 @@ mod tests {
         .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let (dir, id) = dir_find(&ctx, [0, 1], "a/../b", 255).unwrap();
+        let (dir, id) = dir_find(&ctx, [0, 1], "a/../b", 255, None).unwrap();
         assert_eq!(id, 2);
         assert_eq!(dir.pair, [0, 1]);
     }
@@ -532,9 +546,9 @@ mod tests {
         .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let (_dir, id) = dir_find(&ctx, [0, 1], "x0", 255).unwrap();
+        let (_dir, id) = dir_find(&ctx, [0, 1], "x0", 255, None).unwrap();
         assert_eq!(id, 2);
-        assert!(dir_find(&ctx, [0, 1], "d0", 255).is_err());
+        assert!(dir_find(&ctx, [0, 1], "d0", 255, None).is_err());
     }
 
     #[test]
@@ -577,7 +591,7 @@ mod tests {
         .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let (dir, id, name) = dir_find_for_create(&ctx, [0, 1], "z", 255).unwrap();
+        let (dir, id, name) = dir_find_for_create(&ctx, [0, 1], "z", 255, None).unwrap();
         assert_eq!(id, 3);
         assert_eq!(name, "z");
         assert_eq!(dir.pair, [0, 1]);
@@ -623,7 +637,7 @@ mod tests {
         .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let (dir, id, name) = dir_find_for_create(&ctx, [0, 1], "b", 255).unwrap();
+        let (dir, id, name) = dir_find_for_create(&ctx, [0, 1], "b", 255, None).unwrap();
         assert_eq!(id, 2, "b inserts between a and c at id 2");
         assert_eq!(name, "b");
         assert_eq!(dir.pair, [0, 1]);
@@ -654,7 +668,7 @@ mod tests {
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         assert!(matches!(
-            dir_find_for_create(&ctx, [0, 1], "a", 255),
+            dir_find_for_create(&ctx, [0, 1], "a", 255, None),
             Err(Error::Exist)
         ));
     }
@@ -667,7 +681,7 @@ mod tests {
         let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
 
         assert!(matches!(
-            dir_find_for_create(&ctx, [0, 1], "nonexistent/x", 255),
+            dir_find_for_create(&ctx, [0, 1], "nonexistent/x", 255, None),
             Err(Error::Noent)
         ));
     }

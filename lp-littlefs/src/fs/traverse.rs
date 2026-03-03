@@ -45,6 +45,7 @@ pub fn fs_traverse<B, F>(
     ctx: &BdContext<'_, B>,
     root: [u32; 2],
     include_orphans: bool,
+    gdisk: Option<&super::gstate::GState>,
     mut cb: F,
 ) -> Result<(), Error>
 where
@@ -67,7 +68,7 @@ where
         let dir = metadata::fetch_metadata_pair(ctx, tail)?;
 
         for id in 0..dir.count {
-            let info = match metadata::get_entry_info(&dir, id, 255) {
+            let info = match metadata::get_entry_info(&dir, id, 255, gdisk, false) {
                 Ok(i) => i,
                 Err(Error::Noent) => continue,
                 Err(e) => return Err(e),
@@ -76,7 +77,7 @@ where
                 if !include_orphans {
                     continue;
                 }
-                let bytes = match metadata::get_struct(&dir, id) {
+                let bytes = match metadata::get_struct(&dir, id, gdisk) {
                     Ok(b) => b,
                     Err(Error::Noent) => continue,
                     Err(e) => return Err(e),
@@ -88,7 +89,7 @@ where
                     cb(b1)?;
                 }
             } else {
-                let (inline_, head, size) = match metadata::get_file_struct(&dir, id) {
+                let (inline_, head, size) = match metadata::get_file_struct(&dir, id, gdisk) {
                     Ok(x) => x,
                     Err(Error::Noent) => continue,
                     Err(e) => return Err(e),

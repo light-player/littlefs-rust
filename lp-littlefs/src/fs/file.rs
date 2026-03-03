@@ -60,22 +60,22 @@ impl File {
         let is_rdonly = !can_write;
 
         let (dir, id, created) = if is_rdonly {
-            let (dir, id) = path::dir_find(ctx, *root, path, name_max)?;
+            let (dir, id) = path::dir_find(ctx, *root, path, name_max, Some(gdisk))?;
             if id == 0x3ff {
                 return Err(Error::IsDir);
             }
-            let info = metadata::get_entry_info(&dir, id, name_max)?;
+            let info = metadata::get_entry_info(&dir, id, name_max, Some(gdisk), false)?;
             if info.typ != crate::info::FileType::Reg {
                 return Err(Error::IsDir);
             }
             (dir, id, false)
         } else {
-            match path::dir_find(ctx, *root, path, name_max) {
+            match path::dir_find(ctx, *root, path, name_max, Some(gdisk)) {
                 Ok((dir, id)) => {
                     if id == 0x3ff {
                         return Err(Error::IsDir);
                     }
-                    let info = metadata::get_entry_info(&dir, id, name_max)?;
+                    let info = metadata::get_entry_info(&dir, id, name_max, Some(gdisk), false)?;
                     if info.typ != crate::info::FileType::Reg {
                         return Err(Error::IsDir);
                     }
@@ -88,7 +88,8 @@ impl File {
                     if !flags.contains(OpenFlags::CREAT) {
                         return Err(Error::Noent);
                     }
-                    let (cwd, id, name) = path::dir_find_for_create(ctx, *root, path, name_max)?;
+                    let (cwd, id, name) =
+                        path::dir_find_for_create(ctx, *root, path, name_max, Some(gdisk))?;
                     crate::trace!(
                         "file_open CREAT dir_orphaningcommit pair={:?} id={} name={:?}",
                         cwd.pair,
@@ -128,7 +129,7 @@ impl File {
         let (inline_, head, size) = if created || (can_write && flags.contains(OpenFlags::TRUNC)) {
             (true, BLOCK_INLINE, 0u64)
         } else {
-            metadata::get_file_struct(&dir, id)?
+            metadata::get_file_struct(&dir, id, Some(gdisk))?
         };
 
         let mut pos = 0u64;
@@ -147,7 +148,7 @@ impl File {
             inline_buffer.reserve(inline_max as usize);
             if size > 0 && !created && !flags.contains(OpenFlags::TRUNC) {
                 let mut buf = vec![0u8; size as usize];
-                let n = metadata::get_inline_slice(&dir, id, 0, &mut buf)?;
+                let n = metadata::get_inline_slice(&dir, id, 0, &mut buf, Some(gdisk))?;
                 inline_buffer.extend_from_slice(&buf[..n]);
             }
         }
@@ -176,6 +177,7 @@ impl File {
         &mut self,
         ctx: &BdContext<'_, B>,
         buf: &mut [u8],
+        gdisk: Option<&GState>,
     ) -> Result<usize, Error> {
         let size = self.size_for_read();
         if self.pos >= size {
@@ -201,6 +203,7 @@ impl File {
                 self.id,
                 self.pos as usize,
                 &mut buf[..to_read],
+                gdisk,
             )?;
             self.pos += n as u64;
             return Ok(n);
@@ -465,7 +468,7 @@ impl File {
                     let mut buf = vec![0u8; size as usize];
                     let mut pos = 0u64;
                     while pos < size {
-                        let n = self.read(ctx, &mut buf[pos as usize..])?;
+                        let n = self.read(ctx, &mut buf[pos as usize..], Some(gdisk))?;
                         if n == 0 {
                             break;
                         }

@@ -6,12 +6,14 @@
 use crate::error::Error;
 use crate::info::FileType;
 
+use super::gstate;
 use super::metadata;
 
 /// Dump root dir state and entry list. For debugging. Called by LittleFs::fs_debug_dump.
 pub(crate) fn fs_debug_dump_impl(
     dir: &metadata::MdDir,
     name_max: u32,
+    gdisk: Option<&gstate::GState>,
 ) -> Result<::alloc::string::String, Error> {
     let mut out = ::alloc::string::String::new();
     out.push_str(&::alloc::format!(
@@ -31,7 +33,7 @@ pub(crate) fn fs_debug_dump_impl(
     };
     let mut entries = ::alloc::vec::Vec::new();
     for id in start_id..dir.count {
-        match metadata::get_entry_info(dir, id, name_max) {
+        match metadata::get_entry_info(dir, id, name_max, gdisk, false) {
             Ok(info) => {
                 let name = info
                     .name()
