@@ -35,9 +35,29 @@ pub fn force_consistency<B: BlockDevice>(
     block_count: u32,
     file_max: u32,
     attr_max: u32,
+    disk_version: u32,
 ) -> Result<(), Error> {
-    demove(ctx, root, gstate, gdisk, gdelta, lookahead, name_max)?;
-    deorphan(ctx, root, gstate, gdisk, gdelta, lookahead, name_max, true)?;
+    demove(
+        ctx,
+        root,
+        gstate,
+        gdisk,
+        gdelta,
+        lookahead,
+        name_max,
+        disk_version,
+    )?;
+    deorphan(
+        ctx,
+        root,
+        gstate,
+        gdisk,
+        gdelta,
+        lookahead,
+        name_max,
+        true,
+        disk_version,
+    )?;
     desuperblock(
         ctx,
         root,
@@ -49,6 +69,7 @@ pub fn force_consistency<B: BlockDevice>(
         block_count,
         file_max,
         attr_max,
+        disk_version,
     )?;
     Ok(())
 }
@@ -62,6 +83,7 @@ fn demove<B: BlockDevice>(
     gdelta: &mut GState,
     lookahead: &mut Lookahead,
     name_max: u32,
+    disk_version: u32,
 ) -> Result<(), Error> {
     if !gdisk.hasmove() {
         return Ok(());
@@ -84,6 +106,7 @@ fn demove<B: BlockDevice>(
         gdisk,
         gdelta,
         false,
+        disk_version,
     )?;
 
     *gdisk = *gstate;
@@ -102,6 +125,7 @@ fn desuperblock<B: BlockDevice>(
     block_count: u32,
     file_max: u32,
     attr_max: u32,
+    disk_version: u32,
 ) -> Result<(), Error> {
     if !gstate.needssuperblock() {
         return Ok(());
@@ -141,6 +165,7 @@ fn desuperblock<B: BlockDevice>(
         gdisk,
         gdelta,
         false,
+        disk_version,
     )?;
 
     gstate::prepsuperblock(gstate, false);
@@ -157,6 +182,7 @@ fn deorphan<B: BlockDevice>(
     lookahead: &mut Lookahead,
     name_max: u32,
     powerloss: bool,
+    disk_version: u32,
 ) -> Result<(), Error> {
     if !gstate.hasorphans() {
         return Ok(());
@@ -201,8 +227,17 @@ fn deorphan<B: BlockDevice>(
                             .collect();
 
                             let orphaned = commit::dir_orphaningcommit(
-                                ctx, &mut pdir, &attrs, root, lookahead, name_max, gstate, gdisk,
-                                gdelta, false,
+                                ctx,
+                                &mut pdir,
+                                &attrs,
+                                root,
+                                lookahead,
+                                name_max,
+                                gstate,
+                                gdisk,
+                                gdelta,
+                                false,
+                                disk_version,
                             )?;
                             if orphaned {
                                 moreorphans = true;
@@ -232,6 +267,7 @@ fn deorphan<B: BlockDevice>(
                         gdisk,
                         gdelta,
                         false,
+                        disk_version,
                     )?;
                     if orphaned {
                         moreorphans = true;

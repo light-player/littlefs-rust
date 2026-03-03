@@ -133,10 +133,6 @@ fn tag_dsize(tag: u32) -> usize {
     4 + data_size
 }
 
-fn tag_chunk(tag: u32) -> u8 {
-    ((tag & 0x0ff0_0000) >> 20) as u8
-}
-
 fn attr_data_bytes(attr: &CommitAttr<'_>) -> Vec<u8> {
     match &attr.data {
         CommitData::None => Vec::new(),
@@ -195,6 +191,7 @@ pub fn dir_commit_append<B: BlockDevice>(
     dir: &mut MdDir,
     attrs: &[CommitAttr<'_>],
     gstate_ctx: &mut Option<&mut GStateCtx<'_>>,
+    disk_version: u32,
 ) -> Result<(), Error> {
     trace!(
         "dir_commit_append pair={:?} writing to block={} at off={} n_attrs={}",
@@ -207,6 +204,7 @@ pub fn dir_commit_append<B: BlockDevice>(
     let prog_size = ctx.config.prog_size as usize;
     let block_idx = dir.pair[0];
 
+    let begin = if dir.off == 4 { 0 } else { dir.off };
     let mut off = dir.off;
     let mut ptag = dir.etag;
     let mut crc = 0xffff_ffffu32;
@@ -280,14 +278,17 @@ pub fn dir_commit_append<B: BlockDevice>(
         return Err(Error::Nospc);
     }
 
-    let crc_tag = mktag(tag::TYPE_CCRC, 0x3ff, 4);
-    let stored_crc_tag = (crc_tag & 0x7fff_ffff) ^ ptag;
-    ctx.prog(block_idx, off as u32, &stored_crc_tag.to_be_bytes())?;
-    crc = crc::crc32(crc, &stored_crc_tag.to_be_bytes());
-    off += 4;
-    ctx.prog(block_idx, off as u32, &crc.to_le_bytes())?;
-    off += 4;
-    ptag = (crc_tag & 0x7fff_ffff) ^ ((tag_chunk(crc_tag) & 1) as u32) << 31;
+    dir_commit_crc(
+        ctx,
+        block_idx,
+        &mut off,
+        &mut ptag,
+        &mut crc,
+        begin,
+        block_size,
+        prog_size,
+        disk_version,
+    )?;
 
     dir.off = off;
     dir.etag = ptag;
@@ -331,6 +332,106 @@ fn pair_eq(a: [u32; 2], b: [u32; 2]) -> bool {
     a[0] == b[0] && a[1] == b[1]
 }
 
+fn alignup_usize(a: usize, alignment: usize) -> usize {
+    if alignment == 0 {
+        return a;
+    }
+    (a + alignment - 1) & !(alignment - 1)
+}
+
+/// CRC phase of a commit. Per lfs_dir_commitcrc (lfs.c:1669).
+/// Aligns end to prog_size, writes FCRC when space allows, CCRC blocks, verifies.
+fn dir_commit_crc<B: BlockDevice>(
+    ctx: &BdContext<'_, B>,
+    block_idx: u32,
+    off: &mut usize,
+    ptag: &mut u32,
+    crc: &mut u32,
+    begin: usize,
+    block_size: usize,
+    prog_size: usize,
+    disk_version: u32,
+) -> Result<(), Error> {
+    let end = alignup_usize((*off + 20).min(block_size), prog_size);
+
+    let mut off1 = 0usize;
+    let mut crc1 = 0u32;
+
+    while *off < end {
+        let off_after_tag = *off + 4;
+        let mut noff = (end - off_after_tag).min(0x3fe) + off_after_tag;
+        if noff < end {
+            noff = noff.min(end - 20);
+        }
+
+        let mut eperturb: u8 = 0xff;
+        if noff >= end && noff <= block_size - prog_size {
+            let mut buf = [0u8; 1];
+            if ctx.read(block_idx, noff as u32, &mut buf).is_ok() {
+                eperturb = buf[0];
+            }
+
+            if disk_version > 0x0002_0000 {
+                let fcrc_crc = ctx.crc(block_idx, noff as u32, prog_size, 0xffff_ffff)?;
+                let fcrc_tag = mktag(tag::TYPE_FCRC, 0x3ff, 8);
+                let fcrc_stored_tag = (fcrc_tag & 0x7fff_ffff) ^ *ptag;
+                let mut fcrc_data = [0u8; 8];
+                fcrc_data[0..4].copy_from_slice(&(prog_size as u32).to_le_bytes());
+                fcrc_data[4..8].copy_from_slice(&fcrc_crc.to_le_bytes());
+
+                ctx.prog(block_idx, *off as u32, &fcrc_stored_tag.to_be_bytes())?;
+                *crc = crc::crc32(*crc, &fcrc_stored_tag.to_be_bytes());
+                *off += 4;
+                ctx.prog(block_idx, *off as u32, &fcrc_data)?;
+                *crc = crc::crc32(*crc, &fcrc_data);
+                *off += 8;
+                *ptag = fcrc_tag & 0x7fff_ffff;
+            }
+        }
+
+        let ccrc_size = noff - (*off + 4);
+        let ccrc_type = tag::TYPE_CCRC + (((!eperturb) >> 7) as u32);
+        let ccrc_tag = mktag(ccrc_type, 0x3ff, ccrc_size as u32);
+        let ccrc_stored_tag = (ccrc_tag & 0x7fff_ffff) ^ *ptag;
+        *crc = crc::crc32(*crc, &ccrc_stored_tag.to_be_bytes());
+        let stored_crc = *crc;
+
+        ctx.prog(block_idx, *off as u32, &ccrc_stored_tag.to_be_bytes())?;
+        *off += 4;
+        // off1 = start of stored CRC (for verify: end of CRC'd region; for read: position of CRC)
+        if off1 == 0 {
+            off1 = *off;
+            crc1 = stored_crc;
+        }
+        ctx.prog(block_idx, *off as u32, &stored_crc.to_le_bytes())?;
+        *off += 4;
+
+        *ptag = (ccrc_tag & 0x7fff_ffff) ^ ((0x80u32 & !(eperturb as u32)) << 24);
+        *crc = 0xffff_ffff;
+        *off = noff;
+
+        if noff >= end {
+            ctx.sync()?;
+        }
+    }
+
+    let verify_len = off1.saturating_sub(begin);
+    if verify_len > 0 {
+        let crc_verify = ctx.crc(block_idx, begin as u32, verify_len, 0xffff_ffff)?;
+        if crc_verify != crc1 {
+            return Err(Error::Corrupt);
+        }
+    }
+    let mut stored_buf = [0u8; 4];
+    ctx.read(block_idx, off1 as u32, &mut stored_buf)?;
+    let stored_crc_val = u32::from_le_bytes(stored_buf);
+    if stored_crc_val == 0 {
+        return Err(Error::Corrupt);
+    }
+
+    Ok(())
+}
+
 /// Compact source tags [begin, end) and optional attrs into dir. Writes to dir.pair[1], then swaps.
 /// Attrs are appended after source tags (for relocatingcommit merge).
 /// On Nospc or Corrupt, relocates to a new block and retries.
@@ -346,6 +447,7 @@ pub fn dir_compact<B: BlockDevice>(
     root: [u32; 2],
     lookahead: &mut Lookahead,
     gstate_ctx: &mut Option<&mut GStateCtx<'_>>,
+    disk_version: u32,
 ) -> Result<CompactResult, Error> {
     let meta_max = metadata_max(bdc);
     let prog_size = bdc.config.prog_size as usize;
@@ -536,14 +638,29 @@ pub fn dir_compact<B: BlockDevice>(
             dir.pair[1] = new_block;
             continue;
         }
-        let crc_tag = mktag(tag::TYPE_CCRC, 0x3ff, 4);
-        let stored_crc_tag = (crc_tag & 0x7fff_ffff) ^ ptag;
-        bdc.prog(block_idx, off as u32, &stored_crc_tag.to_be_bytes())?;
-        crc = crate::crc::crc32(crc, &stored_crc_tag.to_be_bytes());
-        off += 4;
-        bdc.prog(block_idx, off as u32, &crc.to_le_bytes())?;
-        off += 4;
-        ptag = (crc_tag & 0x7fff_ffff) ^ ((tag_chunk(crc_tag) & 1) as u32) << 31;
+        let block_size = bdc.config.block_size as usize;
+        if let Err(e) = dir_commit_crc(
+            bdc,
+            block_idx,
+            &mut off,
+            &mut ptag,
+            &mut crc,
+            0,
+            block_size,
+            prog_size,
+            disk_version,
+        ) {
+            if matches!(e, Error::Corrupt) {
+                relocated = true;
+                if pair_eq(dir.pair, SUPERBLOCK) {
+                    return Err(Error::Nospc);
+                }
+                let new_block = alloc::alloc(bdc, root, lookahead)?;
+                dir.pair[1] = new_block;
+                continue;
+            }
+            return Err(e);
+        }
 
         dir.pair.swap(0, 1);
         if attrs.is_empty() {
@@ -570,6 +687,7 @@ pub fn dir_split<B: BlockDevice>(
     root: [u32; 2],
     lookahead: &mut Lookahead,
     gstate_ctx: &mut Option<&mut GStateCtx<'_>>,
+    disk_version: u32,
 ) -> Result<(), Error> {
     let mut tail = dir_alloc(ctx, root, lookahead)?;
     tail.split = dir.split;
@@ -585,6 +703,7 @@ pub fn dir_split<B: BlockDevice>(
         root,
         lookahead,
         gstate_ctx,
+        disk_version,
     )?;
 
     dir.tail = tail.pair;
@@ -605,6 +724,7 @@ pub fn dir_splittingcompact<B: BlockDevice>(
     root: [u32; 2],
     lookahead: &mut Lookahead,
     gstate_ctx: &mut Option<&mut GStateCtx<'_>>,
+    disk_version: u32,
 ) -> Result<CompactResult, Error> {
     let meta_max = metadata_max(ctx);
     let prog_size = ctx.config.prog_size as usize;
@@ -621,19 +741,47 @@ pub fn dir_splittingcompact<B: BlockDevice>(
     }
 
     if split != begin {
-        let res = dir_split(ctx, dir, source, split, end, root, lookahead, gstate_ctx);
+        let res = dir_split(
+            ctx,
+            dir,
+            source,
+            split,
+            end,
+            root,
+            lookahead,
+            gstate_ctx,
+            disk_version,
+        );
         if let Err(Error::Nospc) = res {
             trace!("dir_splittingcompact: split failed (Nospc), compact with degraded split");
         } else {
             res?;
             return dir_splittingcompact(
-                ctx, dir, source, begin, split, attrs, root, lookahead, gstate_ctx,
+                ctx,
+                dir,
+                source,
+                begin,
+                split,
+                attrs,
+                root,
+                lookahead,
+                gstate_ctx,
+                disk_version,
             );
         }
     }
 
     dir_compact(
-        ctx, dir, source, begin, end, attrs, root, lookahead, gstate_ctx,
+        ctx,
+        dir,
+        source,
+        begin,
+        end,
+        attrs,
+        root,
+        lookahead,
+        gstate_ctx,
+        disk_version,
     )
 }
 
@@ -649,6 +797,7 @@ pub fn dir_relocatingcommit<B: BlockDevice>(
     lookahead: &mut Lookahead,
     pdir: &mut MdDir,
     gstate_ctx: &mut Option<&mut GStateCtx<'_>>,
+    disk_version: u32,
 ) -> Result<RelocatingResult, Error> {
     let mut hasdelete = false;
     for attr in attrs {
@@ -670,7 +819,7 @@ pub fn dir_relocatingcommit<B: BlockDevice>(
 
     let force_compact = dir_needsrelocation(ctx, dir);
     if !force_compact {
-        match dir_commit_append(ctx, dir, attrs, gstate_ctx) {
+        match dir_commit_append(ctx, dir, attrs, gstate_ctx, disk_version) {
             Ok(()) => return Ok(RelocatingResult::Ok),
             Err(Error::Nospc) | Err(Error::Corrupt) => {}
             Err(e) => return Err(e),
@@ -688,6 +837,7 @@ pub fn dir_relocatingcommit<B: BlockDevice>(
         root,
         lookahead,
         gstate_ctx,
+        disk_version,
     )?;
 
     Ok(if res == CompactResult::Relocated {
@@ -710,6 +860,7 @@ pub fn dir_orphaningcommit<B: BlockDevice>(
     gdisk: &mut GState,
     gdelta: &mut GState,
     skip_dir_adjust: bool,
+    disk_version: u32,
 ) -> Result<bool, Error> {
     trace!(
         "dir_orphaningcommit pair={:?} n_attrs={}",
@@ -738,6 +889,7 @@ pub fn dir_orphaningcommit<B: BlockDevice>(
         lookahead,
         &mut pdir,
         &mut gstate_opt,
+        disk_version,
     )?;
 
     if lpair[0] == dir.pair[0] && lpair[1] == dir.pair[1] {
@@ -761,6 +913,7 @@ pub fn dir_orphaningcommit<B: BlockDevice>(
             lookahead,
             &mut dummy_pdir,
             &mut gstate_opt,
+            disk_version,
         )?;
         ldir = pdir;
     }
@@ -785,6 +938,7 @@ pub fn dir_orphaningcommit<B: BlockDevice>(
                     lookahead,
                     &mut dummy_pdir,
                     &mut gstate_opt,
+                    disk_version,
                 )?;
                 if s == RelocatingResult::Relocated {
                     ldir = pdir;
@@ -812,6 +966,7 @@ pub fn dir_orphaningcommit<B: BlockDevice>(
                 lookahead,
                 &mut dummy_pdir,
                 &mut gstate_opt,
+                disk_version,
             )?;
             ldir = pred;
         } else {
@@ -834,6 +989,7 @@ pub fn dir_drop<B: BlockDevice>(
     gstate: &GState,
     gdisk: &mut GState,
     gdelta: &mut GState,
+    disk_version: u32,
 ) -> Result<(), Error> {
     super::gstate::dir_getgstate(orphan, gdelta)?;
     let tail_attr = if orphan.split {
@@ -859,6 +1015,7 @@ pub fn dir_drop<B: BlockDevice>(
         lookahead,
         &mut dummy,
         &mut gstate_opt,
+        disk_version,
     )?;
     Ok(())
 }
@@ -896,6 +1053,7 @@ mod tests {
             [0u32, 1],
             &mut lookahead,
             &mut None,
+            crate::superblock::DISK_VERSION,
         )
         .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();

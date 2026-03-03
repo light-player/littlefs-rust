@@ -54,6 +54,7 @@ impl File {
         gstate: &GState,
         gdisk: &mut GState,
         gdelta: &mut GState,
+        disk_version: u32,
     ) -> Result<Self, Error> {
         let can_write = flags.contains(OpenFlags::WRONLY) || flags.contains(OpenFlags::RDWR);
         let is_rdonly = !can_write;
@@ -114,6 +115,7 @@ impl File {
                         gdisk,
                         gdelta,
                         false,
+                        disk_version,
                     )?;
                     ctx.sync()?;
                     let dir = metadata::fetch_metadata_pair(ctx, cwd.pair)?;
@@ -371,6 +373,7 @@ impl File {
         gstate: &GState,
         gdisk: &mut GState,
         gdelta: &mut GState,
+        disk_version: u32,
     ) -> Result<(), Error> {
         if !self.dirty {
             return Ok(());
@@ -394,6 +397,7 @@ impl File {
                 gdisk,
                 gdelta,
                 false,
+                disk_version,
             )?;
         } else {
             let mut dir = metadata::fetch_metadata_pair(ctx, self.mdir.pair)?;
@@ -412,6 +416,7 @@ impl File {
                 gdisk,
                 gdelta,
                 false,
+                disk_version,
             )?;
         }
 
@@ -434,6 +439,7 @@ impl File {
         gstate: &GState,
         gdisk: &mut GState,
         gdelta: &mut GState,
+        disk_version: u32,
     ) -> Result<(), Error> {
         let old_pos = self.pos;
         let old_size = self.size_for_read();
@@ -444,7 +450,16 @@ impl File {
                     self.inline_buffer.truncate(size as usize);
                 } else {
                     if self.dirty {
-                        self.sync(ctx, root, lookahead, name_max, gstate, gdisk, gdelta)?;
+                        self.sync(
+                            ctx,
+                            root,
+                            lookahead,
+                            name_max,
+                            gstate,
+                            gdisk,
+                            gdelta,
+                            disk_version,
+                        )?;
                     }
                     self.seek(0, crate::info::SeekWhence::Set)?;
                     let mut buf = vec![0u8; size as usize];
@@ -464,7 +479,16 @@ impl File {
                     self.off = 0;
                 }
             } else {
-                self.sync(ctx, root, lookahead, name_max, gstate, gdisk, gdelta)?;
+                self.sync(
+                    ctx,
+                    root,
+                    lookahead,
+                    name_max,
+                    gstate,
+                    gdisk,
+                    gdelta,
+                    disk_version,
+                )?;
                 let (block, _) = ctz::ctz_find(ctx, self.ctz_head, self.ctz_size, size - 1)?;
                 self.ctz_head = block;
                 self.ctz_size = size;
@@ -535,10 +559,20 @@ impl File {
         gstate: &GState,
         gdisk: &mut GState,
         gdelta: &mut GState,
+        disk_version: u32,
     ) -> Result<(), Error> {
         if self.dirty {
             crate::trace!("file_close dirty -> sync");
-            self.sync(ctx, root, lookahead, name_max, gstate, gdisk, gdelta)?;
+            self.sync(
+                ctx,
+                root,
+                lookahead,
+                name_max,
+                gstate,
+                gdisk,
+                gdelta,
+                disk_version,
+            )?;
         }
         Ok(())
     }

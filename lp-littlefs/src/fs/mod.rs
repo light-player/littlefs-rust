@@ -98,6 +98,7 @@ impl LittleFs {
             state.block_count,
             state.file_max,
             state.attr_max,
+            state.disk_version,
         )?;
 
         let block_size = state.block_size as usize;
@@ -128,6 +129,7 @@ impl LittleFs {
                         &mut state.gdisk,
                         &mut state.gdelta,
                         false,
+                        state.disk_version,
                     )?;
                 }
                 tail = dir.tail;
@@ -214,6 +216,7 @@ impl LittleFs {
             state.block_count,
             state.file_max,
             state.attr_max,
+            state.disk_version,
         )?;
 
         // Per upstream: if gdisk != gstate, commit root with empty attrs.
@@ -234,6 +237,7 @@ impl LittleFs {
                 &mut state.gdisk,
                 &mut state.gdelta,
                 true, // skip_dir_adjust for explicit persist
+                state.disk_version,
             )?;
         }
 
@@ -446,6 +450,7 @@ impl LittleFs {
                 state.block_count,
                 state.file_max,
                 state.attr_max,
+                state.disk_version,
             )?;
         }
         file::File::open(
@@ -459,6 +464,7 @@ impl LittleFs {
             &state.gstate,
             &mut state.gdisk,
             &mut state.gdelta,
+            state.disk_version,
         )
     }
 
@@ -531,6 +537,7 @@ impl LittleFs {
             &state.gstate,
             &mut state.gdisk,
             &mut state.gdelta,
+            state.disk_version,
         )
     }
 
@@ -553,6 +560,7 @@ impl LittleFs {
             &state.gstate,
             &mut state.gdisk,
             &mut state.gdelta,
+            state.disk_version,
         )
     }
 
@@ -582,6 +590,7 @@ impl LittleFs {
             &state.gstate,
             &mut state.gdisk,
             &mut state.gdelta,
+            state.disk_version,
         )
     }
 
@@ -605,6 +614,7 @@ impl LittleFs {
             state.block_count,
             state.file_max,
             state.attr_max,
+            state.disk_version,
         )?;
         let (cwd, id, name) = path::dir_find_for_create(&ctx, state.root, path, state.name_max)?;
         trace!("mkdir cwd.pair={:?} id={} name={:?}", cwd.pair, id, name);
@@ -635,6 +645,7 @@ impl LittleFs {
             &mut state.gdisk,
             &mut state.gdelta,
             false,
+            state.disk_version,
         )?;
 
         let new_pair = new_dir.pair;
@@ -652,6 +663,7 @@ impl LittleFs {
                 &mut state.gdisk,
                 &mut state.gdelta,
                 false,
+                state.disk_version,
             )?;
         }
 
@@ -674,6 +686,7 @@ impl LittleFs {
             &mut state.gdisk,
             &mut state.gdelta,
             false,
+            state.disk_version,
         )?;
 
         state.lookahead.alloc_ckpoint(state.block_count);
@@ -702,6 +715,7 @@ impl LittleFs {
             state.block_count,
             state.file_max,
             state.attr_max,
+            state.disk_version,
         )?;
         let (cwd, id) = path::dir_find(&ctx, state.root, path, state.name_max)?;
 
@@ -734,6 +748,7 @@ impl LittleFs {
             &mut state.gdisk,
             &mut state.gdelta,
             false,
+            state.disk_version,
         )?;
 
         trace!("remove done, bd_sync");
@@ -762,6 +777,7 @@ impl LittleFs {
             state.block_count,
             state.file_max,
             state.attr_max,
+            state.disk_version,
         )?;
         let (old_cwd, old_id) = path::dir_find(&ctx, state.root, old_path, state.name_max)?;
         trace!("rename old_cwd.pair={:?} old_id={}", old_cwd.pair, old_id);
@@ -915,6 +931,7 @@ impl LittleFs {
             &mut state.gdisk,
             &mut state.gdelta,
             false,
+            state.disk_version,
         )?;
 
         if !same_pair && state.gstate.hasmove() {
@@ -931,6 +948,7 @@ impl LittleFs {
                 &mut state.gdisk,
                 &mut state.gdelta,
                 false,
+                state.disk_version,
             )?;
         }
 
@@ -947,6 +965,7 @@ impl LittleFs {
                     &state.gstate,
                     &mut state.gdisk,
                     &mut state.gdelta,
+                    state.disk_version,
                 )?;
             }
         }
@@ -999,6 +1018,7 @@ pub fn create_inline_file<B: BlockDevice>(
         &mut gdisk,
         &mut gdelta,
         false,
+        crate::superblock::DISK_VERSION,
     )?;
     bdcache::bd_sync(bd, config, &rcache, &pcache)
 }

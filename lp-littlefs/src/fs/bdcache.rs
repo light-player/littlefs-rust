@@ -1,10 +1,11 @@
 //! Block device caching layer (FS-owned).
 //!
-//! Matches upstream lfs_bd_read, lfs_bd_prog, lfs_bd_flush, lfs_bd_sync behavior.
+//! Matches upstream lfs_bd_read, lfs_bd_prog, lfs_bd_flush, lfs_bd_sync, lfs_bd_crc behavior.
 //! Caches live in MountState and are discarded on unmount.
 
 use crate::block::BlockDevice;
 use crate::config::Config;
+use crate::crc;
 use crate::error::Error;
 use alloc::vec::Vec;
 use core::cell::RefCell;
@@ -235,6 +236,36 @@ pub fn bd_read<B: BlockDevice>(
     Ok(())
 }
 
+const CRC_BUF_SIZE: usize = 64;
+
+/// Cached CRC of a block region. Per lfs_bd_crc (lfs.c:155).
+/// Reads through pcache/rcache, accumulates CRC-32 (poly 0x04c11db7, init 0xffffffff).
+pub fn bd_crc<B: BlockDevice>(
+    bd: &B,
+    config: &Config,
+    rcache: &RefCell<ReadCache>,
+    pcache: &RefCell<ProgCache>,
+    block: u32,
+    off: u32,
+    size: usize,
+    init: u32,
+) -> Result<u32, Error> {
+    let block_size = config.block_size;
+    if block_size != 0 && (off + size as u32) > block_size {
+        return Err(Error::Corrupt);
+    }
+    let mut buf = [0u8; CRC_BUF_SIZE];
+    let mut c = init;
+    let mut pos = 0u32;
+    while pos < size as u32 {
+        let n = (size - pos as usize).min(buf.len());
+        bd_read(bd, config, rcache, pcache, block, off + pos, &mut buf[..n])?;
+        c = crc::crc32(c, &buf[..n]);
+        pos += n as u32;
+    }
+    Ok(c)
+}
+
 /// Cached prog. Read-before-write for partial updates.
 pub fn bd_prog<B: BlockDevice>(
     bd: &B,
@@ -366,6 +397,19 @@ impl<'a, B: BlockDevice> BdContext<'a, B> {
 
     pub fn erase(&self, block: u32) -> Result<(), Error> {
         self.bd.erase(block)
+    }
+
+    pub fn crc(&self, block: u32, off: u32, size: usize, init: u32) -> Result<u32, Error> {
+        bd_crc(
+            self.bd,
+            self.config,
+            self.rcache,
+            self.pcache,
+            block,
+            off,
+            size,
+            init,
+        )
     }
 
     pub fn sync(&self) -> Result<(), Error> {

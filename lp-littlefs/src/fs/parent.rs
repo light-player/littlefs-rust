@@ -160,6 +160,7 @@ mod tests {
             &mut new_dir,
             &[commit::CommitAttr::soft_tail(pred_tail)],
             &mut None,
+            crate::superblock::DISK_VERSION,
         )
         .unwrap();
 
@@ -170,7 +171,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root_mut, &attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root_mut,
+            &attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let pred = fs_pred(&ctx, root, new_pair).unwrap();
@@ -198,6 +206,7 @@ mod tests {
             &mut new_dir,
             &[commit::CommitAttr::soft_tail(pred_tail)],
             &mut None,
+            crate::superblock::DISK_VERSION,
         )
         .unwrap();
 
@@ -208,7 +217,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root_mut, &attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root_mut,
+            &attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let parent = fs_parent(&ctx, root, new_pair, 255).unwrap();

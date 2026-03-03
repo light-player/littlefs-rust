@@ -210,8 +210,8 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
                 last_etag = ptag;
                 last_tail = temptail;
                 last_split = tempsplit;
-                // Align with C (NAME+SPLICE). Temporarily keep max_id+1 to pass tests while
-                // investigating DELETE visibility bug; remove once root cause is fixed.
+                // Align with C (NAME+SPLICE). We add max_id+1 clamp; C does not.
+                // See docs/implementation-notes/2026-03-03-count-max-id.md.
                 if seen_name_or_splice {
                     tempcount = tempcount.max(0).max(max_id as i32 + 1);
                 } else {
@@ -746,7 +746,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, child_pair),
             commit::CommitAttr::soft_tail(child_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &mkdir_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
 
         let file_attrs = [
@@ -754,7 +761,14 @@ mod tests {
             commit::CommitAttr::name_reg(1, b"burito"),
             commit::CommitAttr::inline_struct(1, &[]),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &file_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &file_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
@@ -796,7 +810,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
@@ -839,7 +860,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, d0_pair),
             commit::CommitAttr::soft_tail(d0_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &mkdir_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
 
         let rename_attrs = [
@@ -848,7 +876,14 @@ mod tests {
             commit::CommitAttr::dir_struct(2, d0_pair),
             commit::CommitAttr::delete(1),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &rename_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
@@ -879,7 +914,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, d0_pair),
             commit::CommitAttr::soft_tail(d0_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &mkdir_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
 
         let rename_attrs = [
@@ -888,7 +930,14 @@ mod tests {
             commit::CommitAttr::dir_struct(2, d0_pair),
             commit::CommitAttr::delete(1),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &rename_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
@@ -918,7 +967,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, d0_pair),
             commit::CommitAttr::soft_tail(d0_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &mkdir_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
 
         let rename_attrs = [
@@ -927,7 +983,14 @@ mod tests {
             commit::CommitAttr::dir_struct(2, d0_pair),
             commit::CommitAttr::delete(1),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &rename_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
@@ -957,7 +1020,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, d0_pair),
             commit::CommitAttr::soft_tail(d0_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &mkdir_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
 
         let rename_attrs = [
@@ -966,7 +1036,14 @@ mod tests {
             commit::CommitAttr::dir_struct(2, d0_pair),
             commit::CommitAttr::delete(1),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &rename_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
@@ -995,7 +1072,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, d0_pair),
             commit::CommitAttr::soft_tail(d0_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &mkdir_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
 
         let rename_attrs = [
@@ -1004,7 +1088,14 @@ mod tests {
             commit::CommitAttr::dir_struct(2, d0_pair),
             commit::CommitAttr::delete(1),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &rename_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
@@ -1034,7 +1125,14 @@ mod tests {
             commit::CommitAttr::dir_struct(1, d0_pair),
             commit::CommitAttr::soft_tail(d0_pair),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &mkdir_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
 
         let rename_attrs = [
@@ -1043,7 +1141,14 @@ mod tests {
             commit::CommitAttr::dir_struct(2, d0_pair),
             commit::CommitAttr::delete(1),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &rename_attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
@@ -1070,7 +1175,14 @@ mod tests {
         let mut child = commit::dir_alloc(&ctx, [0, 1], &mut lookahead).unwrap();
         let null_pair = [0xffff_ffffu32, 0xffff_ffff];
         let attrs = [commit::CommitAttr::soft_tail(null_pair)];
-        commit::dir_commit_append(&ctx, &mut child, &attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut child,
+            &attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, child.pair).unwrap();
@@ -1133,7 +1245,14 @@ mod tests {
         let mut child = commit::dir_alloc(&ctx, [0, 1], &mut lookahead).unwrap();
         let null_pair = [0xffff_ffffu32, 0xffff_ffff];
         let attrs = [commit::CommitAttr::soft_tail(null_pair)];
-        commit::dir_commit_append(&ctx, &mut child, &attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut child,
+            &attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, child.pair).unwrap();
@@ -1178,7 +1297,14 @@ mod tests {
             commit::CommitAttr::name_reg(1, b"hello"),
             commit::CommitAttr::inline_struct(1, content),
         ];
-        commit::dir_commit_append(&ctx, &mut root, &attrs, &mut None).unwrap();
+        commit::dir_commit_append(
+            &ctx,
+            &mut root,
+            &attrs,
+            &mut None,
+            crate::superblock::DISK_VERSION,
+        )
+        .unwrap();
         bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
         let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();

@@ -33,9 +33,9 @@ Rust starts at `off = 4`, reads at `off`, then does `off += dsize`. Same semanti
 | Check `crc == dcrc`, `ptag ^= (chunk & 1) << 31` | Same |
 | `dir->count = tempcount` | `tempcount = max(tempcount, max_id+1)` (see below) |
 
-### Count logic (critical difference)
+### Count logic
 
-**C (1248–1255):**
+**C (1247–1254):**
 
 ```c
 if (lfs_tag_type1(tag) == LFS_TYPE_NAME) {
@@ -46,19 +46,15 @@ if (lfs_tag_type1(tag) == LFS_TYPE_NAME) {
 }
 ```
 
-C uses only splice for the final count. For a rename commit (CREATE 2, NAME 2, DIRSTRUCT 2, DELETE 1):
+C uses **both** NAME and SPLICE: NAME bumps when `id >= tempcount`, SPLICE applies CREATE/DELETE deltas.
 
-- CREATE 2: tempcount += 1 → 3 (from 2)
-- NAME 2: id 2 < 3, no change
-- DELETE 1: tempcount += -1 → 2
+**Rust divergence:** We add `tempcount = max(tempcount, max_id + 1)` at CRC when `seen_name_or_splice`. C does not.
 
-So C yields `count = 2`. With `dir_read` iterating ids 0..count (1..count for root), id 2 is never checked.
+**Why C’s tests pass:** Upstream `test_dirs_many_rename` renames `test%03d` → `tedd%03d`. Since `"tedd" < "test"`, each rename inserts before existing entries (append never used). For append renames (e.g. `d0` → `x0` where `"x" > "d"`), newid = count; CREATE bumps tempcount, then NAME sees `id < tempcount` and does not bump; a single append-rename can yield count too low.
 
-**Rust iteration:** `find_name_in_dir_pair` iterates `start_id..dir.count` and `dir_read` uses `dir.id < dir.mdir.count`. Both need `count >= max_id + 1` to reach all entries.
+**Why Rust may need the extra clamp:** Either (a) C has a latent bug in the append-rename case not covered by its tests, or (b) Rust has a bug elsewhere (block selection, split/relocate, DELETE visibility) that yields a too-low count, and we are masking it with `max_id + 1`. Given C’s tests pass, (b) should be investigated first: block/revision selection, split/relocate behavior, and DELETE visibility when reading dir entries.
 
-**Fix:** Track `max_id` over NAME and SPLICE tags. At CRC: `tempcount = max(tempcount, max_id + 1)` so `count >= max_id + 1` for iteration.
-
-**Caveat:** Only apply `max_id + 1` when we've seen at least one NAME or SPLICE tag (`seen_name_or_splice`). Empty child dirs (only SOFTTAIL, no entries) have no NAME/SPLICE; without this guard we'd force `count = 1`, causing `remove` to incorrectly return NotEmpty.
+**Investigation:** Temporarily remove `max_id + 1`, run tests (especially append-rename: `d0`→`x0`), and fix any failures by addressing block selection, split/relocate, or DELETE visibility.
 
 ### NAME / SPLICE / TAIL handling
 
