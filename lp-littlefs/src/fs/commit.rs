@@ -671,9 +671,7 @@ pub fn dir_compact<B: BlockDevice>(
         }
 
         dir.pair.swap(0, 1);
-        if attrs.is_empty() {
-            dir.count = end.saturating_sub(begin);
-        }
+        dir.count = end.saturating_sub(begin);
         dir.off = off;
         dir.etag = ptag;
 
@@ -807,6 +805,7 @@ pub fn dir_relocatingcommit<B: BlockDevice>(
     gstate_ctx: &mut Option<&mut GStateCtx<'_>>,
     disk_version: u32,
 ) -> Result<RelocatingResult, Error> {
+    let count_before_apply = dir.count;
     let mut hasdelete = false;
     for attr in attrs {
         apply_attr_to_state(dir, attr);
@@ -835,12 +834,15 @@ pub fn dir_relocatingcommit<B: BlockDevice>(
     }
 
     let source = dir.clone();
+    // Use count before applying attrs for compact range: the source block contains
+    // tags for all ids [0, count_before_apply); applying DELETE reduces count
+    // but does not remove tags from the block, so we must copy the full range.
     let res = dir_splittingcompact(
         ctx,
         dir,
         &source,
         0,
-        source.count,
+        count_before_apply,
         attrs,
         root,
         lookahead,
