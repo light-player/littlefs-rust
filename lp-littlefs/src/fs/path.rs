@@ -85,7 +85,7 @@ pub fn dir_find<B: BlockDevice>(
             continue;
         }
 
-        let found_id = find_name_in_dir(ctx, &cwd, seg, name_max, gdisk)?;
+        let found_id = find_name_in_dir(ctx, &mut cwd, seg, name_max, gdisk)?;
         let info = metadata::get_entry_info(&cwd, found_id, name_max, gdisk, false)?;
 
         if seg_idx + 1 >= segments.len() {
@@ -190,7 +190,7 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
             continue;
         }
 
-        let found_id = match find_name_in_dir(ctx, &cwd, seg, name_max, gdisk) {
+        let found_id = match find_name_in_dir(ctx, &mut cwd, seg, name_max, gdisk) {
             Ok(id) => id,
             Err(Error::Noent) if seg_idx + 1 >= segments.len() => {
                 let id = find_insertion_id(&cwd, seg, name_max, gdisk)?;
@@ -280,7 +280,7 @@ fn find_dotdot_cancel_count(remaining: &[&str]) -> usize {
 
 fn find_name_in_dir<B: BlockDevice>(
     ctx: &BdContext<'_, B>,
-    dir: &metadata::MdDir,
+    dir: &mut metadata::MdDir,
     name: &str,
     name_max: u32,
     gdisk: Option<&GState>,
@@ -299,8 +299,21 @@ fn find_name_in_dir<B: BlockDevice>(
     match find_name_in_dir_pair(dir, name_bytes, name_max, start_id, gdisk) {
         Ok(id) => Ok(id),
         Err(Error::Noent) if dir.split => {
-            let next_dir = metadata::fetch_metadata_pair(ctx, dir.tail)?;
-            find_name_in_dir(ctx, &next_dir, name, name_max, gdisk)
+            let mut next_dir = metadata::fetch_metadata_pair(ctx, dir.tail)?;
+            match find_name_in_dir(ctx, &mut next_dir, name, name_max, gdisk) {
+                Ok(id) => {
+                    *dir = next_dir;
+                    Ok(id)
+                }
+                Err(Error::Noent) => {
+                    // Per C lfs_dir_fetchmatch: when not found, dir is left at the block we
+                    // searched last (the tail). Callers like find_insertion_id need the tail's
+                    // count for correct insertion ids when creating in a split dir.
+                    *dir = next_dir;
+                    Err(Error::Noent)
+                }
+                Err(e) => Err(e),
+            }
         }
         other => other,
     }
@@ -317,8 +330,22 @@ fn find_name_in_dir_pair(
     for id in start_id..dir.count {
         match metadata::get_entry_info(dir, id, name_max, gdisk, false) {
             Ok(info) if info.name_bytes() == name_bytes => return Ok(id),
-            Ok(_) => {}
-            Err(Error::Noent) => continue,
+            Ok(_info) => {
+                trace!(
+                    "find_name_in_dir_pair pair={:?} id={} name={:?} (no match)",
+                    dir.pair,
+                    id,
+                    _info.name_bytes()
+                );
+            }
+            Err(Error::Noent) => {
+                trace!(
+                    "find_name_in_dir_pair pair={:?} id={} get_entry_info Noent",
+                    dir.pair,
+                    id
+                );
+                continue;
+            }
             Err(e) => return Err(e),
         }
     }

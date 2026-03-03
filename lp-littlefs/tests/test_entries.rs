@@ -134,7 +134,6 @@ fn test_entries_shrink() {
 }
 
 #[test]
-#[ignore = "spill layout may differ with metadata"]
 fn test_entries_spill() {
     init_log();
     let (bd, config, mut lfs) = fs_with_cache_512();
@@ -169,7 +168,6 @@ fn test_entries_spill() {
 }
 
 #[test]
-#[ignore = "push_spill layout may differ with metadata"]
 fn test_entries_push_spill() {
     init_log();
     let (bd, config, mut lfs) = fs_with_cache_512();
@@ -237,7 +235,6 @@ fn test_entries_push_spill() {
 }
 
 #[test]
-#[ignore = "drop/remove with inline neighbors may differ"]
 fn test_entries_drop() {
     init_log();
     let (bd, config, mut lfs) = fs_with_cache_512();
