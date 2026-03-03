@@ -1,4 +1,6 @@
 //! Directory iteration.
+//!
+//! Per lfs_dir_read_ (lfs.c:1771).
 
 use crate::block::BlockDevice;
 use crate::error::Error;
@@ -9,6 +11,7 @@ use super::bdcache::BdContext;
 use super::metadata;
 
 /// Read next directory entry. Returns 1 on success, 0 at end of directory.
+/// Per lfs_dir_read_ (lfs.c:1771).
 pub fn dir_read<B: BlockDevice>(
     ctx: &BdContext<'_, B>,
     dir: &mut super::Dir,

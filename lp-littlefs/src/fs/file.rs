@@ -1,6 +1,7 @@
 //! File operations: open, read, write, seek, tell, size, sync, truncate, rewind, close.
 //!
-//! Per lfs.c lfs_file_opencfg_, lfs_file_flushedread, lfs_file_flushedwrite, etc.
+//! Per lfs_file_opencfg_ (lfs.c:3065), lfs_file_flushedread, lfs_file_flushedwrite,
+//! lfs_file_sync_.
 
 use crate::block::BlockDevice;
 use crate::error::Error;
@@ -41,6 +42,7 @@ pub struct File {
 
 impl File {
     /// Open a file. Supports RDONLY, WRONLY, RDWR, CREAT, EXCL, TRUNC, APPEND.
+    /// Per lfs_file_opencfg_ (lfs.c:3065).
     pub fn open<B: BlockDevice>(
         ctx: &BdContext<'_, B>,
         root: &mut [u32; 2],

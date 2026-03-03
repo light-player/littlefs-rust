@@ -1,7 +1,7 @@
 //! Directory commit machinery.
 //!
-//! Appends tags to metadata blocks. Per lfs_dir_commitattr, lfs_dir_commitcrc,
-//! lfs_dir_alloc (lfs.c).
+//! Appends tags to metadata blocks. Per lfs_dir_commitattr (lfs.c:1621),
+//! lfs_dir_commitcrc (lfs.c:1669), lfs_dir_alloc (lfs.c:1815).
 
 use ::alloc::vec::Vec;
 
@@ -169,6 +169,7 @@ fn apply_attr_to_state(dir: &mut MdDir, attr: &CommitAttr<'_>) {
 }
 
 /// Allocate a new empty metadata pair.
+/// Per lfs_dir_alloc (lfs.c:1815).
 pub fn dir_alloc<B: BlockDevice>(
     ctx: &BdContext<'_, B>,
     root: [u32; 2],
@@ -188,6 +189,7 @@ pub fn dir_alloc<B: BlockDevice>(
 
 /// Append attributes to a directory. Returns Err(Nospc) if block is full.
 /// For a freshly allocated dir (off==4), writes revision 1 first.
+/// Per lfs_dir_commitattr (lfs.c:1621), lfs_dir_commitcrc (lfs.c:1669).
 pub fn dir_commit_append<B: BlockDevice>(
     ctx: &BdContext<'_, B>,
     dir: &mut MdDir,
@@ -333,6 +335,7 @@ fn pair_eq(a: [u32; 2], b: [u32; 2]) -> bool {
 /// Attrs are appended after source tags (for relocatingcommit merge).
 /// On Nospc or Corrupt, relocates to a new block and retries.
 /// Returns Relocated if a relocation occurred.
+/// Per lfs_dir_compact (lfs.c:1952).
 pub fn dir_compact<B: BlockDevice>(
     bdc: &BdContext<'_, B>,
     dir: &mut MdDir,
@@ -635,6 +638,7 @@ pub fn dir_splittingcompact<B: BlockDevice>(
 
 /// Relocating commit: try inline append, else splittingcompact.
 /// Returns Relocated if block was relocated, Dropped if dir was dropped (empty with split pred).
+/// Per lfs_dir_relocatingcommit (lfs.c:2234).
 pub fn dir_relocatingcommit<B: BlockDevice>(
     ctx: &BdContext<'_, B>,
     dir: &mut MdDir,
@@ -693,6 +697,7 @@ pub fn dir_relocatingcommit<B: BlockDevice>(
 }
 
 /// Orphaning commit: relocatingcommit plus relocation chain fixup.
+/// Per lfs_dir_orphaningcommit (lfs.c:2408).
 pub fn dir_orphaningcommit<B: BlockDevice>(
     ctx: &BdContext<'_, B>,
     dir: &mut MdDir,
