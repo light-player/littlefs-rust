@@ -64,6 +64,11 @@ lp-littlefs = { git = "https://github.com/light-player/lp-littlefs", branch = "m
 lp-littlefs = { git = "https://github.com/light-player/lp-littlefs", rev = "v0.1.0" }
 ```
 
+## How it was made
+
+`lp-littlefs` was primariily authored by the Cursor IDE and the Composer 1.5 model,
+directed by a human engineer.
+
 ## Status
 
 Early-stage; API unstable.
