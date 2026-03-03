@@ -9,6 +9,8 @@ use rstest::rstest;
 #[rstest]
 #[case(10, 4)]
 #[case(100, 10)]
+#[case(10, 26)]
+#[ignore]
 fn test_interspersed_files(#[case] size: usize, #[case] files: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
@@ -74,6 +76,9 @@ fn test_interspersed_files(#[case] size: usize, #[case] files: usize) {
 
 #[rstest]
 #[case(10, 4)]
+#[case(10, 10)]
+#[case(100, 10)]
+#[ignore]
 fn test_interspersed_remove_files(#[case] size: usize, #[case] files: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();

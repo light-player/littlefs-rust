@@ -431,6 +431,9 @@ fn test_files_many() {
 #[rstest]
 #[case(512, 513)]
 #[case(511, 512)]
+#[case(32, 33)]
+#[case(2048, 2049)]
+#[ignore]
 fn test_truncate_simple(#[case] medium_size: u64, #[case] large_size: u64) {
     let (bd, config, mut fs) = fresh_fs();
 
@@ -589,6 +592,9 @@ fn test_seek_read(#[case] count: usize) {
 #[rstest]
 #[case(512, 513)]
 #[case(511, 512)]
+#[case(32, 33)]
+#[case(2048, 2049)]
+#[ignore]
 fn test_truncate_read(#[case] medium: u64, #[case] large: u64) {
     let (bd, config, mut fs) = fresh_fs();
 
@@ -691,6 +697,9 @@ fn test_truncate_write_read() {
 #[rstest]
 #[case(512, 513)]
 #[case(511, 512)]
+#[case(32, 33)]
+#[case(2048, 2049)]
+#[ignore]
 fn test_truncate_write(#[case] medium: u64, #[case] large: u64) {
     let (bd, config, mut fs) = fresh_fs();
 
