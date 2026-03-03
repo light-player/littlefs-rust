@@ -1,6 +1,7 @@
 //! LittleFS filesystem implementation.
 
 mod alloc;
+mod bdcache;
 mod commit;
 mod consistent;
 mod ctz;
@@ -21,6 +22,8 @@ use crate::config::Config;
 use crate::error::Error;
 use crate::info::{FsInfo, Info};
 use crate::trace;
+
+use self::bdcache::BdContext;
 
 pub struct LittleFs {
     mounted: Option<mount::MountState>,
@@ -77,10 +80,10 @@ impl LittleFs {
     /// compact_thresh, refill lookahead buffer. Per lfs_fs_gc (lfs.h:752).
     pub fn fs_gc<B: BlockDevice>(&mut self, bd: &B, config: &Config) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
 
         consistent::force_consistency(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.gstate,
             &mut state.gdisk,
@@ -105,13 +108,12 @@ impl LittleFs {
         if config.compact_thresh >= 0 && (config.compact_thresh as usize) < block_size - prog_size {
             let mut tail = state.root;
             while tail[0] != 0xffff_ffff || tail[1] != 0xffff_ffff {
-                let mut dir = metadata::fetch_metadata_pair(bd, config, tail)?;
+                let mut dir = metadata::fetch_metadata_pair(&ctx, tail)?;
                 let needs_compact = !dir.erased || dir.off > compact_thresh;
                 if needs_compact {
                     dir.erased = false;
                     commit::dir_orphaningcommit(
-                        bd,
-                        config,
+                        &ctx,
                         &mut dir,
                         &[],
                         &mut state.root,
@@ -130,7 +132,7 @@ impl LittleFs {
         let lookahead_bits = config.lookahead_size.saturating_mul(8);
         let lookahead_full = state.lookahead.size >= lookahead_bits.min(state.block_count);
         if !lookahead_full {
-            alloc::alloc_scan(bd, config, state.root, &mut state.lookahead)?;
+            alloc::alloc_scan(&ctx, state.root, &mut state.lookahead)?;
         }
 
         Ok(())
@@ -148,7 +150,8 @@ impl LittleFs {
         F: FnMut(u32) -> Result<(), Error>,
     {
         let state = self.require_mounted()?;
-        traverse::fs_traverse(bd, config, state.root, false, cb)
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
+        traverse::fs_traverse(&ctx, state.root, false, cb)
     }
 
     /// Number of allocated blocks. Per lfs_fs_size (lfs.h:510).
@@ -180,10 +183,10 @@ impl LittleFs {
         config: &Config,
     ) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
 
         consistent::force_consistency(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.gstate,
             &mut state.gdisk,
@@ -201,10 +204,9 @@ impl LittleFs {
         delta.xor(&state.gdisk);
         delta.xor(&state.gstate);
         if !delta.iszero() {
-            let mut root_dir = metadata::fetch_metadata_pair(bd, config, state.root)?;
+            let mut root_dir = metadata::fetch_metadata_pair(&ctx, state.root)?;
             commit::dir_orphaningcommit(
-                bd,
-                config,
+                &ctx,
                 &mut root_dir,
                 &[],
                 &mut state.root,
@@ -217,14 +219,15 @@ impl LittleFs {
             )?;
         }
 
-        bd.sync()?;
+        bdcache::bd_sync(bd, config, &state.rcache, &state.pcache)?;
         Ok(())
     }
 
     pub fn stat<B: BlockDevice>(&self, bd: &B, config: &Config, path: &str) -> Result<Info, Error> {
         trace!("stat path={:?}", path);
         let state = self.require_mounted()?;
-        let (dir, id) = path::dir_find(bd, config, state.root, path, state.name_max)?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
+        let (dir, id) = path::dir_find(&ctx, state.root, path, state.name_max)?;
         trace!("stat dir_find returned id={}", id);
 
         if id == 0x3ff {
@@ -250,7 +253,8 @@ impl LittleFs {
     ) -> Result<Dir, Error> {
         trace!("dir_open path={:?}", path);
         let state = self.require_mounted()?;
-        let (dir, id) = path::dir_find(bd, config, state.root, path, state.name_max)?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
+        let (dir, id) = path::dir_find(&ctx, state.root, path, state.name_max)?;
 
         if id != 0x3ff {
             let info = metadata::get_entry_info(&dir, id, state.name_max)?;
@@ -270,7 +274,7 @@ impl LittleFs {
         };
 
         trace!("dir_open fetch_metadata_pair pair={:?}", pair);
-        let md = metadata::fetch_metadata_pair(bd, config, pair)?;
+        let md = metadata::fetch_metadata_pair(&ctx, pair)?;
         let is_root = pair[0] == 0 || pair[0] == 1;
 
         Ok(Dir {
@@ -286,12 +290,13 @@ impl LittleFs {
     pub fn dir_read<B: BlockDevice>(
         &self,
         bd: &B,
-        _config: &Config,
+        config: &Config,
         dir: &mut Dir,
         info: &mut Info,
     ) -> Result<u32, Error> {
-        self.require_mounted()?;
-        dir::dir_read(bd, _config, dir, info, dir.name_max)
+        let state = self.require_mounted()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
+        dir::dir_read(&ctx, dir, info, dir.name_max)
     }
 
     pub fn dir_close(&self, _dir: Dir) -> Result<(), Error> {
@@ -306,12 +311,12 @@ impl LittleFs {
         flags: crate::info::OpenFlags,
     ) -> Result<file::File, Error> {
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         if flags.contains(crate::info::OpenFlags::WRONLY)
             || flags.contains(crate::info::OpenFlags::RDWR)
         {
             consistent::force_consistency(
-                bd,
-                config,
+                &ctx,
                 &mut state.root,
                 &mut state.gstate,
                 &mut state.gdisk,
@@ -324,8 +329,7 @@ impl LittleFs {
             )?;
         }
         file::File::open(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.lookahead,
             path,
@@ -345,8 +349,9 @@ impl LittleFs {
         file: &mut file::File,
         buf: &mut [u8],
     ) -> Result<usize, Error> {
-        self.require_mounted()?;
-        file.read(bd, config, buf)
+        let state = self.require_mounted()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
+        file.read(&ctx, buf)
     }
 
     pub fn file_seek<B: BlockDevice>(
@@ -379,9 +384,9 @@ impl LittleFs {
         data: &[u8],
     ) -> Result<usize, Error> {
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         file.write(
-            bd,
-            config,
+            &ctx,
             state.root,
             &mut state.lookahead,
             state.inline_max,
@@ -397,9 +402,9 @@ impl LittleFs {
         file: &mut file::File,
     ) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         file.sync(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
@@ -417,9 +422,9 @@ impl LittleFs {
         size: u64,
     ) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         file.truncate(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
@@ -448,9 +453,9 @@ impl LittleFs {
         file: file::File,
     ) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         file.close(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.lookahead,
             state.name_max,
@@ -468,9 +473,9 @@ impl LittleFs {
     ) -> Result<(), Error> {
         trace!("mkdir path={:?}", path);
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         consistent::force_consistency(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.gstate,
             &mut state.gdisk,
@@ -481,8 +486,7 @@ impl LittleFs {
             state.file_max,
             state.attr_max,
         )?;
-        let (cwd, id, name) =
-            path::dir_find_for_create(bd, config, state.root, path, state.name_max)?;
+        let (cwd, id, name) = path::dir_find_for_create(&ctx, state.root, path, state.name_max)?;
         trace!("mkdir cwd.pair={:?} id={} name={:?}", cwd.pair, id, name);
 
         let name_len = name.len();
@@ -492,17 +496,16 @@ impl LittleFs {
 
         state.lookahead.alloc_ckpoint(state.block_count);
 
-        let mut new_dir = commit::dir_alloc(bd, config, state.root, &mut state.lookahead)?;
+        let mut new_dir = commit::dir_alloc(&ctx, state.root, &mut state.lookahead)?;
 
         let mut pred = cwd.clone();
         while pred.split {
-            pred = metadata::fetch_metadata_pair(bd, config, pred.tail)?;
+            pred = metadata::fetch_metadata_pair(&ctx, pred.tail)?;
         }
 
         let pred_tail = pred.tail;
         commit::dir_orphaningcommit(
-            bd,
-            config,
+            &ctx,
             &mut new_dir,
             &[commit::CommitAttr::soft_tail(pred_tail)],
             &mut state.root,
@@ -517,10 +520,9 @@ impl LittleFs {
         let new_pair = new_dir.pair;
 
         if cwd.split {
-            let mut pred_mut = metadata::fetch_metadata_pair(bd, config, pred.pair)?;
+            let mut pred_mut = metadata::fetch_metadata_pair(&ctx, pred.pair)?;
             commit::dir_orphaningcommit(
-                bd,
-                config,
+                &ctx,
                 &mut pred_mut,
                 &[commit::CommitAttr::soft_tail(new_pair)],
                 &mut state.root,
@@ -533,7 +535,7 @@ impl LittleFs {
             )?;
         }
 
-        let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
+        let mut cwd_mut = metadata::fetch_metadata_pair(&ctx, cwd.pair)?;
         let mut attrs: Vec<commit::CommitAttr> = Vec::new();
         attrs.push(commit::CommitAttr::create(id));
         attrs.push(commit::CommitAttr::name_dir(id, name.as_bytes()));
@@ -542,8 +544,7 @@ impl LittleFs {
             attrs.push(commit::CommitAttr::soft_tail(new_pair));
         }
         commit::dir_orphaningcommit(
-            bd,
-            config,
+            &ctx,
             &mut cwd_mut,
             &attrs,
             &mut state.root,
@@ -557,7 +558,7 @@ impl LittleFs {
 
         state.lookahead.alloc_ckpoint(state.block_count);
 
-        bd.sync()?;
+        bdcache::bd_sync(bd, config, &state.rcache, &state.pcache)?;
         Ok(())
     }
 
@@ -568,9 +569,9 @@ impl LittleFs {
         path: &str,
     ) -> Result<(), Error> {
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         consistent::force_consistency(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.gstate,
             &mut state.gdisk,
@@ -581,7 +582,7 @@ impl LittleFs {
             state.file_max,
             state.attr_max,
         )?;
-        let (cwd, id) = path::dir_find(bd, config, state.root, path, state.name_max)?;
+        let (cwd, id) = path::dir_find(&ctx, state.root, path, state.name_max)?;
 
         if id == 0x3ff {
             return Err(Error::Inval);
@@ -594,16 +595,15 @@ impl LittleFs {
                 u32::from_le_bytes(pair[0..4].try_into().unwrap()),
                 u32::from_le_bytes(pair[4..8].try_into().unwrap()),
             ];
-            let child = metadata::fetch_metadata_pair(bd, config, dir_pair)?;
+            let child = metadata::fetch_metadata_pair(&ctx, dir_pair)?;
             if child.count != 0 || child.split {
                 return Err(Error::NotEmpty);
             }
         }
 
-        let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
+        let mut cwd_mut = metadata::fetch_metadata_pair(&ctx, cwd.pair)?;
         commit::dir_orphaningcommit(
-            bd,
-            config,
+            &ctx,
             &mut cwd_mut,
             &[commit::CommitAttr::delete(id)],
             &mut state.root,
@@ -615,7 +615,7 @@ impl LittleFs {
             false,
         )?;
 
-        bd.sync()?;
+        bdcache::bd_sync(bd, config, &state.rcache, &state.pcache)?;
         Ok(())
     }
 
@@ -628,9 +628,9 @@ impl LittleFs {
     ) -> Result<(), Error> {
         trace!("rename old={:?} new={:?}", old_path, new_path);
         let state = self.require_mounted_mut()?;
+        let ctx = BdContext::new(bd, config, &state.rcache, &state.pcache);
         consistent::force_consistency(
-            bd,
-            config,
+            &ctx,
             &mut state.root,
             &mut state.gstate,
             &mut state.gdisk,
@@ -641,7 +641,7 @@ impl LittleFs {
             state.file_max,
             state.attr_max,
         )?;
-        let (old_cwd, old_id) = path::dir_find(bd, config, state.root, old_path, state.name_max)?;
+        let (old_cwd, old_id) = path::dir_find(&ctx, state.root, old_path, state.name_max)?;
         trace!("rename old_cwd.pair={:?} old_id={}", old_cwd.pair, old_id);
 
         if old_id == 0x3ff {
@@ -670,7 +670,7 @@ impl LittleFs {
         }
 
         let (new_cwd, new_id, new_name, overwrite_dir_orphan) =
-            match path::dir_find(bd, config, state.root, new_path, state.name_max) {
+            match path::dir_find(&ctx, state.root, new_path, state.name_max) {
                 Ok((cwd, id)) => {
                     let name = path::path_last_component(new_path).unwrap_or("").as_bytes();
                     let new_info = metadata::get_entry_info(&cwd, id, state.name_max)?;
@@ -693,7 +693,7 @@ impl LittleFs {
                             u32::from_le_bytes(prev_pair_bytes[0..4].try_into().unwrap()),
                             u32::from_le_bytes(prev_pair_bytes[4..8].try_into().unwrap()),
                         ];
-                        let prevdir = metadata::fetch_metadata_pair(bd, config, prev_pair)?;
+                        let prevdir = metadata::fetch_metadata_pair(&ctx, prev_pair)?;
                         if prevdir.count > 0 || prevdir.split {
                             return Err(Error::NotEmpty);
                         }
@@ -703,13 +703,8 @@ impl LittleFs {
                     (cwd, id, name, orphan)
                 }
                 Err(Error::Noent) => {
-                    let (cwd, id, name) = path::dir_find_for_create(
-                        bd,
-                        config,
-                        state.root,
-                        new_path,
-                        state.name_max,
-                    )?;
+                    let (cwd, id, name) =
+                        path::dir_find_for_create(&ctx, state.root, new_path, state.name_max)?;
                     (cwd, id, name.as_bytes(), None)
                 }
                 Err(e) => return Err(e),
@@ -729,7 +724,7 @@ impl LittleFs {
             gstate::prepmove(&mut state.gstate, newoldid, old_cwd.pair);
         }
 
-        let mut new_cwd_mut = metadata::fetch_metadata_pair(bd, config, new_cwd.pair)?;
+        let mut new_cwd_mut = metadata::fetch_metadata_pair(&ctx, new_cwd.pair)?;
 
         let (delete_overwrite, delete_old) = if overwrite_dir_orphan.is_some() {
             (true, false)
@@ -787,8 +782,7 @@ impl LittleFs {
         };
 
         commit::dir_orphaningcommit(
-            bd,
-            config,
+            &ctx,
             &mut new_cwd_mut,
             &attrs,
             &mut state.root,
@@ -802,10 +796,9 @@ impl LittleFs {
 
         if !same_pair && state.gstate.hasmove() {
             gstate::prepmove(&mut state.gstate, 0x3ff, [0, 0]);
-            let mut old_cwd_mut = metadata::fetch_metadata_pair(bd, config, old_cwd.pair)?;
+            let mut old_cwd_mut = metadata::fetch_metadata_pair(&ctx, old_cwd.pair)?;
             commit::dir_orphaningcommit(
-                bd,
-                config,
+                &ctx,
                 &mut old_cwd_mut,
                 &[commit::CommitAttr::delete(old_id)],
                 &mut state.root,
@@ -820,10 +813,9 @@ impl LittleFs {
 
         if let Some(orphan) = overwrite_dir_orphan {
             gstate::preporphans(&mut state.gstate, -1)?;
-            if let Some(mut pred) = parent::fs_pred(bd, config, state.root, orphan.pair)? {
+            if let Some(mut pred) = parent::fs_pred(&ctx, state.root, orphan.pair)? {
                 commit::dir_drop(
-                    bd,
-                    config,
+                    &ctx,
                     &mut pred,
                     &orphan,
                     &mut state.root,
@@ -837,7 +829,7 @@ impl LittleFs {
         }
 
         trace!("rename commit done, syncing");
-        bd.sync()?;
+        bdcache::bd_sync(bd, config, &state.rcache, &state.pcache)?;
         Ok(())
     }
 }
@@ -855,9 +847,15 @@ pub fn create_inline_file<B: BlockDevice>(
     path: &str,
     content: &[u8],
 ) -> Result<(), Error> {
+    use core::cell::RefCell;
+
+    let rcache = RefCell::new(bdcache::new_read_cache(config)?);
+    let pcache = RefCell::new(bdcache::new_prog_cache(config)?);
+    let ctx = BdContext::new(bd, config, &rcache, &pcache);
+
     let mut root = [0u32, 1];
-    let (cwd, id, name) = path::dir_find_for_create(bd, config, root, path, 255)?;
-    let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
+    let (cwd, id, name) = path::dir_find_for_create(&ctx, root, path, 255)?;
+    let mut cwd_mut = metadata::fetch_metadata_pair(&ctx, cwd.pair)?;
     let attrs = [
         commit::CommitAttr::create(id),
         commit::CommitAttr::name_reg(id, name.as_bytes()),
@@ -868,8 +866,7 @@ pub fn create_inline_file<B: BlockDevice>(
     let mut gdisk = gstate::GState::zero();
     let mut gdelta = gstate::GState::zero();
     commit::dir_orphaningcommit(
-        bd,
-        config,
+        &ctx,
         &mut cwd_mut,
         &attrs,
         &mut root,
@@ -880,7 +877,7 @@ pub fn create_inline_file<B: BlockDevice>(
         &mut gdelta,
         false,
     )?;
-    bd.sync()
+    bdcache::bd_sync(bd, config, &rcache, &pcache)
 }
 
 /// Open directory handle for iteration.

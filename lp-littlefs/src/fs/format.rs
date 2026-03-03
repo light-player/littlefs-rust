@@ -2,11 +2,15 @@
 //!
 //! Writes initial superblock to metadata pair (blocks 0, 1) per SPEC.md.
 
+use core::cell::RefCell;
+
 use crate::block::BlockDevice;
 use crate::config::Config;
 use crate::crc;
 use crate::error::Error;
 use crate::superblock::{tag, Superblock, DISK_VERSION};
+
+use super::bdcache;
 
 /// LFS_NAME_MAX, LFS_FILE_MAX, LFS_ATTR_MAX from lfs.h
 const NAME_MAX: u32 = 255;
@@ -29,6 +33,10 @@ pub fn format<B: BlockDevice>(bd: &B, config: &Config) -> Result<(), Error> {
     if config.block_count == 0 {
         return Err(Error::Inval);
     }
+
+    let rcache = RefCell::new(bdcache::new_read_cache(config)?);
+    let pcache = RefCell::new(bdcache::new_prog_cache(config)?);
+    let ctx = bdcache::BdContext::new(bd, config, &rcache, &pcache);
 
     let block_size = config.block_size as usize;
     let prog_size = config.prog_size as usize;
@@ -114,12 +122,12 @@ pub fn format<B: BlockDevice>(bd: &B, config: &Config) -> Result<(), Error> {
     block[off..].fill(0xff);
 
     // Erase and prog blocks 0 and 1
-    bd.erase(0)?;
-    bd.erase(1)?;
+    ctx.erase(0)?;
+    ctx.erase(1)?;
     for i in (0..block_size).step_by(prog_size) {
-        bd.prog(0, i as u32, &block[i..i + prog_size])?;
-        bd.prog(1, i as u32, &block[i..i + prog_size])?;
+        ctx.prog(0, i as u32, &block[i..i + prog_size])?;
+        ctx.prog(1, i as u32, &block[i..i + prog_size])?;
     }
-    bd.sync()?;
+    bdcache::bd_sync(bd, config, &rcache, &pcache)?;
     Ok(())
 }

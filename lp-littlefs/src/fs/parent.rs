@@ -3,10 +3,10 @@
 //! Per lfs_fs_pred (lfs.c:4796-4825), lfs_fs_parent (lfs.c:4856-4886).
 
 use crate::block::BlockDevice;
-use crate::config::Config;
 use crate::error::Error;
 use crate::info::FileType;
 
+use super::bdcache::BdContext;
 use super::metadata::{fetch_metadata_pair, get_entry_info, get_struct, MdDir};
 
 const BLOCK_NULL: u32 = 0xffff_ffff;
@@ -43,8 +43,7 @@ fn tortoise_detectcycles(
 ///
 /// Per lfs_fs_pred (lfs.c:4796-4825).
 pub fn fs_pred<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: [u32; 2],
     pair: [u32; 2],
 ) -> Result<Option<MdDir>, Error> {
@@ -54,7 +53,7 @@ pub fn fs_pred<B: BlockDevice>(
     while !pair_isnull(tail) {
         tortoise_detectcycles(&mut tortoise, tail)?;
 
-        let dir = fetch_metadata_pair(bd, config, tail)?;
+        let dir = fetch_metadata_pair(ctx, tail)?;
         if pair_issync(dir.tail, pair) {
             return Ok(Some(dir));
         }
@@ -72,8 +71,7 @@ pub fn fs_pred<B: BlockDevice>(
 ///
 /// Per lfs_fs_parent (lfs.c:4856-4886).
 pub fn fs_parent<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: [u32; 2],
     pair: [u32; 2],
     name_max: u32,
@@ -84,7 +82,7 @@ pub fn fs_parent<B: BlockDevice>(
     while !pair_isnull(tail) {
         tortoise_detectcycles(&mut tortoise, tail)?;
 
-        let dir = fetch_metadata_pair(bd, config, tail)?;
+        let dir = fetch_metadata_pair(ctx, tail)?;
 
         for id in 0..dir.count {
             let info = match get_entry_info(&dir, id, name_max) {
@@ -121,8 +119,10 @@ mod tests {
     use crate::block::RamBlockDevice;
     use crate::config::Config;
     use crate::fs::alloc::Lookahead;
+    use crate::fs::bdcache::{self, BdContext};
     use crate::fs::commit;
     use crate::fs::format;
+    use core::cell::RefCell;
 
     fn formatted_bd() -> (RamBlockDevice, Config) {
         let config = Config::default_for_tests(128);
@@ -134,24 +134,29 @@ mod tests {
     #[test]
     fn fs_pred_root_has_no_predecessor() {
         let (bd, config) = formatted_bd();
-        let r = fs_pred(&bd, &config, [0, 1], [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let r = fs_pred(&ctx, [0, 1], [0, 1]).unwrap();
         assert!(r.is_none());
     }
 
     #[test]
     fn fs_pred_finds_predecessor_after_mkdir() {
         let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
         let root = [0u32, 1];
         let mut lookahead = Lookahead::new(&config);
         lookahead.alloc_drop(128);
 
-        let mut new_dir = commit::dir_alloc(&bd, &config, root, &mut lookahead).unwrap();
-        let mut root_mut = fetch_metadata_pair(&bd, &config, root).unwrap();
+        let mut new_dir = commit::dir_alloc(&ctx, root, &mut lookahead).unwrap();
+        let mut root_mut = fetch_metadata_pair(&ctx, root).unwrap();
 
         let pred_tail = root_mut.tail;
         commit::dir_commit_append(
-            &bd,
-            &config,
+            &ctx,
             &mut new_dir,
             &[commit::CommitAttr::soft_tail(pred_tail)],
             &mut None,
@@ -165,10 +170,10 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root_mut, &attrs, &mut None).unwrap();
-        bd.sync().unwrap();
+        commit::dir_commit_append(&ctx, &mut root_mut, &attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let pred = fs_pred(&bd, &config, root, new_pair).unwrap();
+        let pred = fs_pred(&ctx, root, new_pair).unwrap();
         assert!(pred.is_some());
         let p = pred.unwrap();
         assert!(pair_issync(p.tail, new_pair));
@@ -177,17 +182,19 @@ mod tests {
     #[test]
     fn fs_parent_finds_parent_after_mkdir() {
         let (bd, config) = formatted_bd();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
         let root = [0u32, 1];
         let mut lookahead = Lookahead::new(&config);
         lookahead.alloc_drop(128);
 
-        let mut new_dir = commit::dir_alloc(&bd, &config, root, &mut lookahead).unwrap();
-        let mut root_mut = fetch_metadata_pair(&bd, &config, root).unwrap();
+        let mut new_dir = commit::dir_alloc(&ctx, root, &mut lookahead).unwrap();
+        let mut root_mut = fetch_metadata_pair(&ctx, root).unwrap();
 
         let pred_tail = root_mut.tail;
         commit::dir_commit_append(
-            &bd,
-            &config,
+            &ctx,
             &mut new_dir,
             &[commit::CommitAttr::soft_tail(pred_tail)],
             &mut None,
@@ -201,10 +208,10 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root_mut, &attrs, &mut None).unwrap();
-        bd.sync().unwrap();
+        commit::dir_commit_append(&ctx, &mut root_mut, &attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let parent = fs_parent(&bd, &config, root, new_pair, 255).unwrap();
+        let parent = fs_parent(&ctx, root, new_pair, 255).unwrap();
         assert!(parent.is_some());
         let (p, id) = parent.unwrap();
         assert_eq!(id, 1);

@@ -3,9 +3,10 @@
 //! Per SPEC.md and lfs.c lfs_dir_fetchmatch, lfs_dir_getslice.
 
 use crate::block::BlockDevice;
-use crate::config::Config;
 use crate::crc;
 use crate::error::Error;
+
+use super::bdcache::BdContext;
 use crate::info::{FileType, Info};
 use crate::superblock::{tag, Superblock};
 use crate::trace;
@@ -102,22 +103,21 @@ fn tag_isvalid(t: u32) -> bool {
 /// If the higher-rev block fails CRC (e.g. partial write), tries the other block.
 /// Per lfs.c lfs_dir_fetchmatch.
 pub fn fetch_metadata_pair<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     pair: [u32; 2],
 ) -> Result<MdDir, Error> {
-    fetch_metadata_pair_ext(bd, config, pair, None, None)
+    fetch_metadata_pair_ext(ctx, pair, None, None)
 }
 
 /// Extended fetch with optional seed accumulation and disk version for FCRC/erased check.
 pub fn fetch_metadata_pair_ext<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     pair: [u32; 2],
     mut seed_out: Option<&mut u32>,
     disk_version: Option<u32>,
 ) -> Result<MdDir, Error> {
     use crate::superblock::DISK_VERSION;
+    let config = ctx.config;
     trace!("fetch_metadata_pair pair={:?}", pair);
     let block_size = config.block_size as usize;
     if config.block_count != 0 && (pair[0] >= config.block_count || pair[1] >= config.block_count) {
@@ -126,8 +126,8 @@ pub fn fetch_metadata_pair_ext<B: BlockDevice>(
 
     let mut revs = [0u32; 2];
     let mut blocks = [alloc::vec![0u8; block_size], alloc::vec![0u8; block_size]];
-    bd.read(pair[0], 0, &mut blocks[0])?;
-    bd.read(pair[1], 0, &mut blocks[1])?;
+    ctx.read(pair[0], 0, &mut blocks[0])?;
+    ctx.read(pair[1], 0, &mut blocks[1])?;
     revs[0] = u32::from_le_bytes(blocks[0][0..4].try_into().unwrap());
     revs[1] = u32::from_le_bytes(blocks[1][0..4].try_into().unwrap());
 
@@ -492,11 +492,10 @@ pub fn get_superblock_from_dir(dir: &MdDir) -> Option<Superblock> {
 /// Read superblock from root metadata pair.
 #[allow(dead_code)]
 pub fn read_superblock<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: [u32; 2],
 ) -> Result<Superblock, Error> {
-    let dir = fetch_metadata_pair(bd, config, root)?;
+    let dir = fetch_metadata_pair(ctx, root)?;
     let gmask = 0x7ff0_fc00;
     let gtag = (tag::TYPE_INLINESTRUCT << 20) | Superblock::SIZE as u32;
     let result = get_tag_backwards(&dir, gmask, gtag)?;
@@ -687,8 +686,10 @@ mod tests {
     use super::*;
     use crate::block::RamBlockDevice;
     use crate::config::Config;
+    use crate::fs::bdcache::{self, BdContext};
     use crate::fs::commit;
     use crate::fs::format;
+    use core::cell::RefCell;
 
     fn formatted_bd() -> (RamBlockDevice, Config) {
         let config = Config::default_for_tests(128);
@@ -700,7 +701,10 @@ mod tests {
     #[test]
     fn fetch_metadata_pair_after_format() {
         let (bd, config) = formatted_bd();
-        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         assert_eq!(dir.pair[0], 0);
         assert_eq!(dir.count, 1);
         assert!(!dir.split);
@@ -709,7 +713,10 @@ mod tests {
     #[test]
     fn get_tag_backwards_inlinestruct_id0() {
         let (bd, config) = formatted_bd();
-        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let gmask = 0x7ff0_fc00;
         let gtag = (tag::TYPE_INLINESTRUCT << 20) | Superblock::SIZE as u32;
         let r = get_tag_backwards(&dir, gmask, gtag).unwrap();
@@ -722,7 +729,10 @@ mod tests {
     #[test]
     fn get_entry_info_superblock_id0() {
         let (bd, config) = formatted_bd();
-        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let info = get_entry_info(&dir, 0, 255).unwrap();
         assert_eq!(info.name().unwrap(), "littlefs");
     }
@@ -730,7 +740,10 @@ mod tests {
     #[test]
     fn read_superblock_after_format() {
         let (bd, config) = formatted_bd();
-        let sb = read_superblock(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let sb = read_superblock(&ctx, [0, 1]).unwrap();
         assert_eq!(sb.block_size, config.block_size);
         assert_eq!(sb.block_count, config.block_count);
         assert_eq!(sb.name_max, 255);
@@ -742,7 +755,10 @@ mod tests {
     #[test]
     fn fetch_after_append_commit() {
         let (bd, config) = formatted_bd();
-        let mut root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let new_pair = [2u32, 3];
         let attrs = [
             commit::CommitAttr::create(1),
@@ -750,10 +766,10 @@ mod tests {
             commit::CommitAttr::dir_struct(1, new_pair),
             commit::CommitAttr::soft_tail(new_pair),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root, &attrs, &mut None).unwrap();
-        bd.sync().unwrap();
+        commit::dir_commit_append(&ctx, &mut root, &attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         assert!(
             dir.count >= 2,
             "expected count >= 2, got {} (off={})",
@@ -782,7 +798,10 @@ mod tests {
     #[test]
     fn fetch_after_rename_commit() {
         let (bd, config) = formatted_bd();
-        let mut root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let d0_pair = [2u32, 3];
         let mkdir_attrs = [
             commit::CommitAttr::create(1),
@@ -790,8 +809,8 @@ mod tests {
             commit::CommitAttr::dir_struct(1, d0_pair),
             commit::CommitAttr::soft_tail(d0_pair),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root, &mkdir_attrs, &mut None).unwrap();
-        root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        commit::dir_commit_append(&ctx, &mut root, &mkdir_attrs, &mut None).unwrap();
+        root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
 
         let rename_attrs = [
             commit::CommitAttr::create(2),
@@ -799,10 +818,10 @@ mod tests {
             commit::CommitAttr::dir_struct(2, d0_pair),
             commit::CommitAttr::delete(1),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root, &rename_attrs, &mut None).unwrap();
-        bd.sync().unwrap();
+        commit::dir_commit_append(&ctx, &mut root, &rename_attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         assert!(
             dir.count >= 3,
             "rename creates id 2; count must be >= 3 for find/stat, got {}",
@@ -816,7 +835,10 @@ mod tests {
     #[test]
     fn dir_traverse_size_formatted() {
         let (bd, config) = formatted_bd();
-        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let size = dir_traverse_size(&dir, 0, 1).unwrap();
         assert!(size > 0, "formatted root has superblock etc");
     }
@@ -824,7 +846,10 @@ mod tests {
     #[test]
     fn dir_traverse_size_empty_range() {
         let (bd, config) = formatted_bd();
-        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let size = dir_traverse_size(&dir, 1, 1).unwrap();
         assert_eq!(size, 0);
     }
@@ -832,17 +857,20 @@ mod tests {
     #[test]
     fn get_inline_slice_reads_file_data() {
         let (bd, config) = formatted_bd();
-        let mut root = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let rcache = RefCell::new(bdcache::new_read_cache(&config).unwrap());
+        let pcache = RefCell::new(bdcache::new_prog_cache(&config).unwrap());
+        let ctx = BdContext::new(&bd, &config, &rcache, &pcache);
+        let mut root = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let content = b"Hello World!\0";
         let attrs = [
             commit::CommitAttr::create(1),
             commit::CommitAttr::name_reg(1, b"hello"),
             commit::CommitAttr::inline_struct(1, content),
         ];
-        commit::dir_commit_append(&bd, &config, &mut root, &attrs, &mut None).unwrap();
-        bd.sync().unwrap();
+        commit::dir_commit_append(&ctx, &mut root, &attrs, &mut None).unwrap();
+        bdcache::bd_sync(&bd, &config, &rcache, &pcache).unwrap();
 
-        let dir = fetch_metadata_pair(&bd, &config, [0, 1]).unwrap();
+        let dir = fetch_metadata_pair(&ctx, [0, 1]).unwrap();
         let mut buf = [0u8; 32];
         let n = get_inline_slice(&dir, 1, 0, &mut buf).unwrap();
         assert_eq!(n, content.len());

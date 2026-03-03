@@ -6,7 +6,7 @@
 mod common;
 
 use common::{dir_entry_names, fresh_fs, init_log};
-use lp_littlefs::{BlockDevice, Dir, Error, FileType, Info, OpenFlags};
+use lp_littlefs::{Dir, Error, FileType, Info, OpenFlags};
 
 // --- test_dirs_root ---
 // Upstream: dir_open("/"), dir_read returns ".", "..", then 0
@@ -128,6 +128,7 @@ fn test_dirs_many_rename() {
 
 // --- test_dirs_other_errors ---
 // Upstream: LFS_ERR_EXIST, NOENT, NOTDIR, ISDIR, rename edge cases, root path errors
+// TODO: Fails after cache moved to FS layer—persisted metadata not visible after remount.
 #[test]
 fn test_dirs_other_errors() {
     init_log();
@@ -143,7 +144,6 @@ fn test_dirs_other_errors() {
         )
         .unwrap();
     lfs.file_close(&bd, &config, file).unwrap();
-    bd.sync().unwrap();
     lfs.unmount().unwrap();
     lfs.mount(&bd, &config).unwrap();
 

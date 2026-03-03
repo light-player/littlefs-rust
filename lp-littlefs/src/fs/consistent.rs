@@ -3,11 +3,11 @@
 //! Per lfs.c lfs_fs_forceconsistency, lfs_fs_demove, lfs_fs_deorphan, lfs_fs_desuperblock.
 
 use crate::block::BlockDevice;
-use crate::config::Config;
 use crate::error::Error;
 use crate::superblock::{Superblock, DISK_VERSION};
 
 use super::alloc::Lookahead;
+use super::bdcache::BdContext;
 use super::commit;
 use super::gstate::{self, GState};
 use super::metadata;
@@ -25,8 +25,7 @@ fn pair_issync(a: [u32; 2], b: [u32; 2]) -> bool {
 
 /// Run demove, deorphan, desuperblock. Per lfs_fs_forceconsistency.
 pub fn force_consistency<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: &mut [u32; 2],
     gstate: &mut GState,
     gdisk: &mut GState,
@@ -37,13 +36,10 @@ pub fn force_consistency<B: BlockDevice>(
     file_max: u32,
     attr_max: u32,
 ) -> Result<(), Error> {
-    demove(bd, config, root, gstate, gdisk, gdelta, lookahead, name_max)?;
-    deorphan(
-        bd, config, root, gstate, gdisk, gdelta, lookahead, name_max, true,
-    )?;
+    demove(ctx, root, gstate, gdisk, gdelta, lookahead, name_max)?;
+    deorphan(ctx, root, gstate, gdisk, gdelta, lookahead, name_max, true)?;
     desuperblock(
-        bd,
-        config,
+        ctx,
         root,
         gstate,
         gdisk,
@@ -59,8 +55,7 @@ pub fn force_consistency<B: BlockDevice>(
 
 /// Complete pending move: delete move id from gdisk.pair. Per lfs_fs_demove.
 fn demove<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: &mut [u32; 2],
     gstate: &mut GState,
     gdisk: &mut GState,
@@ -77,10 +72,9 @@ fn demove<B: BlockDevice>(
 
     gstate::prepmove(gstate, 0x3ff, [0, 0]);
 
-    let mut movedir = metadata::fetch_metadata_pair(bd, config, pair)?;
+    let mut movedir = metadata::fetch_metadata_pair(ctx, pair)?;
     commit::dir_orphaningcommit(
-        bd,
-        config,
+        ctx,
         &mut movedir,
         &[commit::CommitAttr::delete(move_id as u16)],
         root,
@@ -98,8 +92,7 @@ fn demove<B: BlockDevice>(
 
 /// Rewrite superblock to root when needssuperblock. Per lfs_fs_desuperblock.
 fn desuperblock<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: &mut [u32; 2],
     gstate: &mut GState,
     gdisk: &mut GState,
@@ -116,7 +109,7 @@ fn desuperblock<B: BlockDevice>(
 
     let superblock = Superblock {
         version: DISK_VERSION,
-        block_size: config.block_size,
+        block_size: ctx.config.block_size,
         block_count,
         name_max,
         file_max,
@@ -136,10 +129,9 @@ fn desuperblock<B: BlockDevice>(
     .try_into()
     .unwrap();
 
-    let mut root_dir = metadata::fetch_metadata_pair(bd, config, *root)?;
+    let mut root_dir = metadata::fetch_metadata_pair(ctx, *root)?;
     commit::dir_orphaningcommit(
-        bd,
-        config,
+        ctx,
         &mut root_dir,
         &[commit::CommitAttr::inline_struct(0, &sb_bytes)],
         root,
@@ -157,8 +149,7 @@ fn desuperblock<B: BlockDevice>(
 
 /// Repair half-orphans (relocations) and full-orphans (removes/renames). Per lfs_fs_deorphan.
 fn deorphan<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: &mut [u32; 2],
     gstate: &mut GState,
     gdisk: &mut GState,
@@ -174,7 +165,7 @@ fn deorphan<B: BlockDevice>(
     let mut pass: u8 = 0;
     while pass < 2 {
         let mut pdir = {
-            let mut d = metadata::MdDir::alloc_empty([0, 0], config.block_size as usize);
+            let mut d = metadata::MdDir::alloc_empty([0, 0], ctx.config.block_size as usize);
             d.split = true;
             d.tail = [0, 1];
             d
@@ -182,10 +173,10 @@ fn deorphan<B: BlockDevice>(
         let mut moreorphans = false;
 
         while !pair_is_null(pdir.tail) {
-            let dir = metadata::fetch_metadata_pair(bd, config, pdir.tail)?;
+            let dir = metadata::fetch_metadata_pair(ctx, pdir.tail)?;
 
             if !pdir.split {
-                let parent_opt = parent::fs_parent(bd, config, *root, pdir.tail, name_max)?;
+                let parent_opt = parent::fs_parent(ctx, *root, pdir.tail, name_max)?;
 
                 if pass == 0 {
                     if let Some((ref parent_dir, tag_id)) = parent_opt {
@@ -210,8 +201,8 @@ fn deorphan<B: BlockDevice>(
                             .collect();
 
                             let orphaned = commit::dir_orphaningcommit(
-                                bd, config, &mut pdir, &attrs, root, lookahead, name_max, gstate,
-                                gdisk, gdelta, false,
+                                ctx, &mut pdir, &attrs, root, lookahead, name_max, gstate, gdisk,
+                                gdelta, false,
                             )?;
                             if orphaned {
                                 moreorphans = true;
@@ -231,8 +222,7 @@ fn deorphan<B: BlockDevice>(
                     };
 
                     let orphaned = commit::dir_orphaningcommit(
-                        bd,
-                        config,
+                        ctx,
                         &mut pdir,
                         &[tail_attr],
                         root,

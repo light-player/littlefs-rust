@@ -3,17 +3,16 @@
 //! Per lfs_dir_find (lfs.c 1483-1590).
 
 use crate::block::BlockDevice;
-use crate::config::Config;
 use crate::error::Error;
 use crate::info::FileType;
 use crate::trace;
 
+use super::bdcache::BdContext;
 use super::metadata;
 
 /// Find entry at path. Returns (MdDir, id) where id is 0x3ff for root.
 pub fn dir_find<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: [u32; 2],
     path: &str,
     name_max: u32,
@@ -32,13 +31,13 @@ pub fn dir_find<B: BlockDevice>(
 
     if segments.is_empty() {
         trace!("dir_find segments empty -> root");
-        let dir = metadata::fetch_metadata_pair(bd, config, root)?;
+        let dir = metadata::fetch_metadata_pair(ctx, root)?;
         return Ok((dir, 0x3ff));
     }
 
     trace!("dir_find segments={:?}", segments);
     let mut stack: alloc::vec::Vec<(metadata::MdDir, u16)> = alloc::vec![];
-    let mut cwd = metadata::fetch_metadata_pair(bd, config, root)?;
+    let mut cwd = metadata::fetch_metadata_pair(ctx, root)?;
     let mut tag_id: u16 = 0x3ff;
     let mut seg_idx = 0usize;
 
@@ -86,7 +85,7 @@ pub fn dir_find<B: BlockDevice>(
             continue;
         }
 
-        let found_id = find_name_in_dir(bd, config, &cwd, seg, name_max)?;
+        let found_id = find_name_in_dir(ctx, &cwd, seg, name_max)?;
         trace!("dir_find seg={:?} found_id={}", seg, found_id);
         let info = metadata::get_entry_info(&cwd, found_id, name_max)?;
 
@@ -102,10 +101,10 @@ pub fn dir_find<B: BlockDevice>(
 
         stack.push((cwd.clone(), found_id));
         if found_id == 0x3ff {
-            cwd = metadata::fetch_metadata_pair(bd, config, root)?;
+            cwd = metadata::fetch_metadata_pair(ctx, root)?;
         } else {
             let pair = get_dir_struct(&cwd, found_id)?;
-            cwd = metadata::fetch_metadata_pair(bd, config, pair)?;
+            cwd = metadata::fetch_metadata_pair(ctx, pair)?;
         }
         tag_id = found_id;
         seg_idx += 1;
@@ -119,8 +118,7 @@ pub fn dir_find<B: BlockDevice>(
 /// Returns Err(Exist) when the final component already exists.
 /// Returns Err(Noent) when a parent component does not exist.
 pub fn dir_find_for_create<'a, B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: [u32; 2],
     path: &'a str,
     name_max: u32,
@@ -142,7 +140,7 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
     }
 
     let mut stack: alloc::vec::Vec<(metadata::MdDir, u16)> = alloc::vec![];
-    let mut cwd = metadata::fetch_metadata_pair(bd, config, root)?;
+    let mut cwd = metadata::fetch_metadata_pair(ctx, root)?;
     let mut tag_id: u16 = 0x3ff;
     let mut seg_idx = 0usize;
 
@@ -187,7 +185,7 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
             continue;
         }
 
-        let found_id = match find_name_in_dir(bd, config, &cwd, seg, name_max) {
+        let found_id = match find_name_in_dir(ctx, &cwd, seg, name_max) {
             Ok(id) => id,
             Err(Error::Noent) if seg_idx + 1 >= segments.len() => {
                 let id = find_insertion_id(&cwd, seg, name_max)?;
@@ -222,10 +220,10 @@ pub fn dir_find_for_create<'a, B: BlockDevice>(
 
         stack.push((cwd.clone(), found_id));
         if found_id == 0x3ff {
-            cwd = metadata::fetch_metadata_pair(bd, config, root)?;
+            cwd = metadata::fetch_metadata_pair(ctx, root)?;
         } else {
             let pair = get_dir_struct(&cwd, found_id)?;
-            cwd = metadata::fetch_metadata_pair(bd, config, pair)?;
+            cwd = metadata::fetch_metadata_pair(ctx, pair)?;
         }
         tag_id = found_id;
         seg_idx += 1;
@@ -285,8 +283,7 @@ fn find_dotdot_cancel_count(remaining: &[&str]) -> usize {
 }
 
 fn find_name_in_dir<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     dir: &metadata::MdDir,
     name: &str,
     name_max: u32,
@@ -309,15 +306,15 @@ fn find_name_in_dir<B: BlockDevice>(
         dir.count,
         start_id
     );
-    match find_name_in_dir_pair(bd, config, dir, name_bytes, name_max, start_id) {
+    match find_name_in_dir_pair(dir, name_bytes, name_max, start_id) {
         Ok(id) => {
             trace!("find_name_in_dir found id={}", id);
             Ok(id)
         }
         Err(Error::Noent) if dir.split => {
-            let next_dir = metadata::fetch_metadata_pair(bd, config, dir.tail)?;
+            let next_dir = metadata::fetch_metadata_pair(ctx, dir.tail)?;
             trace!("find_name_in_dir split, trying tail");
-            find_name_in_dir(bd, config, &next_dir, name, name_max)
+            find_name_in_dir(ctx, &next_dir, name, name_max)
         }
         other => {
             trace!("find_name_in_dir Noent (no split)");
@@ -326,9 +323,7 @@ fn find_name_in_dir<B: BlockDevice>(
     }
 }
 
-fn find_name_in_dir_pair<B: BlockDevice>(
-    _bd: &B,
-    _config: &Config,
+fn find_name_in_dir_pair(
     dir: &metadata::MdDir,
     name_bytes: &[u8],
     name_max: u32,

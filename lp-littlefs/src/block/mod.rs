@@ -2,10 +2,10 @@
 //!
 //! Maps to lfs_config read/prog/erase/sync callbacks.
 
-mod cache;
+mod powerloss;
 mod ram;
 
-pub use cache::CachedBlockDevice;
+pub use powerloss::PowerLossBlockDevice;
 pub use ram::RamBlockDevice;
 
 use crate::crc;

@@ -1,17 +1,16 @@
 //! Directory iteration.
 
 use crate::block::BlockDevice;
-use crate::config::Config;
 use crate::error::Error;
 use crate::info::{FileType, Info};
 use crate::trace;
 
+use super::bdcache::BdContext;
 use super::metadata;
 
 /// Read next directory entry. Returns 1 on success, 0 at end of directory.
 pub fn dir_read<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     dir: &mut super::Dir,
     info: &mut Info,
     name_max: u32,
@@ -34,7 +33,7 @@ pub fn dir_read<B: BlockDevice>(
             if !dir.mdir.split {
                 return Ok(0);
             }
-            dir.mdir = metadata::fetch_metadata_pair(bd, config, dir.mdir.tail)?;
+            dir.mdir = metadata::fetch_metadata_pair(ctx, dir.mdir.tail)?;
             dir.id = 0;
         }
 

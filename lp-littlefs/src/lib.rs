@@ -16,7 +16,7 @@ mod info;
 mod superblock;
 mod trace;
 
-pub use block::{BlockDevice, CachedBlockDevice, RamBlockDevice};
+pub use block::{BlockDevice, PowerLossBlockDevice, RamBlockDevice};
 pub use config::Config;
 pub use error::Error;
 pub use fs::{create_inline_file, Dir, File, LittleFs};

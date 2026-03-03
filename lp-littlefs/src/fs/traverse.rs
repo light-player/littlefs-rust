@@ -3,10 +3,10 @@
 //! Per lfs_fs_traverse_ (lfs.c:4693-4794). Walks metadata pairs via the
 //! threaded linked list (softtail chain) and marks used blocks.
 
+use super::bdcache::BdContext;
 use super::ctz;
 use super::metadata;
 use crate::block::BlockDevice;
-use crate::config::Config;
 use crate::error::Error;
 
 /// Block address meaning "null" or unused.
@@ -42,8 +42,7 @@ fn tortoise_detectcycles(
 /// When `include_orphans` is true, also traverses into DIRSTRUCT entries
 /// (orphaned directories that may not be in the threaded list).
 pub fn fs_traverse<B, F>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: [u32; 2],
     include_orphans: bool,
     mut cb: F,
@@ -65,7 +64,7 @@ where
         cb(tail[0])?;
         cb(tail[1])?;
 
-        let dir = metadata::fetch_metadata_pair(bd, config, tail)?;
+        let dir = metadata::fetch_metadata_pair(ctx, tail)?;
 
         for id in 0..dir.count {
             let info = match metadata::get_entry_info(&dir, id, 255) {
@@ -95,7 +94,7 @@ where
                     Err(e) => return Err(e),
                 };
                 if !inline_ && head != 0xffff_ffff && size > 0 {
-                    ctz::ctz_traverse(bd, config, head, size, |block| {
+                    ctz::ctz_traverse(ctx, head, size, |block| {
                         cb(block)?;
                         Ok(())
                     })?;

@@ -5,8 +5,7 @@
 #![allow(dead_code)]
 
 use lp_littlefs::{
-    create_inline_file, BlockDevice, CachedBlockDevice, Config, Dir, Error, FileType, Info,
-    LittleFs, RamBlockDevice,
+    create_inline_file, BlockDevice, Config, Dir, Error, FileType, Info, LittleFs, RamBlockDevice,
 };
 
 /// Default test config. Block count 128.
@@ -14,15 +13,14 @@ pub fn default_config() -> Config {
     Config::default_for_tests(128)
 }
 
-/// Cached block device for tests.
-pub fn cached_bd(config: &Config) -> CachedBlockDevice<RamBlockDevice> {
-    let ram = RamBlockDevice::new(config.block_size, config.block_count);
-    CachedBlockDevice::new(ram, config).unwrap()
+/// RAM block device for tests. Cache is internal to the FS.
+pub fn ram_bd(config: &Config) -> RamBlockDevice {
+    RamBlockDevice::new(config.block_size, config.block_count)
 }
 
-/// Uncached block device for tests that need raw access (e.g. power-loss simulation).
+/// Alias for ram_bd. For tests that need raw access (e.g. power-loss simulation).
 pub fn uncached_bd(config: &Config) -> RamBlockDevice {
-    RamBlockDevice::new(config.block_size, config.block_count)
+    ram_bd(config)
 }
 
 /// Initialize logger for trace output.
@@ -32,9 +30,9 @@ pub fn init_log() {
 }
 
 /// Format and mount a fresh FS. Returns (bd, config, fs).
-pub fn fresh_fs() -> (CachedBlockDevice<RamBlockDevice>, Config, LittleFs) {
+pub fn fresh_fs() -> (RamBlockDevice, Config, LittleFs) {
     let config = default_config();
-    let bd = cached_bd(&config);
+    let bd = ram_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();
@@ -42,9 +40,9 @@ pub fn fresh_fs() -> (CachedBlockDevice<RamBlockDevice>, Config, LittleFs) {
 }
 
 /// Format, create inline "hello" file, and mount. Returns (bd, config, fs).
-pub fn fs_with_hello() -> (CachedBlockDevice<RamBlockDevice>, Config, LittleFs) {
+pub fn fs_with_hello() -> (RamBlockDevice, Config, LittleFs) {
     let config = default_config();
-    let bd = cached_bd(&config);
+    let bd = ram_bd(&config);
     let mut fs = LittleFs::new();
 
     fs.format(&bd, &config).unwrap();

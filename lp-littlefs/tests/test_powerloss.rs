@@ -7,7 +7,7 @@
 
 mod common;
 
-use common::{cached_bd, default_config};
+use common::{default_config, uncached_bd};
 use lp_littlefs::{BlockDevice, LittleFs, OpenFlags};
 
 // --- test_powerloss_only_rev ---
@@ -16,7 +16,7 @@ use lp_littlefs::{BlockDevice, LittleFs, OpenFlags};
 fn test_powerloss_only_rev() {
     let _ = env_logger::builder().is_test(true).try_init();
     let config = default_config();
-    let bd = cached_bd(&config);
+    let bd = uncached_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();

@@ -6,6 +6,7 @@ use crate::block::BlockDevice;
 use crate::config::Config;
 use crate::error::Error;
 
+use super::bdcache::BdContext;
 use super::traverse;
 
 /// Lookahead allocator state.
@@ -47,12 +48,11 @@ impl Lookahead {
 
 /// Allocate a free block. Uses lookahead buffer and fs_traverse for scanning.
 pub fn alloc<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: [u32; 2],
     lookahead: &mut Lookahead,
 ) -> Result<u32, Error> {
-    let block_count = config.block_count;
+    let block_count = ctx.config.block_count;
 
     loop {
         while lookahead.next < lookahead.size {
@@ -89,18 +89,17 @@ pub fn alloc<B: BlockDevice>(
             return Err(Error::Nospc);
         }
 
-        alloc_scan(bd, config, root, lookahead)?;
+        alloc_scan(ctx, root, lookahead)?;
     }
 }
 
 pub(crate) fn alloc_scan<B: BlockDevice>(
-    bd: &B,
-    config: &Config,
+    ctx: &BdContext<'_, B>,
     root: [u32; 2],
     lookahead: &mut Lookahead,
 ) -> Result<(), Error> {
-    let block_count = config.block_count;
-    let lookahead_bits = config.lookahead_size.saturating_mul(8);
+    let block_count = ctx.config.block_count;
+    let lookahead_bits = ctx.config.lookahead_size.saturating_mul(8);
 
     lookahead.start = (lookahead.start + lookahead.next) % block_count;
     lookahead.next = 0;
@@ -108,7 +107,7 @@ pub(crate) fn alloc_scan<B: BlockDevice>(
 
     lookahead.buffer.fill(0);
 
-    traverse::fs_traverse(bd, config, root, true, |block| {
+    traverse::fs_traverse(ctx, root, true, |block| {
         let off = (block
             .wrapping_sub(lookahead.start)
             .wrapping_add(block_count))

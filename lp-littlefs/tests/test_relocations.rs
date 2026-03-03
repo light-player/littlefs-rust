@@ -5,7 +5,7 @@
 
 mod common;
 
-use common::{cached_bd, default_config, init_log};
+use common::{default_config, init_log, ram_bd};
 use lp_littlefs::{LittleFs, OpenFlags};
 
 /// Fill FS, create many files in child dir. Triggers compaction/split when
@@ -14,7 +14,7 @@ use lp_littlefs::{LittleFs, OpenFlags};
 fn test_relocations_dangling_split_dir() {
     init_log();
     let config = default_config();
-    let bd = cached_bd(&config);
+    let bd = ram_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();
@@ -48,7 +48,7 @@ fn test_relocations_dangling_split_dir() {
 fn test_relocations_outdated_head() {
     init_log();
     let config = default_config();
-    let bd = cached_bd(&config);
+    let bd = ram_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
     lfs.mount(&bd, &config).unwrap();

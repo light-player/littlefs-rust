@@ -3,19 +3,21 @@
 //! Traverses metadata tail chain from [0,1], finds superblock, accumulates gstate.
 //! Per lfs_mount_ (lfs.c:4482).
 
+use core::cell::RefCell;
+
 use crate::block::BlockDevice;
 use crate::config::Config;
 use crate::error::Error;
 use crate::superblock::{Superblock, DISK_VERSION};
 
 use super::alloc::Lookahead;
+use super::bdcache::{self, BdContext, ProgCache, ReadCache};
 use super::gstate::{self, GState};
 use super::metadata;
 
 const BLOCK_NULL: u32 = 0xffff_ffff;
 
 /// Mount state to store in LittleFs.
-#[derive(Clone)]
 pub(crate) struct MountState {
     pub root: [u32; 2],
     pub block_size: u32,
@@ -32,6 +34,8 @@ pub(crate) struct MountState {
     pub gdisk: GState,
     /// Pending gstate delta. Per lfs.gdelta.
     pub gdelta: GState,
+    pub(crate) rcache: RefCell<ReadCache>,
+    pub(crate) pcache: RefCell<ProgCache>,
 }
 
 fn pair_is_null(pair: [u32; 2]) -> bool {
@@ -40,10 +44,12 @@ fn pair_is_null(pair: [u32; 2]) -> bool {
 
 pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Error> {
     use crate::trace;
-    // Ensure caches are flushed and dropped so we read current device state.
-    // Needed when CachedBlockDevice persists across unmount/remount (C code creates fresh lfs each mount).
     trace!("mount: sync block device");
     bd.sync()?;
+
+    let rcache = RefCell::new(bdcache::new_read_cache(config)?);
+    let pcache = RefCell::new(bdcache::new_prog_cache(config)?);
+    let ctx = BdContext::new(bd, config, &rcache, &pcache);
 
     let mut tail = [0u32, 1u32];
     let mut gstate = GState::zero();
@@ -58,7 +64,7 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
         }
 
         trace!("mount: fetch_metadata_pair tail={:?}", tail);
-        let dir = metadata::fetch_metadata_pair_ext(bd, config, tail, Some(&mut seed), None)?;
+        let dir = metadata::fetch_metadata_pair_ext(&ctx, tail, Some(&mut seed), None)?;
 
         if let Some(sb) = metadata::get_superblock_from_dir(&dir) {
             root = dir.pair;
@@ -138,5 +144,7 @@ pub fn mount<B: BlockDevice>(bd: &B, config: &Config) -> Result<MountState, Erro
         gstate,
         gdisk,
         gdelta: GState::zero(),
+        rcache,
+        pcache,
     })
 }

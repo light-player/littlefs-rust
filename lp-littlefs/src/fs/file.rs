@@ -3,7 +3,6 @@
 //! Per lfs.c lfs_file_opencfg_, lfs_file_flushedread, lfs_file_flushedwrite, etc.
 
 use crate::block::BlockDevice;
-use crate::config::Config;
 use crate::error::Error;
 use crate::info::OpenFlags;
 
@@ -11,6 +10,7 @@ use ::alloc::vec;
 use ::alloc::vec::Vec;
 
 use super::alloc;
+use super::bdcache::BdContext;
 use super::commit;
 use super::ctz;
 use super::gstate::GState;
@@ -42,8 +42,7 @@ pub struct File {
 impl File {
     /// Open a file. Supports RDONLY, WRONLY, RDWR, CREAT, EXCL, TRUNC, APPEND.
     pub fn open<B: BlockDevice>(
-        bd: &B,
-        config: &Config,
+        ctx: &BdContext<'_, B>,
         root: &mut [u32; 2],
         lookahead: &mut alloc::Lookahead,
         path: &str,
@@ -58,7 +57,7 @@ impl File {
         let is_rdonly = !can_write;
 
         let (dir, id, created) = if is_rdonly {
-            let (dir, id) = path::dir_find(bd, config, *root, path, name_max)?;
+            let (dir, id) = path::dir_find(ctx, *root, path, name_max)?;
             if id == 0x3ff {
                 return Err(Error::IsDir);
             }
@@ -68,7 +67,7 @@ impl File {
             }
             (dir, id, false)
         } else {
-            match path::dir_find(bd, config, *root, path, name_max) {
+            match path::dir_find(ctx, *root, path, name_max) {
                 Ok((dir, id)) => {
                     if id == 0x3ff {
                         return Err(Error::IsDir);
@@ -86,20 +85,18 @@ impl File {
                     if !flags.contains(OpenFlags::CREAT) {
                         return Err(Error::Noent);
                     }
-                    let (cwd, id, name) =
-                        path::dir_find_for_create(bd, config, *root, path, name_max)?;
+                    let (cwd, id, name) = path::dir_find_for_create(ctx, *root, path, name_max)?;
                     if name.len() > name_max as usize {
                         return Err(Error::Nametoolong);
                     }
-                    let mut cwd_mut = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
+                    let mut cwd_mut = metadata::fetch_metadata_pair(ctx, cwd.pair)?;
                     let attrs = [
                         commit::CommitAttr::create(id),
                         commit::CommitAttr::name_reg(id, name.as_bytes()),
                         commit::CommitAttr::inline_struct(id, &[]),
                     ];
                     commit::dir_orphaningcommit(
-                        bd,
-                        config,
+                        ctx,
                         &mut cwd_mut,
                         &attrs,
                         root,
@@ -110,8 +107,8 @@ impl File {
                         gdelta,
                         false,
                     )?;
-                    bd.sync()?;
-                    let dir = metadata::fetch_metadata_pair(bd, config, cwd.pair)?;
+                    ctx.sync()?;
+                    let dir = metadata::fetch_metadata_pair(ctx, cwd.pair)?;
                     (dir, id, true)
                 }
                 Err(e) => return Err(e),
@@ -157,7 +154,7 @@ impl File {
             pos,
             block,
             off,
-            block_size: config.block_size,
+            block_size: ctx.config.block_size,
             inline_buffer,
             dirty,
             writing,
@@ -167,8 +164,7 @@ impl File {
     /// Read bytes from file. Returns 0 at EOF.
     pub fn read<B: BlockDevice>(
         &mut self,
-        bd: &B,
-        config: &Config,
+        ctx: &BdContext<'_, B>,
         buf: &mut [u8],
     ) -> Result<usize, Error> {
         let size = self.size_for_read();
@@ -205,8 +201,7 @@ impl File {
         while buf_pos < to_read {
             let need_block = self.block == BLOCK_NULL || self.off >= self.block_size;
             if need_block {
-                let (block, off) =
-                    ctz::ctz_find(bd, config, self.ctz_head, self.ctz_size, self.pos)?;
+                let (block, off) = ctz::ctz_find(ctx, self.ctz_head, self.ctz_size, self.pos)?;
                 self.block = block;
                 self.off = off;
             }
@@ -214,7 +209,7 @@ impl File {
             let avail_in_block = (self.block_size - self.off) as usize;
             let want = (to_read - buf_pos).min(avail_in_block);
 
-            bd.read(self.block, self.off, &mut buf[buf_pos..buf_pos + want])?;
+            ctx.read(self.block, self.off, &mut buf[buf_pos..buf_pos + want])?;
 
             self.pos += want as u64;
             self.off += want as u32;
@@ -236,8 +231,7 @@ impl File {
     #[allow(clippy::too_many_arguments)]
     pub fn write<B: BlockDevice>(
         &mut self,
-        bd: &B,
-        config: &Config,
+        ctx: &BdContext<'_, B>,
         root: [u32; 2],
         lookahead: &mut alloc::Lookahead,
         inline_max: u32,
@@ -259,7 +253,7 @@ impl File {
                 let pos = self.pos as usize;
                 self.inline_buffer[pos..][..data.len()].copy_from_slice(data);
                 self.pos += data.len() as u64;
-                self.outline(bd, config, root, lookahead)?;
+                self.outline(ctx, root, lookahead)?;
                 return Ok(data.len());
             }
             if new_size > self.inline_buffer.len() {
@@ -275,13 +269,13 @@ impl File {
         if self.pos > self.ctz_size {
             let zeros = (self.pos - self.ctz_size) as usize;
             for _ in 0..zeros {
-                self.write_one_ctz(bd, config, root, lookahead, 0)?;
+                self.write_one_ctz(ctx, root, lookahead, 0)?;
             }
         }
 
         let mut written = 0;
         for byte in data {
-            self.write_one_ctz(bd, config, root, lookahead, *byte)?;
+            self.write_one_ctz(ctx, root, lookahead, *byte)?;
             written += 1;
         }
         Ok(written)
@@ -289,19 +283,18 @@ impl File {
 
     fn outline<B: BlockDevice>(
         &mut self,
-        bd: &B,
-        config: &Config,
+        ctx: &BdContext<'_, B>,
         root: [u32; 2],
         lookahead: &mut alloc::Lookahead,
     ) -> Result<(), Error> {
-        lookahead.alloc_ckpoint(config.block_count);
+        lookahead.alloc_ckpoint(ctx.config.block_count);
 
-        let block = alloc::alloc(bd, config, root, lookahead)?;
-        bd.erase(block)?;
+        let block = alloc::alloc(ctx, root, lookahead)?;
+        ctx.erase(block)?;
 
         let size = self.inline_buffer.len();
         for (i, &b) in self.inline_buffer.iter().enumerate() {
-            bd.prog(block, i as u32, &[b])?;
+            ctx.prog(block, i as u32, &[b])?;
         }
 
         self.ctz_head = block;
@@ -317,8 +310,7 @@ impl File {
 
     fn write_one_ctz<B: BlockDevice>(
         &mut self,
-        bd: &B,
-        config: &Config,
+        ctx: &BdContext<'_, B>,
         root: [u32; 2],
         lookahead: &mut alloc::Lookahead,
         byte: u8,
@@ -329,23 +321,21 @@ impl File {
                 self.block = self.ctz_head;
                 self.off = 0;
             } else if !self.writing && self.pos == 0 && self.ctz_size > 0 {
-                let (block, off) = ctz::ctz_find(bd, config, self.ctz_head, self.ctz_size, 0)?;
+                let (block, off) = ctz::ctz_find(ctx, self.ctz_head, self.ctz_size, 0)?;
                 self.block = block;
                 self.off = off;
             } else if !self.writing && self.pos > 0 {
-                let (block, _) =
-                    ctz::ctz_find(bd, config, self.ctz_head, self.ctz_size, self.pos - 1)?;
+                let (block, _) = ctz::ctz_find(ctx, self.ctz_head, self.ctz_size, self.pos - 1)?;
                 self.block = block;
                 self.off = self.pos as u32 % self.block_size;
                 if self.off == 0 {
                     let mut noff = self.pos - 1;
-                    let _ = ctz::ctz_index(config.block_size, &mut noff);
+                    let _ = ctz::ctz_index(ctx.config.block_size, &mut noff);
                     self.off = (noff + 1) as u32;
                 }
             } else {
-                lookahead.alloc_ckpoint(config.block_count);
-                let (block, off) =
-                    ctz::ctz_extend(bd, config, root, lookahead, self.block, self.pos)?;
+                lookahead.alloc_ckpoint(ctx.config.block_count);
+                let (block, off) = ctz::ctz_extend(ctx, root, lookahead, self.block, self.pos)?;
                 self.block = block;
                 self.ctz_head = block;
                 self.off = off;
@@ -353,21 +343,20 @@ impl File {
             self.writing = true;
         }
 
-        bd.prog(self.block, self.off, &[byte])?;
+        ctx.prog(self.block, self.off, &[byte])?;
         self.pos += 1;
         self.off += 1;
         self.ctz_size = self.ctz_size.max(self.pos);
         self.dirty = true;
 
-        lookahead.alloc_ckpoint(config.block_count);
+        lookahead.alloc_ckpoint(ctx.config.block_count);
         Ok(())
     }
 
     /// Flush buffer to storage and commit metadata.
     pub fn sync<B: BlockDevice>(
         &mut self,
-        bd: &B,
-        config: &Config,
+        ctx: &BdContext<'_, B>,
         root: &mut [u32; 2],
         lookahead: &mut alloc::Lookahead,
         name_max: u32,
@@ -379,13 +368,12 @@ impl File {
             return Ok(());
         }
 
-        bd.sync()?;
+        ctx.sync()?;
 
         if self.inline {
-            let mut dir = metadata::fetch_metadata_pair(bd, config, self.mdir.pair)?;
+            let mut dir = metadata::fetch_metadata_pair(ctx, self.mdir.pair)?;
             commit::dir_orphaningcommit(
-                bd,
-                config,
+                ctx,
                 &mut dir,
                 &[commit::CommitAttr::inline_struct(
                     self.id,
@@ -400,10 +388,9 @@ impl File {
                 false,
             )?;
         } else {
-            let mut dir = metadata::fetch_metadata_pair(bd, config, self.mdir.pair)?;
+            let mut dir = metadata::fetch_metadata_pair(ctx, self.mdir.pair)?;
             commit::dir_orphaningcommit(
-                bd,
-                config,
+                ctx,
                 &mut dir,
                 &[commit::CommitAttr::ctz_struct(
                     self.id,
@@ -420,8 +407,8 @@ impl File {
             )?;
         }
 
-        bd.sync()?;
-        self.mdir = metadata::fetch_metadata_pair(bd, config, self.mdir.pair)?;
+        ctx.sync()?;
+        self.mdir = metadata::fetch_metadata_pair(ctx, self.mdir.pair)?;
         self.dirty = false;
         self.writing = false;
         Ok(())
@@ -430,8 +417,7 @@ impl File {
     /// Truncate file to given size.
     pub fn truncate<B: BlockDevice>(
         &mut self,
-        bd: &B,
-        config: &Config,
+        ctx: &BdContext<'_, B>,
         root: &mut [u32; 2],
         lookahead: &mut alloc::Lookahead,
         name_max: u32,
@@ -450,13 +436,13 @@ impl File {
                     self.inline_buffer.truncate(size as usize);
                 } else {
                     if self.dirty {
-                        self.sync(bd, config, root, lookahead, name_max, gstate, gdisk, gdelta)?;
+                        self.sync(ctx, root, lookahead, name_max, gstate, gdisk, gdelta)?;
                     }
                     self.seek(0, crate::info::SeekWhence::Set)?;
                     let mut buf = vec![0u8; size as usize];
                     let mut pos = 0u64;
                     while pos < size {
-                        let n = self.read(bd, config, &mut buf[pos as usize..])?;
+                        let n = self.read(ctx, &mut buf[pos as usize..])?;
                         if n == 0 {
                             break;
                         }
@@ -470,8 +456,8 @@ impl File {
                     self.off = 0;
                 }
             } else {
-                self.sync(bd, config, root, lookahead, name_max, gstate, gdisk, gdelta)?;
-                let (block, _) = ctz::ctz_find(bd, config, self.ctz_head, self.ctz_size, size - 1)?;
+                self.sync(ctx, root, lookahead, name_max, gstate, gdisk, gdelta)?;
+                let (block, _) = ctz::ctz_find(ctx, self.ctz_head, self.ctz_size, size - 1)?;
                 self.ctz_head = block;
                 self.ctz_size = size;
                 self.pos = size;
@@ -484,7 +470,7 @@ impl File {
             let to_fill = (size - old_size) as usize;
             let file_max = 2_147_483_647u32;
             for _ in 0..to_fill {
-                self.write(bd, config, *root, lookahead, inline_max, file_max, &[0])?;
+                self.write(ctx, *root, lookahead, inline_max, file_max, &[0])?;
             }
         }
 
@@ -534,8 +520,7 @@ impl File {
     /// Close file. Syncs if dirty.
     pub fn close<B: BlockDevice>(
         mut self,
-        bd: &B,
-        config: &Config,
+        ctx: &BdContext<'_, B>,
         root: &mut [u32; 2],
         lookahead: &mut alloc::Lookahead,
         name_max: u32,
@@ -544,7 +529,7 @@ impl File {
         gdelta: &mut GState,
     ) -> Result<(), Error> {
         if self.dirty {
-            self.sync(bd, config, root, lookahead, name_max, gstate, gdisk, gdelta)?;
+            self.sync(ctx, root, lookahead, name_max, gstate, gdisk, gdelta)?;
         }
         Ok(())
     }
