@@ -381,30 +381,31 @@ pub fn dir_compact<B: BlockDevice>(
         let mut crc = crate::crc::crc32(0xffff_ffff, &rev_buf);
 
         const CRC_MIN: usize = 20;
-        let traverse_res = dir_traverse_tags(source, begin, end, -(begin as i32), |tag, data| {
-            let dsize = tag_dsize(tag);
-            if off + dsize > meta_max - CRC_MIN {
-                return Err(Error::Nospc);
-            }
-            let ntag = (tag & 0x7fff_ffff) ^ ptag;
-            let ntag_be = ntag.to_be_bytes();
-            bdc.prog(block_idx, off as u32, &ntag_be).map_err(|e| {
-                if matches!(e, Error::Corrupt) {
-                    Error::Corrupt
-                } else {
-                    e
+        let traverse_res =
+            dir_traverse_tags(source, begin, end, -(begin as i32), true, |tag, data| {
+                let dsize = tag_dsize(tag);
+                if off + dsize > meta_max - CRC_MIN {
+                    return Err(Error::Nospc);
                 }
-            })?;
-            crc = crate::crc::crc32(crc, &ntag_be);
-            off += 4;
-            if !data.is_empty() {
-                bdc.prog(block_idx, off as u32, data)?;
-                crc = crate::crc::crc32(crc, data);
-                off += data.len();
-            }
-            ptag = tag & 0x7fff_ffff;
-            Ok(TraverseAction::Continue)
-        });
+                let ntag = (tag & 0x7fff_ffff) ^ ptag;
+                let ntag_be = ntag.to_be_bytes();
+                bdc.prog(block_idx, off as u32, &ntag_be).map_err(|e| {
+                    if matches!(e, Error::Corrupt) {
+                        Error::Corrupt
+                    } else {
+                        e
+                    }
+                })?;
+                crc = crate::crc::crc32(crc, &ntag_be);
+                off += 4;
+                if !data.is_empty() {
+                    bdc.prog(block_idx, off as u32, data)?;
+                    crc = crate::crc::crc32(crc, data);
+                    off += data.len();
+                }
+                ptag = tag & 0x7fff_ffff;
+                Ok(TraverseAction::Continue)
+            });
 
         if let Err(e) = traverse_res {
             if matches!(e, Error::Nospc | Error::Corrupt) {

@@ -163,7 +163,7 @@ pub fn compute_movestate_delta(
 /// Accumulate MOVESTATE deltas from a metadata dir into gstate.
 /// Per lfs_dir_getgstate (lfs.c:1395). XORs all MOVESTATE tags in the dir.
 pub fn dir_getgstate(dir: &super::metadata::MdDir, gstate: &mut GState) -> Result<(), Error> {
-    super::metadata::dir_traverse_tags(dir, 0, 0x400, 0, |tag, data| {
+    super::metadata::dir_traverse_tags(dir, 0, 0x400, 0, false, |tag, data| {
         let type3 = (tag >> 20) & 0x7ff;
         if type3 != tag::TYPE_MOVESTATE {
             return Ok(super::metadata::TraverseAction::Continue);

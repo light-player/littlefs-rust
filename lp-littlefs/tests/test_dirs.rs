@@ -122,7 +122,6 @@ fn test_dirs_one_rename() {
 #[rstest]
 #[case(5)]
 #[case(8)]
-#[ignore]
 fn test_dirs_many_rename(#[case] n: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
