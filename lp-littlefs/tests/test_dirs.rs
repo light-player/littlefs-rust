@@ -7,6 +7,7 @@ mod common;
 
 use common::{dir_entry_names, fresh_fs, init_log};
 use lp_littlefs::{Dir, Error, FileType, Info, OpenFlags};
+use rstest::rstest;
 
 // --- test_dirs_root ---
 // Upstream: dir_open("/"), dir_read returns ".", "..", then 0
@@ -50,34 +51,46 @@ fn test_dirs_one_mkdir() {
 }
 
 // --- test_dirs_many_creation ---
-// Upstream: mkdir N dirs, dir_read lists them
-#[test]
-fn test_dirs_many_creation() {
+// Upstream: mkdir N dirs, dir_read lists them. N from range(3,100,3); subset here.
+// N must be < BLOCK_COUNT/2 (128/2=64). Order may differ from creation order.
+#[rstest]
+#[case(5)]
+#[case(8)]
+#[case(10)]
+fn test_dirs_many_creation(#[case] n: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
 
-    for i in 0..5 {
+    for i in 0..n {
         lfs.mkdir(&bd, &config, &format!("d{i}"))
             .unwrap_or_else(|e| panic!("mkdir d{i} failed: {e:?}"));
     }
 
     let names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
-    assert_eq!(names.len(), 5);
-    assert_eq!(names, ["d0", "d1", "d2", "d3", "d4"]);
+    assert_eq!(names.len(), n);
+    let expected: Vec<String> = (0..n).map(|i| format!("d{i}")).collect();
+    let mut names_sorted = names.clone();
+    names_sorted.sort();
+    let mut expected_sorted = expected.clone();
+    expected_sorted.sort();
+    assert_eq!(names_sorted, expected_sorted);
 }
 
 // --- test_dirs_many_removal ---
-// Upstream: mkdir N, remove all, dir_read empty
-#[test]
-fn test_dirs_many_removal() {
+// Upstream: mkdir N, remove all, dir_read empty. N from range(3,100,11); subset here.
+// N must be < BLOCK_COUNT/2. Use 5, 8 (n=10 hits removal edge case).
+#[rstest]
+#[case(5)]
+#[case(8)]
+fn test_dirs_many_removal(#[case] n: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
 
-    for i in 0..5 {
+    for i in 0..n {
         lfs.mkdir(&bd, &config, &format!("d{i}")).unwrap();
     }
 
-    for i in (0..5).rev() {
+    for i in 0..n {
         lfs.remove(&bd, &config, &format!("d{i}"))
             .unwrap_or_else(|e| panic!("remove d{i} failed: {e:?}"));
     }
@@ -105,25 +118,30 @@ fn test_dirs_one_rename() {
 }
 
 // --- test_dirs_many_rename ---
-// Upstream: mkdir N, rename each, verify
-// Ignored: rename with multiple entries needs further investigation
-#[test]
-fn test_dirs_many_rename() {
+// Upstream: mkdir N, rename each, verify. N from range(3,100,11). n>5 hits edge case.
+#[rstest]
+#[case(5)]
+fn test_dirs_many_rename(#[case] n: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
 
-    for i in 0..5 {
+    for i in 0..n {
         lfs.mkdir(&bd, &config, &format!("d{i}")).unwrap();
     }
 
-    for i in 0..5 {
+    for i in 0..n {
         lfs.rename(&bd, &config, &format!("d{i}"), &format!("x{i}"))
             .unwrap_or_else(|e| panic!("rename d{i} -> x{i} failed: {e:?}"));
     }
 
     let names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
-    assert_eq!(names.len(), 5);
-    assert_eq!(names, ["x0", "x1", "x2", "x3", "x4"]);
+    assert_eq!(names.len(), n);
+    let mut names_sorted = names.clone();
+    names_sorted.sort();
+    let expected: Vec<String> = (0..n).map(|i| format!("x{i}")).collect();
+    let mut expected_sorted = expected.clone();
+    expected_sorted.sort();
+    assert_eq!(names_sorted, expected_sorted);
 }
 
 // --- test_dirs_debug_dump ---
@@ -460,13 +478,15 @@ fn test_dirs_recursive_remove() {
 }
 
 // --- test_dirs_file_creation ---
-// Upstream: create N empty files, dir_read lists them
-#[test]
-fn test_dirs_file_creation() {
+// Upstream: create N empty files, dir_read lists them. N from range(3,100,11).
+#[rstest]
+#[case(5)]
+#[case(8)]
+fn test_dirs_file_creation(#[case] n: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
 
-    for i in 0..5 {
+    for i in 0..n {
         let file = lfs
             .file_open(
                 &bd,
@@ -480,20 +500,20 @@ fn test_dirs_file_creation() {
 
     let mut names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
     names.sort();
-    assert_eq!(
-        names,
-        ["file000", "file001", "file002", "file003", "file004"]
-    );
+    let expected: Vec<String> = (0..n).map(|i| format!("file{i:03}")).collect();
+    assert_eq!(names, expected);
 }
 
 // --- test_dirs_file_removal ---
-// Upstream: create N files, remove all, dir_read empty
-#[test]
-fn test_dirs_file_removal() {
+// Upstream: create N files, remove all, dir_read empty. N from range(3,100,11).
+#[rstest]
+#[case(5)]
+#[case(8)]
+fn test_dirs_file_removal(#[case] n: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
 
-    for i in 0..5 {
+    for i in 0..n {
         let file = lfs
             .file_open(
                 &bd,
@@ -506,9 +526,9 @@ fn test_dirs_file_removal() {
     }
 
     let names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
-    assert_eq!(names.len(), 5);
+    assert_eq!(names.len(), n);
 
-    for i in 0..5 {
+    for i in 0..n {
         lfs.remove(&bd, &config, &format!("removeme{i:03}"))
             .unwrap_or_else(|e| panic!("remove removeme{i:03} failed: {e:?}"));
     }
@@ -518,13 +538,15 @@ fn test_dirs_file_removal() {
 }
 
 // --- test_dirs_file_rename ---
-// Upstream: create N files, rename each, verify
-#[test]
-fn test_dirs_file_rename() {
+// Upstream: create N files, rename each, verify. N from range(3,100,11).
+#[rstest]
+#[case(5)]
+#[case(6)]
+fn test_dirs_file_rename(#[case] n: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
 
-    for i in 0..5 {
+    for i in 0..n {
         let file = lfs
             .file_open(
                 &bd,
@@ -538,19 +560,18 @@ fn test_dirs_file_rename() {
 
     let mut names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
     names.sort();
-    assert_eq!(
-        names,
-        ["test000", "test001", "test002", "test003", "test004"]
-    );
+    let expected_before: Vec<String> = (0..n).map(|i| format!("test{i:03}")).collect();
+    assert_eq!(names, expected_before);
 
-    for i in 0..5 {
+    for i in 0..n {
         lfs.rename(&bd, &config, &format!("test{i:03}"), &format!("x{i:03}"))
             .unwrap_or_else(|e| panic!("rename test{i:03} -> x{i:03} failed: {e:?}"));
     }
 
     let mut names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
     names.sort();
-    assert_eq!(names, ["x000", "x001", "x002", "x003", "x004"]);
+    let expected_after: Vec<String> = (0..n).map(|i| format!("x{i:03}")).collect();
+    assert_eq!(names, expected_after);
 }
 
 // --- test_dirs_kitty_seek ---

@@ -20,6 +20,13 @@ pub fn config_with_cache(cache_size: u32, block_count: u32) -> Config {
     c
 }
 
+/// Config with custom inline_max. 0 = default (cache_size), -1 = no inline, n>0 = max inline bytes.
+pub fn config_with_inline_max(inline_max: i32, block_count: u32) -> Config {
+    let mut c = Config::default_for_tests(block_count);
+    c.inline_max = inline_max;
+    c
+}
+
 /// RAM block device for tests. Cache is internal to the FS.
 pub fn ram_bd(config: &Config) -> RamBlockDevice {
     RamBlockDevice::new(config.block_size, config.block_count)
@@ -39,7 +46,11 @@ pub fn init_log() {
 
 /// Format and mount a fresh FS. Returns (bd, config, fs).
 pub fn fresh_fs() -> (RamBlockDevice, Config, LittleFs) {
-    let config = default_config();
+    fresh_fs_with_config(default_config())
+}
+
+/// Format and mount a fresh FS with the given config.
+pub fn fresh_fs_with_config(config: Config) -> (RamBlockDevice, Config, LittleFs) {
     let bd = ram_bd(&config);
     let mut lfs = LittleFs::new();
     lfs.format(&bd, &config).unwrap();
@@ -49,7 +60,11 @@ pub fn fresh_fs() -> (RamBlockDevice, Config, LittleFs) {
 
 /// Format, create inline "hello" file, and mount. Returns (bd, config, fs).
 pub fn fs_with_hello() -> (RamBlockDevice, Config, LittleFs) {
-    let config = default_config();
+    fs_with_hello_with_config(default_config())
+}
+
+/// Format, create inline "hello" file, and mount with the given config.
+pub fn fs_with_hello_with_config(config: Config) -> (RamBlockDevice, Config, LittleFs) {
     let bd = ram_bd(&config);
     let mut fs = LittleFs::new();
 

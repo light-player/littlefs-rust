@@ -9,6 +9,7 @@ mod common;
 
 use common::{default_config, uncached_bd};
 use lp_littlefs::{BlockDevice, LittleFs, OpenFlags};
+use rstest::rstest;
 
 // --- test_powerloss_only_rev ---
 // Upstream: write rev+1 to one block of dir pair; mount picks higher rev, read/write still works.
@@ -130,10 +131,13 @@ fn test_powerloss_only_rev() {
 }
 
 // --- test_powerloss_partial_prog ---
-// Upstream: simulate partial prog (tweak one byte in metadata); mount should still work.
-// Requires prog_size < block_size (we have 16 < 512).
-#[test]
-fn test_powerloss_partial_prog() {
+// Upstream: BYTE_OFF=[0, PROG_SIZE-1, PROG_SIZE/2], BYTE_VALUE=[0x33, 0xcc].
+#[rstest]
+#[case(0, 0x33)]
+#[case(0, 0xcc)]
+#[case(8, 0x33)]
+#[case(15, 0xcc)]
+fn test_powerloss_partial_prog(#[case] byte_off: usize, #[case] byte_value: u8) {
     let _ = env_logger::builder().is_test(true).try_init();
     let config = default_config();
     let bd = uncached_bd(&config);
@@ -167,8 +171,6 @@ fn test_powerloss_partial_prog() {
 
     let mut block_buf = vec![0u8; config.block_size as usize];
     bd.read(block, 0, &mut block_buf).unwrap();
-    let byte_off = 0usize;
-    let byte_value = 0x33u8;
     block_buf[off as usize + byte_off] = byte_value;
 
     bd.erase(block).unwrap();

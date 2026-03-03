@@ -6,6 +6,7 @@
 //! These tests validate the block device abstraction, not littlefs itself.
 
 use lp_littlefs::{BlockDevice, RamBlockDevice};
+use rstest::rstest;
 
 /// Default test geometry. Easy to change for different upstream geometries.
 fn default_geometry() -> (u32, u32) {
@@ -15,16 +16,14 @@ fn default_geometry() -> (u32, u32) {
 }
 
 // --- test_bd_one_block ---
-// Upstream: erase block 0, prog in chunks, read back and verify.
-// Uses (block_index + offset + j) % 251 to avoid powers-of-two aliasing.
-#[test]
-fn test_bd_one_block() {
+// Upstream: READ=[READ_SIZE,BLOCK_SIZE], PROG=[PROG_SIZE,BLOCK_SIZE]. Subset: (16,16), (512,512).
+#[rstest]
+#[case(16, 16)]
+#[case(512, 512)]
+fn test_bd_one_block(#[case] read_size: u32, #[case] prog_size: u32) {
     let (block_size, block_count) = default_geometry();
     let bd = RamBlockDevice::new(block_size, block_count);
-
-    let read_size = 16u32;
-    let prog_size = 16u32;
-    let mut buffer = vec![0u8; read_size.max(prog_size) as usize];
+    let mut buffer = vec![0u8; read_size.max(prog_size).max(1) as usize];
 
     // Erase block 0
     bd.erase(0).unwrap();
@@ -51,15 +50,13 @@ fn test_bd_one_block() {
 }
 
 // --- test_bd_two_block ---
-// Upstream: prog block 0, read block 0, prog block 1, read block 1, re-read block 0.
-#[test]
-fn test_bd_two_block() {
+#[rstest]
+#[case(16, 16)]
+#[case(512, 512)]
+fn test_bd_two_block(#[case] read_size: u32, #[case] prog_size: u32) {
     let (block_size, block_count) = default_geometry();
     let bd = RamBlockDevice::new(block_size, block_count);
-
-    let read_size = 16u32;
-    let prog_size = 16u32;
-    let buf_len = read_size.max(prog_size) as usize;
+    let buf_len = read_size.max(prog_size).max(1) as usize;
     let mut buffer = vec![0u8; buf_len];
 
     for block in [0u32, 1u32] {
@@ -99,15 +96,13 @@ fn test_bd_two_block() {
 }
 
 // --- test_bd_last_block ---
-// Upstream: prog block 0, read block 0, prog block_count-1, read block_count-1.
-#[test]
-fn test_bd_last_block() {
+#[rstest]
+#[case(16, 16)]
+#[case(512, 512)]
+fn test_bd_last_block(#[case] read_size: u32, #[case] prog_size: u32) {
     let (block_size, block_count) = default_geometry();
     let bd = RamBlockDevice::new(block_size, block_count);
-
-    let read_size = 16u32;
-    let prog_size = 16u32;
-    let buf_len = read_size.max(prog_size) as usize;
+    let buf_len = read_size.max(prog_size).max(1) as usize;
     let mut buffer = vec![0u8; buf_len];
     let last_block = block_count - 1;
 
@@ -153,15 +148,13 @@ fn test_bd_last_block() {
 }
 
 // --- test_bd_powers_of_two ---
-// Upstream: write/read every power-of-two block index (1, 2, 4, 8, ...)
-#[test]
-fn test_bd_powers_of_two() {
+#[rstest]
+#[case(16, 16)]
+#[case(512, 512)]
+fn test_bd_powers_of_two(#[case] read_size: u32, #[case] prog_size: u32) {
     let (block_size, block_count) = default_geometry();
     let bd = RamBlockDevice::new(block_size, block_count);
-
-    let read_size = 16u32;
-    let prog_size = 16u32;
-    let buf_len = read_size.max(prog_size) as usize;
+    let buf_len = read_size.max(prog_size).max(1) as usize;
     let mut buffer = vec![0u8; buf_len];
 
     let mut block = 1u32;
@@ -207,15 +200,13 @@ fn test_bd_powers_of_two() {
 }
 
 // --- test_bd_fibonacci ---
-// Upstream: write/read every fibonacci block index (1, 1, 2, 3, 5, 8, 13, ...)
-#[test]
-fn test_bd_fibonacci() {
+#[rstest]
+#[case(16, 16)]
+#[case(512, 512)]
+fn test_bd_fibonacci(#[case] read_size: u32, #[case] prog_size: u32) {
     let (block_size, block_count) = default_geometry();
     let bd = RamBlockDevice::new(block_size, block_count);
-
-    let read_size = 16u32;
-    let prog_size = 16u32;
-    let buf_len = read_size.max(prog_size) as usize;
+    let buf_len = read_size.max(prog_size).max(1) as usize;
     let mut buffer = vec![0u8; buf_len];
 
     let mut block = 1u32;

@@ -5,12 +5,20 @@
 
 mod common;
 
-use common::{fresh_fs, fs_with_hello};
+use common::{
+    config_with_inline_max, fresh_fs, fresh_fs_with_config, fs_with_hello,
+    fs_with_hello_with_config,
+};
 use lp_littlefs::{OpenFlags, SeekWhence};
+use rstest::rstest;
 
-#[test]
-fn test_files_simple_read() {
-    let (bd, config, mut fs) = fs_with_hello();
+#[rstest]
+#[case::inline_default(0)]
+#[case::inline_disabled(-1)]
+#[case::inline_small(8)]
+fn test_files_simple_read(#[case] inline_max: i32) {
+    let config = config_with_inline_max(inline_max, 128);
+    let (bd, config, mut fs) = fs_with_hello_with_config(config);
 
     let mut file = fs
         .file_open(&bd, &config, "hello", OpenFlags::new(OpenFlags::RDONLY))
@@ -63,9 +71,13 @@ fn test_files_seek_tell() {
 }
 
 /// Create, write "Hello World!", close, unmount, mount, read back. Per test_files_simple.
-#[test]
-fn test_files_simple() {
-    let (bd, config, mut fs) = fresh_fs();
+#[rstest]
+#[case::inline_default(0)]
+#[case::inline_disabled(-1)]
+#[case::inline_small(8)]
+fn test_files_simple(#[case] inline_max: i32) {
+    let config = config_with_inline_max(inline_max, 128);
+    let (bd, config, mut fs) = fresh_fs_with_config(config);
 
     let mut file = fs
         .file_open(
@@ -133,131 +145,47 @@ fn test_fs_gc() {
 }
 
 /// APPEND flag: write, close, reopen with APPEND, write more, read back.
-#[test]
-fn test_files_append() {
-    let (bd, config, mut fs) = fresh_fs();
+#[rstest]
+#[case(32, 32, 31, 0)]
+#[case(32, 32, 16, -1)]
+#[case(7, 7, 1, 8)]
+fn test_files_append(
+    #[case] size1: usize,
+    #[case] size2: usize,
+    #[case] chunk: usize,
+    #[case] inline_max: i32,
+) {
+    let config = config_with_inline_max(inline_max, 128);
+    let (bd, config, mut fs) = fresh_fs_with_config(config);
+    fs.format(&bd, &config).unwrap();
+    fs.mount(&bd, &config).unwrap();
 
     let mut file = fs
         .file_open(
             &bd,
             &config,
-            "x",
+            "avacado",
             OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
         )
         .unwrap();
-    fs.file_write(&bd, &config, &mut file, b"aaaa").unwrap();
+    for i in (0..size1).step_by(chunk) {
+        let end = (i + chunk).min(size1);
+        let data: Vec<u8> = (i..end).map(|j| (j % 256) as u8).collect();
+        fs.file_write(&bd, &config, &mut file, &data).unwrap();
+    }
     fs.file_close(&bd, &config, file).unwrap();
 
     let mut file = fs
         .file_open(
             &bd,
             &config,
-            "x",
+            "avacado",
             OpenFlags::new(OpenFlags::WRONLY | OpenFlags::APPEND),
         )
         .unwrap();
-    fs.file_write(&bd, &config, &mut file, b"bbbb").unwrap();
-    fs.file_close(&bd, &config, file).unwrap();
-
-    fs.unmount(&bd, &config).unwrap();
-    fs.mount(&bd, &config).unwrap();
-
-    let mut file = fs
-        .file_open(&bd, &config, "x", OpenFlags::new(OpenFlags::RDONLY))
-        .unwrap();
-    let mut buf = [0u8; 16];
-    let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
-    assert_eq!(n, 8);
-    assert_eq!(&buf[..8], b"aaaabbbb");
-    fs.file_close(&bd, &config, file).unwrap();
-}
-
-/// TRUNC: create and write, close, reopen with TRUNC, write different content.
-#[test]
-fn test_files_truncate() {
-    let (bd, config, mut fs) = fresh_fs();
-
-    let mut file = fs
-        .file_open(
-            &bd,
-            &config,
-            "f",
-            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
-        )
-        .unwrap();
-    fs.file_write(&bd, &config, &mut file, b"original").unwrap();
-    fs.file_close(&bd, &config, file).unwrap();
-
-    let mut file = fs
-        .file_open(
-            &bd,
-            &config,
-            "f",
-            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::TRUNC),
-        )
-        .unwrap();
-    fs.file_write(&bd, &config, &mut file, b"xyz").unwrap();
-    fs.file_close(&bd, &config, file).unwrap();
-
-    let mut file = fs
-        .file_open(&bd, &config, "f", OpenFlags::new(OpenFlags::RDONLY))
-        .unwrap();
-    let mut buf = [0u8; 16];
-    let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
-    assert_eq!(n, 3);
-    assert_eq!(&buf[..3], b"xyz");
-    fs.file_close(&bd, &config, file).unwrap();
-}
-
-/// Large file (chunked write) to exercise CTZ. Per test_files_large subset.
-#[test]
-fn test_files_large() {
-    // First verify 65 bytes works (inline->CTZ transition, single CTZ block)
-    let (bd, config, mut fs) = fresh_fs();
-    fs.format(&bd, &config).unwrap();
-    fs.mount(&bd, &config).unwrap();
-    let mut file = fs
-        .file_open(
-            &bd,
-            &config,
-            "small",
-            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
-        )
-        .unwrap();
-    let data_65: Vec<u8> = (0..65).collect();
-    fs.file_write(&bd, &config, &mut file, &data_65).unwrap();
-    fs.file_close(&bd, &config, file).unwrap();
-    fs.unmount(&bd, &config).unwrap();
-    fs.mount(&bd, &config).unwrap();
-    let mut file = fs
-        .file_open(&bd, &config, "small", OpenFlags::new(OpenFlags::RDONLY))
-        .unwrap();
-    let mut buf = [0u8; 128];
-    let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
-    assert_eq!(n, 65, "65-byte file (inline->CTZ) should read back");
-    assert_eq!(&buf[..65], &data_65[..]);
-    fs.file_close(&bd, &config, file).unwrap();
-    fs.unmount(&bd, &config).unwrap();
-
-    // Now test 1024 bytes (multi-block CTZ) - reuse bd, fresh format
-    fs.format(&bd, &config).unwrap();
-    fs.mount(&bd, &config).unwrap();
-
-    let mut file = fs
-        .file_open(
-            &bd,
-            &config,
-            "big",
-            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
-        )
-        .unwrap();
-    let size = 513usize; // two blocks - first full, second has 1 byte
-    let chunk = 64;
-    for i in 0..size.div_ceil(chunk) {
-        let start = i * chunk;
-        let end = (start + chunk).min(size);
-        let _len = end - start;
-        let data: Vec<u8> = (start..end).map(|j| (j % 256) as u8).collect();
+    for i in (0..size2).step_by(chunk) {
+        let end = (i + chunk).min(size2);
+        let data: Vec<u8> = (size1 + i..size1 + end).map(|j| (j % 256) as u8).collect();
         fs.file_write(&bd, &config, &mut file, &data).unwrap();
     }
     fs.file_close(&bd, &config, file).unwrap();
@@ -266,10 +194,123 @@ fn test_files_large() {
     fs.mount(&bd, &config).unwrap();
 
     let mut file = fs
-        .file_open(&bd, &config, "big", OpenFlags::new(OpenFlags::RDONLY))
+        .file_open(&bd, &config, "avacado", OpenFlags::new(OpenFlags::RDONLY))
+        .unwrap();
+    assert_eq!(fs.file_size(&file).unwrap(), (size1 + size2) as i64);
+    let mut buf = [0u8; 1024];
+    let mut pos = 0;
+    let total = size1 + size2;
+    while pos < total {
+        let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
+        if n == 0 {
+            break;
+        }
+        for (j, &b) in buf.iter().take(n).enumerate() {
+            assert_eq!(b, ((pos + j) % 256) as u8, "at pos {}", pos + j);
+        }
+        pos += n;
+    }
+    assert_eq!(pos, total);
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// TRUNC: create and write, close, reopen with TRUNC, write different content.
+#[rstest]
+#[case(32, 32, 31, 0)]
+#[case(32, 7, 16, -1)]
+#[case(7, 7, 1, 8)]
+fn test_files_truncate(
+    #[case] size1: usize,
+    #[case] size2: usize,
+    #[case] chunk: usize,
+    #[case] inline_max: i32,
+) {
+    let config = config_with_inline_max(inline_max, 128);
+    let (bd, config, mut fs) = fresh_fs_with_config(config);
+    fs.format(&bd, &config).unwrap();
+    fs.mount(&bd, &config).unwrap();
+
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "avacado",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
+        )
+        .unwrap();
+    for i in (0..size1).step_by(chunk) {
+        let end = (i + chunk).min(size1);
+        let data: Vec<u8> = (i..end).map(|j| (j % 256) as u8).collect();
+        fs.file_write(&bd, &config, &mut file, &data).unwrap();
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "avacado",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::TRUNC),
+        )
+        .unwrap();
+    for i in (0..size2).step_by(chunk) {
+        let end = (i + chunk).min(size2);
+        let data: Vec<u8> = (100 + i..100 + end).map(|j| (j % 256) as u8).collect();
+        fs.file_write(&bd, &config, &mut file, &data).unwrap();
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+
+    fs.unmount(&bd, &config).unwrap();
+    fs.mount(&bd, &config).unwrap();
+
+    let mut file = fs
+        .file_open(&bd, &config, "avacado", OpenFlags::new(OpenFlags::RDONLY))
+        .unwrap();
+    assert_eq!(fs.file_size(&file).unwrap(), size2 as i64);
+    let mut buf = [0u8; 1024];
+    let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
+    assert_eq!(n, size2);
+    for (j, &b) in buf.iter().take(size2).enumerate() {
+        assert_eq!(b, ((100 + j) % 256) as u8, "at pos {}", j);
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Large file (chunked write) to exercise CTZ. Per test_files_large subset.
+#[rstest]
+#[case(32, 31, 0)]
+#[case(65, 64, 0)]
+#[case(513, 64, -1)]
+#[case(0, 1, 0)]
+#[case(7, 1, 8)]
+fn test_files_large(#[case] size: usize, #[case] chunk: usize, #[case] inline_max: i32) {
+    let config = config_with_inline_max(inline_max, 128);
+    let (bd, config, mut fs) = fresh_fs_with_config(config);
+    fs.format(&bd, &config).unwrap();
+    fs.mount(&bd, &config).unwrap();
+
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "avacado",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
+        )
+        .unwrap();
+    for i in (0..size).step_by(chunk) {
+        let end = (i + chunk).min(size);
+        let data: Vec<u8> = (i..end).map(|j| (j % 256) as u8).collect();
+        fs.file_write(&bd, &config, &mut file, &data).unwrap();
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(&bd, &config, "avacado", OpenFlags::new(OpenFlags::RDONLY))
         .unwrap();
     assert_eq!(fs.file_size(&file).unwrap(), size as i64);
-    let mut buf = [0u8; 64];
+    let mut buf = [0u8; 1024];
     let mut pos = 0;
     while pos < size {
         let n = fs
@@ -288,65 +329,66 @@ fn test_files_large() {
 }
 
 /// Overwrite existing file with different size. Per test_files_rewrite.
-#[test]
-fn test_files_rewrite() {
-    let (bd, config, mut fs) = fresh_fs();
+#[rstest]
+#[case(32, 32, 31, 0)]
+#[case(64, 50, 16, -1)]
+#[case(32, 80, 64, 8)]
+fn test_files_rewrite(
+    #[case] size1: usize,
+    #[case] size2: usize,
+    #[case] chunk: usize,
+    #[case] inline_max: i32,
+) {
+    let config = config_with_inline_max(inline_max, 128);
+    let (bd, config, mut fs) = fresh_fs_with_config(config);
+    fs.format(&bd, &config).unwrap();
+    fs.mount(&bd, &config).unwrap();
 
-    // Write initial content
     let mut file = fs
         .file_open(
             &bd,
             &config,
-            "f",
+            "avacado",
             OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
         )
         .unwrap();
-    let data1: Vec<u8> = (0..64).map(|i| i as u8).collect();
-    fs.file_write(&bd, &config, &mut file, &data1).unwrap();
+    for i in (0..size1).step_by(chunk) {
+        let end = (i + chunk).min(size1);
+        let data: Vec<u8> = (i..end).map(|j| (j % 256) as u8).collect();
+        fs.file_write(&bd, &config, &mut file, &data).unwrap();
+    }
     fs.file_close(&bd, &config, file).unwrap();
 
-    // Reopen for overwrite (no TRUNC), write smaller then larger
     let mut file = fs
-        .file_open(&bd, &config, "f", OpenFlags::new(OpenFlags::WRONLY))
+        .file_open(&bd, &config, "avacado", OpenFlags::new(OpenFlags::WRONLY))
         .unwrap();
-    let data2: Vec<u8> = (100..150).map(|i| i as u8).collect();
-    fs.file_write(&bd, &config, &mut file, &data2).unwrap();
-    fs.file_close(&bd, &config, file).unwrap();
-
-    fs.unmount(&bd, &config).unwrap();
-    fs.mount(&bd, &config).unwrap();
-
-    // Read: first 50 bytes are new (100..150), bytes 50..64 are old (50..64)
-    let mut file = fs
-        .file_open(&bd, &config, "f", OpenFlags::new(OpenFlags::RDONLY))
-        .unwrap();
-    assert_eq!(fs.file_size(&file).unwrap(), 64);
-    let mut buf = vec![0u8; 64];
-    let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
-    assert_eq!(n, 64);
-    assert_eq!(&buf[..50], &data2[..], "first 50 bytes overwritten");
-    assert_eq!(&buf[50..64], &data1[50..64], "bytes 50..64 preserved");
-    fs.file_close(&bd, &config, file).unwrap();
-
-    // Rewrite with more data (extend)
-    let mut file = fs
-        .file_open(&bd, &config, "f", OpenFlags::new(OpenFlags::WRONLY))
-        .unwrap();
-    let data3: Vec<u8> = (200..280).map(|i| i as u8).collect();
-    fs.file_write(&bd, &config, &mut file, &data3).unwrap();
+    for i in (0..size2).step_by(chunk) {
+        let end = (i + chunk).min(size2);
+        let data: Vec<u8> = (100 + i..100 + end).map(|j| (j % 256) as u8).collect();
+        fs.file_write(&bd, &config, &mut file, &data).unwrap();
+    }
     fs.file_close(&bd, &config, file).unwrap();
 
     fs.unmount(&bd, &config).unwrap();
     fs.mount(&bd, &config).unwrap();
 
+    let expected_size = size1.max(size2);
     let mut file = fs
-        .file_open(&bd, &config, "f", OpenFlags::new(OpenFlags::RDONLY))
+        .file_open(&bd, &config, "avacado", OpenFlags::new(OpenFlags::RDONLY))
         .unwrap();
-    assert_eq!(fs.file_size(&file).unwrap(), 80);
-    let mut buf = vec![0u8; 128];
+    assert_eq!(fs.file_size(&file).unwrap(), expected_size as i64);
+    let mut buf = vec![0u8; expected_size + 64];
     let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
-    assert_eq!(n, 80);
-    assert_eq!(&buf[..80], &data3[..]);
+    assert_eq!(n, expected_size);
+    for j in 0..size2.min(expected_size) {
+        assert_eq!(buf[j], ((100 + j) % 256) as u8, "overwritten at {}", j);
+    }
+    for j in size2..size1.min(expected_size) {
+        assert_eq!(buf[j], (j % 256) as u8, "preserved at {}", j);
+    }
+    for j in size1..size2.min(expected_size) {
+        assert_eq!(buf[j], ((100 + j) % 256) as u8, "extended at {}", j);
+    }
     fs.file_close(&bd, &config, file).unwrap();
 }
 
@@ -386,10 +428,10 @@ fn test_files_many() {
 }
 
 /// Per test_truncate_simple: write LARGESIZE, close, remount, open RDWR, truncate to MEDIUMSIZE, remount, read.
-#[test]
-fn test_truncate_simple() {
-    const LARGE_SIZE: u64 = 513;
-    const MEDIUM_SIZE: u64 = 512;
+#[rstest]
+#[case(512, 513)]
+#[case(511, 512)]
+fn test_truncate_simple(#[case] medium_size: u64, #[case] large_size: u64) {
     let (bd, config, mut fs) = fresh_fs();
 
     let mut file = fs
@@ -402,12 +444,12 @@ fn test_truncate_simple() {
         .unwrap();
     let chunk = b"hair";
     let mut written: u64 = 0;
-    while written < LARGE_SIZE {
-        let n = chunk.len().min((LARGE_SIZE - written) as usize);
+    while written < large_size {
+        let n = chunk.len().min((large_size - written) as usize);
         let w = fs.file_write(&bd, &config, &mut file, &chunk[..n]).unwrap();
         written += w as u64;
     }
-    assert_eq!(fs.file_size(&file).unwrap(), LARGE_SIZE as i64);
+    assert_eq!(fs.file_size(&file).unwrap(), large_size as i64);
     fs.file_close(&bd, &config, file).unwrap();
 
     fs.unmount(&bd, &config).unwrap();
@@ -416,10 +458,10 @@ fn test_truncate_simple() {
     let mut file = fs
         .file_open(&bd, &config, "baldynoop", OpenFlags::new(OpenFlags::RDWR))
         .unwrap();
-    assert_eq!(fs.file_size(&file).unwrap(), LARGE_SIZE as i64);
-    fs.file_truncate(&bd, &config, &mut file, MEDIUM_SIZE)
+    assert_eq!(fs.file_size(&file).unwrap(), large_size as i64);
+    fs.file_truncate(&bd, &config, &mut file, medium_size)
         .unwrap();
-    assert_eq!(fs.file_size(&file).unwrap(), MEDIUM_SIZE as i64);
+    assert_eq!(fs.file_size(&file).unwrap(), medium_size as i64);
     fs.file_close(&bd, &config, file).unwrap();
 
     fs.unmount(&bd, &config).unwrap();
@@ -428,10 +470,10 @@ fn test_truncate_simple() {
     let mut file = fs
         .file_open(&bd, &config, "baldynoop", OpenFlags::new(OpenFlags::RDONLY))
         .unwrap();
-    assert_eq!(fs.file_size(&file).unwrap(), MEDIUM_SIZE as i64);
+    assert_eq!(fs.file_size(&file).unwrap(), medium_size as i64);
     let mut buf = [0u8; 1024];
     let mut read_total: usize = 0;
-    while read_total < MEDIUM_SIZE as usize {
+    while read_total < medium_size as usize {
         let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
         if n == 0 {
             break;
@@ -442,15 +484,17 @@ fn test_truncate_simple() {
         }
         read_total += n;
     }
-    assert_eq!(read_total, MEDIUM_SIZE as usize);
+    assert_eq!(read_total, medium_size as usize);
     let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
     assert_eq!(n, 0);
     fs.file_close(&bd, &config, file).unwrap();
 }
 
 /// Per test_seek_read: SEEK_SET, SEEK_CUR, SEEK_END, rewind.
-#[test]
-fn test_seek_read() {
+#[rstest]
+#[case(4)]
+#[case(12)]
+fn test_seek_read(#[case] count: usize) {
     let (bd, config, mut fs) = fresh_fs();
 
     let data = b"kittycatcat";
@@ -462,7 +506,7 @@ fn test_seek_read() {
             OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
         )
         .unwrap();
-    for _ in 0..4 {
+    for _ in 0..count {
         fs.file_write(&bd, &config, &mut file, data).unwrap();
     }
     fs.file_close(&bd, &config, file).unwrap();
@@ -542,10 +586,10 @@ fn test_seek_read() {
 }
 
 /// Per test_truncate_read: truncate then read before unmount.
-#[test]
-fn test_truncate_read() {
-    const LARGE: u64 = 513;
-    const MEDIUM: u64 = 512;
+#[rstest]
+#[case(512, 513)]
+#[case(511, 512)]
+fn test_truncate_read(#[case] medium: u64, #[case] large: u64) {
     let (bd, config, mut fs) = fresh_fs();
 
     let mut file = fs
@@ -558,8 +602,8 @@ fn test_truncate_read() {
         .unwrap();
     let chunk = b"hair";
     let mut w: u64 = 0;
-    while w < LARGE {
-        let n = chunk.len().min((LARGE - w) as usize);
+    while w < large {
+        let n = chunk.len().min((large - w) as usize);
         w += fs.file_write(&bd, &config, &mut file, &chunk[..n]).unwrap() as u64;
     }
     fs.file_close(&bd, &config, file).unwrap();
@@ -569,10 +613,10 @@ fn test_truncate_read() {
     let mut file = fs
         .file_open(&bd, &config, "baldyread", OpenFlags::new(OpenFlags::RDWR))
         .unwrap();
-    fs.file_truncate(&bd, &config, &mut file, MEDIUM).unwrap();
+    fs.file_truncate(&bd, &config, &mut file, medium).unwrap();
     let mut buf = [0u8; 8];
     let mut r: usize = 0;
-    while r < MEDIUM as usize {
+    while r < medium as usize {
         let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
         if n == 0 {
             break;
@@ -582,7 +626,7 @@ fn test_truncate_read() {
         }
         r += n;
     }
-    assert_eq!(r, MEDIUM as usize);
+    assert_eq!(r, medium as usize);
     assert_eq!(fs.file_read(&bd, &config, &mut file, &mut buf).unwrap(), 0);
     fs.file_close(&bd, &config, file).unwrap();
     fs.unmount(&bd, &config).unwrap();
@@ -591,7 +635,7 @@ fn test_truncate_read() {
     let file = fs
         .file_open(&bd, &config, "baldyread", OpenFlags::new(OpenFlags::RDONLY))
         .unwrap();
-    assert_eq!(fs.file_size(&file).unwrap(), MEDIUM as i64);
+    assert_eq!(fs.file_size(&file).unwrap(), medium as i64);
     fs.file_close(&bd, &config, file).unwrap();
 }
 
@@ -644,10 +688,10 @@ fn test_truncate_write_read() {
 }
 
 /// Per test_truncate_write: truncate then write new content.
-#[test]
-fn test_truncate_write() {
-    const LARGE: u64 = 513;
-    const MEDIUM: u64 = 512;
+#[rstest]
+#[case(512, 513)]
+#[case(511, 512)]
+fn test_truncate_write(#[case] medium: u64, #[case] large: u64) {
     let (bd, config, mut fs) = fresh_fs();
 
     let mut file = fs
@@ -660,8 +704,8 @@ fn test_truncate_write() {
         .unwrap();
     let chunk = b"hair";
     let mut w: u64 = 0;
-    while w < LARGE {
-        let n = chunk.len().min((LARGE - w) as usize);
+    while w < large {
+        let n = chunk.len().min((large - w) as usize);
         w += fs.file_write(&bd, &config, &mut file, &chunk[..n]).unwrap() as u64;
     }
     fs.file_close(&bd, &config, file).unwrap();
@@ -671,11 +715,11 @@ fn test_truncate_write() {
     let mut file = fs
         .file_open(&bd, &config, "baldywrite", OpenFlags::new(OpenFlags::RDWR))
         .unwrap();
-    fs.file_truncate(&bd, &config, &mut file, MEDIUM).unwrap();
+    fs.file_truncate(&bd, &config, &mut file, medium).unwrap();
     let new_chunk = b"bald";
     let mut w: u64 = 0;
-    while w < MEDIUM {
-        let n = new_chunk.len().min((MEDIUM - w) as usize);
+    while w < medium {
+        let n = new_chunk.len().min((medium - w) as usize);
         w += fs
             .file_write(&bd, &config, &mut file, &new_chunk[..n])
             .unwrap() as u64;
@@ -694,7 +738,7 @@ fn test_truncate_write() {
         .unwrap();
     let mut buf = [0u8; 8];
     let mut r: usize = 0;
-    while r < MEDIUM as usize {
+    while r < medium as usize {
         let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
         if n == 0 {
             break;
@@ -704,7 +748,7 @@ fn test_truncate_write() {
         }
         r += n;
     }
-    assert_eq!(r, MEDIUM as usize);
+    assert_eq!(r, medium as usize);
     fs.file_close(&bd, &config, file).unwrap();
 }
 
@@ -780,8 +824,10 @@ fn test_truncate_nop() {
 }
 
 /// Per test_seek_write: seek and overwrite.
-#[test]
-fn test_seek_write() {
+#[rstest]
+#[case(4)]
+#[case(12)]
+fn test_seek_write(#[case] count: usize) {
     let (bd, config, mut fs) = fresh_fs();
     let data = b"kittycatcat";
     let mut file = fs
@@ -792,7 +838,7 @@ fn test_seek_write() {
             OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
         )
         .unwrap();
-    for _ in 0..4 {
+    for _ in 0..count {
         fs.file_write(&bd, &config, &mut file, data).unwrap();
     }
     fs.file_close(&bd, &config, file).unwrap();

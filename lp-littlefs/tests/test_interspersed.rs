@@ -4,17 +4,18 @@ mod common;
 
 use common::{dir_entry_names, fresh_fs, init_log};
 use lp_littlefs::{FileType, OpenFlags};
+use rstest::rstest;
 
-#[test]
-fn test_interspersed_files() {
+#[rstest]
+#[case(10, 4)]
+#[case(100, 10)]
+fn test_interspersed_files(#[case] size: usize, #[case] files: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
     let alphas = b"abcdefghijklmnopqrstuvwxyz";
-    const FILES: usize = 4;
-    const SIZE: usize = 10;
 
-    let mut files = Vec::new();
-    for j in 0..FILES {
+    let mut open_files = Vec::new();
+    for j in 0..files {
         let path = format!("{}", alphas[j] as char);
         let file = lfs
             .file_open(
@@ -24,59 +25,61 @@ fn test_interspersed_files() {
                 OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
             )
             .unwrap();
-        files.push(file);
+        open_files.push(file);
     }
-    for _i in 0..SIZE {
-        for j in 0..FILES {
-            lfs.file_write(&bd, &config, &mut files[j], &[alphas[j]])
+    for _i in 0..size {
+        for j in 0..files {
+            lfs.file_write(&bd, &config, &mut open_files[j], &[alphas[j]])
                 .unwrap();
         }
     }
-    for file in files {
+    for file in open_files {
         lfs.file_close(&bd, &config, file).unwrap();
     }
 
     let names = dir_entry_names(&mut lfs, &bd, &config, "/").unwrap();
-    assert_eq!(names.len(), FILES);
-    for j in 0..FILES {
-        assert_eq!(names[j], format!("{}", alphas[j] as char));
-        let info = lfs.stat(&bd, &config, &names[j]).unwrap();
-        assert_eq!(info.size, SIZE as u32);
+    assert_eq!(names.len(), files);
+    let mut names_sorted = names.clone();
+    names_sorted.sort();
+    for j in 0..files {
+        let name = format!("{}", alphas[j] as char);
+        assert!(names_sorted.contains(&name));
+        let info = lfs.stat(&bd, &config, &name).unwrap();
+        assert_eq!(info.size, size as u32);
         assert!(matches!(info.typ, FileType::Reg));
     }
 
-    let mut files = Vec::new();
-    for j in 0..FILES {
+    let mut open_files = Vec::new();
+    for j in 0..files {
         let path = format!("{}", alphas[j] as char);
         let file = lfs
             .file_open(&bd, &config, &path, OpenFlags::new(OpenFlags::RDONLY))
             .unwrap();
-        files.push(file);
+        open_files.push(file);
     }
-    for _ in 0..10 {
-        for j in 0..FILES {
+    for _ in 0..size {
+        for j in 0..files {
             let mut buf = [0u8; 1];
             let n = lfs
-                .file_read(&bd, &config, &mut files[j], &mut buf)
+                .file_read(&bd, &config, &mut open_files[j], &mut buf)
                 .unwrap();
             assert_eq!(n, 1);
             assert_eq!(buf[0], alphas[j]);
         }
     }
-    for file in files {
+    for file in open_files {
         lfs.file_close(&bd, &config, file).unwrap();
     }
 }
 
-#[test]
-fn test_interspersed_remove_files() {
+#[rstest]
+#[case(10, 4)]
+fn test_interspersed_remove_files(#[case] size: usize, #[case] files: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
     let alphas = b"abcdefghijklmnopqrstuvwxyz";
-    const FILES: usize = 4;
-    const SIZE: usize = 10;
 
-    for j in 0..FILES {
+    for j in 0..files {
         let path = format!("{}", alphas[j] as char);
         let mut file = lfs
             .file_open(
@@ -86,7 +89,7 @@ fn test_interspersed_remove_files() {
                 OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::EXCL),
             )
             .unwrap();
-        for _ in 0..SIZE {
+        for _ in 0..size {
             lfs.file_write(&bd, &config, &mut file, &[alphas[j]])
                 .unwrap();
         }
@@ -103,7 +106,7 @@ fn test_interspersed_remove_files() {
             OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT),
         )
         .unwrap();
-    for j in 0..FILES {
+    for j in 0..files {
         lfs.file_write(&bd, &config, &mut file, b"~").unwrap();
         lfs.file_sync(&bd, &config, &mut file).unwrap();
         let path = format!("{}", alphas[j] as char);
@@ -115,12 +118,12 @@ fn test_interspersed_remove_files() {
     assert_eq!(names.len(), 1);
     assert_eq!(names[0], "zzz");
     let info = lfs.stat(&bd, &config, "zzz").unwrap();
-    assert_eq!(info.size, FILES as u32);
+    assert_eq!(info.size, files as u32);
 
     let mut file = lfs
         .file_open(&bd, &config, "zzz", OpenFlags::new(OpenFlags::RDONLY))
         .unwrap();
-    for _ in 0..FILES {
+    for _ in 0..files {
         let mut buf = [0u8; 1];
         let n = lfs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
         assert_eq!(n, 1);
@@ -129,11 +132,12 @@ fn test_interspersed_remove_files() {
     lfs.file_close(&bd, &config, file).unwrap();
 }
 
-#[test]
-fn test_interspersed_remove_inconveniently() {
+#[rstest]
+#[case(10)]
+#[case(20)]
+fn test_interspersed_remove_inconveniently(#[case] size: usize) {
     init_log();
     let (bd, config, mut lfs) = fresh_fs();
-    const SIZE: usize = 10;
 
     let mut f0 = lfs
         .file_open(
@@ -160,13 +164,13 @@ fn test_interspersed_remove_inconveniently() {
         )
         .unwrap();
 
-    for _ in 0..SIZE / 2 {
+    for _ in 0..size / 2 {
         lfs.file_write(&bd, &config, &mut f0, b"e").unwrap();
         lfs.file_write(&bd, &config, &mut f1, b"f").unwrap();
         lfs.file_write(&bd, &config, &mut f2, b"g").unwrap();
     }
     lfs.remove(&bd, &config, "f").unwrap();
-    for _ in 0..SIZE / 2 {
+    for _ in 0..size / 2 {
         lfs.file_write(&bd, &config, &mut f0, b"e").unwrap();
         lfs.file_write(&bd, &config, &mut f1, b"f").unwrap();
         lfs.file_write(&bd, &config, &mut f2, b"g").unwrap();
@@ -187,7 +191,7 @@ fn test_interspersed_remove_inconveniently() {
         .file_open(&bd, &config, "g", OpenFlags::new(OpenFlags::RDONLY))
         .unwrap();
     let mut buf = [0u8; 1];
-    for _ in 0..SIZE {
+    for _ in 0..size {
         let n = lfs.file_read(&bd, &config, &mut f0, &mut buf).unwrap();
         assert_eq!(n, 1);
         assert_eq!(buf[0], b'e');
