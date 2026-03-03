@@ -1,0 +1,18 @@
+//! Metadata and directory operations. Per lfs.c lfs_dir_*.
+
+mod commit;
+mod fetch;
+mod find;
+mod lfs_commit;
+mod lfs_dir;
+mod lfs_fcrc;
+mod lfs_mdir;
+mod lfs_mlist;
+mod open;
+mod traverse;
+
+pub use lfs_commit::LfsCommit;
+pub use lfs_dir::LfsDir;
+pub use lfs_fcrc::LfsFcrc;
+pub use lfs_mdir::LfsMdir;
+pub use lfs_mlist::LfsMlist;
