@@ -77,3 +77,74 @@ fn test_relocations_outdated_head() {
         assert_eq!(info.name().unwrap(), &format!("f{i}"));
     }
 }
+
+// --- test_relocations_reentrant ---
+// Upstream: random mkdir/remove with powerloss, block_cycles=1 forces relocations
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_relocations_reentrant() {}
+
+// --- test_relocations_reentrant_renames ---
+// Upstream: random mkdir/rename/remove with powerloss
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_relocations_reentrant_renames() {}
+
+// --- test_relocations_nonreentrant ---
+// Upstream: similar to reentrant but no powerloss
+#[test]
+fn test_relocations_nonreentrant() {
+    init_log();
+    let config = default_config();
+    let bd = ram_bd(&config);
+    let mut lfs = LittleFs::new();
+    lfs.format(&bd, &config).unwrap();
+    lfs.mount(&bd, &config).unwrap();
+
+    for i in 0..6 {
+        let path = format!("{}", (b'a' + i) as char);
+        let _ = lfs.mkdir(&bd, &config, &path);
+    }
+    for i in 0..6 {
+        let path = format!("{}", (b'a' + i) as char);
+        let info = lfs.stat(&bd, &config, &path).unwrap();
+        assert_eq!(info.name().unwrap(), path);
+        lfs.remove(&bd, &config, &path).unwrap();
+    }
+    lfs.unmount(&bd, &config).unwrap();
+}
+
+// --- test_relocations_nonreentrant_renames ---
+// Upstream: random mkdir/rename/remove with 2000 cycles; may hit non-DAG edge cases.
+// Chained renames (x->z, y->x, z->y) cause z to disappear after y->x (implementation bug).
+#[test]
+fn test_relocations_nonreentrant_renames() {
+    init_log();
+    let config = default_config();
+    let bd = ram_bd(&config);
+    let mut lfs = LittleFs::new();
+    lfs.format(&bd, &config).unwrap();
+    lfs.mount(&bd, &config).unwrap();
+
+    for p in ["x", "y"] {
+        let file = lfs
+            .file_open(
+                &bd,
+                &config,
+                p,
+                OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT),
+            )
+            .unwrap();
+        lfs.file_close(&bd, &config, file).unwrap();
+    }
+    lfs.rename(&bd, &config, "x", "z").unwrap();
+    lfs.rename(&bd, &config, "y", "x").unwrap();
+    lfs.rename(&bd, &config, "z", "y").unwrap();
+    let info = lfs.stat(&bd, &config, "x").unwrap();
+    assert_eq!(info.name().unwrap(), "x");
+    let info = lfs.stat(&bd, &config, "y").unwrap();
+    assert_eq!(info.name().unwrap(), "y");
+    lfs.remove(&bd, &config, "x").unwrap();
+    lfs.remove(&bd, &config, "y").unwrap();
+    lfs.unmount(&bd, &config).unwrap();
+}

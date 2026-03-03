@@ -13,6 +13,13 @@ pub fn default_config() -> Config {
     Config::default_for_tests(128)
 }
 
+/// Config with custom cache_size (e.g. 512 for inline-size tests).
+pub fn config_with_cache(cache_size: u32, block_count: u32) -> Config {
+    let mut c = Config::default_for_tests(block_count);
+    c.cache_size = cache_size;
+    c
+}
+
 /// RAM block device for tests. Cache is internal to the FS.
 pub fn ram_bd(config: &Config) -> RamBlockDevice {
     RamBlockDevice::new(config.block_size, config.block_count)

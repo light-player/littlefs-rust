@@ -2,6 +2,17 @@
 //!
 //! Per lfs.h struct lfs_info (lines 297–310) and lfs_fsinfo (lines 313–332).
 
+/// File open config with optional attrs. Per lfs.h struct lfs_file_config.
+/// Stub type for file_opencfg; attrs not implemented.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FileOpenConfig {
+    /// Attr count (attrs not implemented)
+    pub attr_count: usize,
+}
+
+/// LFS_ATTR_MAX from lfs.h
+pub const ATTR_MAX: usize = 1022;
+
 /// Open flags for file_open. Per lfs.h LFS_O_RDONLY etc.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct OpenFlags(pub u32);

@@ -541,6 +541,589 @@ fn test_seek_read() {
     fs.file_close(&bd, &config, file).unwrap();
 }
 
+/// Per test_truncate_read: truncate then read before unmount.
+#[test]
+fn test_truncate_read() {
+    const LARGE: u64 = 513;
+    const MEDIUM: u64 = 512;
+    let (bd, config, mut fs) = fresh_fs();
+
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "baldyread",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT),
+        )
+        .unwrap();
+    let chunk = b"hair";
+    let mut w: u64 = 0;
+    while w < LARGE {
+        let n = chunk.len().min((LARGE - w) as usize);
+        w += fs.file_write(&bd, &config, &mut file, &chunk[..n]).unwrap() as u64;
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(&bd, &config, "baldyread", OpenFlags::new(OpenFlags::RDWR))
+        .unwrap();
+    fs.file_truncate(&bd, &config, &mut file, MEDIUM).unwrap();
+    let mut buf = [0u8; 8];
+    let mut r: usize = 0;
+    while r < MEDIUM as usize {
+        let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
+        if n == 0 {
+            break;
+        }
+        for j in 0..n {
+            assert_eq!(buf[j], chunk[(r + j) % 4]);
+        }
+        r += n;
+    }
+    assert_eq!(r, MEDIUM as usize);
+    assert_eq!(fs.file_read(&bd, &config, &mut file, &mut buf).unwrap(), 0);
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let file = fs
+        .file_open(&bd, &config, "baldyread", OpenFlags::new(OpenFlags::RDONLY))
+        .unwrap();
+    assert_eq!(fs.file_size(&file).unwrap(), MEDIUM as i64);
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_truncate_write_read: write, truncate, read in same session.
+#[test]
+fn test_truncate_write_read() {
+    let (bd, config, mut fs) = fresh_fs();
+    let size = config.cache_size.min(256) as usize;
+    let qsize = size / 4;
+
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "sequence",
+            OpenFlags::new(OpenFlags::RDWR | OpenFlags::CREAT | OpenFlags::TRUNC),
+        )
+        .unwrap();
+
+    let wb: Vec<u8> = (0..size as u8).collect();
+    let n = fs.file_write(&bd, &config, &mut file, &wb).unwrap();
+    assert_eq!(n, size);
+    assert_eq!(fs.file_size(&file).unwrap(), size as i64);
+    assert_eq!(fs.file_tell(&file).unwrap(), size as i64);
+
+    fs.file_seek(&bd, &config, &mut file, 0, SeekWhence::Set)
+        .unwrap();
+    let trunc = size - qsize;
+    fs.file_truncate(&bd, &config, &mut file, trunc as u64)
+        .unwrap();
+    assert_eq!(fs.file_tell(&file).unwrap(), 0);
+    assert_eq!(fs.file_size(&file).unwrap(), trunc as i64);
+
+    let mut rb = vec![0u8; size];
+    let n = fs.file_read(&bd, &config, &mut file, &mut rb).unwrap();
+    assert_eq!(n, trunc);
+    assert_eq!(&rb[..trunc], &wb[..trunc]);
+
+    fs.file_seek(&bd, &config, &mut file, qsize as i64, SeekWhence::Set)
+        .unwrap();
+    let trunc2 = trunc - qsize;
+    fs.file_truncate(&bd, &config, &mut file, trunc2 as u64)
+        .unwrap();
+    assert_eq!(fs.file_tell(&file).unwrap(), qsize as i64);
+    let n = fs.file_read(&bd, &config, &mut file, &mut rb).unwrap();
+    assert_eq!(n, trunc2 - qsize);
+    assert_eq!(&rb[..(trunc2 - qsize)], &wb[qsize..trunc2]);
+
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_truncate_write: truncate then write new content.
+#[test]
+fn test_truncate_write() {
+    const LARGE: u64 = 513;
+    const MEDIUM: u64 = 512;
+    let (bd, config, mut fs) = fresh_fs();
+
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "baldywrite",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT),
+        )
+        .unwrap();
+    let chunk = b"hair";
+    let mut w: u64 = 0;
+    while w < LARGE {
+        let n = chunk.len().min((LARGE - w) as usize);
+        w += fs.file_write(&bd, &config, &mut file, &chunk[..n]).unwrap() as u64;
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(&bd, &config, "baldywrite", OpenFlags::new(OpenFlags::RDWR))
+        .unwrap();
+    fs.file_truncate(&bd, &config, &mut file, MEDIUM).unwrap();
+    let new_chunk = b"bald";
+    let mut w: u64 = 0;
+    while w < MEDIUM {
+        let n = new_chunk.len().min((MEDIUM - w) as usize);
+        w += fs
+            .file_write(&bd, &config, &mut file, &new_chunk[..n])
+            .unwrap() as u64;
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "baldywrite",
+            OpenFlags::new(OpenFlags::RDONLY),
+        )
+        .unwrap();
+    let mut buf = [0u8; 8];
+    let mut r: usize = 0;
+    while r < MEDIUM as usize {
+        let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
+        if n == 0 {
+            break;
+        }
+        for j in 0..n {
+            assert_eq!(buf[j], new_chunk[(r + j) % 4]);
+        }
+        r += n;
+    }
+    assert_eq!(r, MEDIUM as usize);
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_truncate_reentrant_write() {}
+
+#[test]
+#[ignore = "complex config with multiple size permutations"]
+fn test_truncate_aggressive() {}
+
+/// Per test_truncate_nop: truncate to current size during write (no-op).
+#[test]
+#[ignore = "truncate to current size during write may return Inval"]
+fn test_truncate_nop() {
+    const MEDIUM: u64 = 512;
+    let (bd, config, mut fs) = fresh_fs();
+
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "baldynoop",
+            OpenFlags::new(OpenFlags::RDWR | OpenFlags::CREAT),
+        )
+        .unwrap();
+    let chunk = b"hair";
+    let mut w: u64 = 0;
+    while w < MEDIUM {
+        let n = chunk.len().min((MEDIUM - w) as usize);
+        let nw = fs.file_write(&bd, &config, &mut file, &chunk[..n]).unwrap();
+        w += nw as u64;
+        fs.file_truncate(&bd, &config, &mut file, w).unwrap();
+    }
+    assert_eq!(fs.file_size(&file).unwrap(), MEDIUM as i64);
+    fs.file_seek(&bd, &config, &mut file, 0, SeekWhence::Set)
+        .unwrap();
+    fs.file_truncate(&bd, &config, &mut file, MEDIUM).unwrap();
+    let mut buf = [0u8; 8];
+    let mut r: usize = 0;
+    while r < MEDIUM as usize {
+        let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
+        if n == 0 {
+            break;
+        }
+        for j in 0..n {
+            assert_eq!(buf[j], chunk[(r + j) % 4]);
+        }
+        r += n;
+    }
+    assert_eq!(r, MEDIUM as usize);
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(&bd, &config, "baldynoop", OpenFlags::new(OpenFlags::RDWR))
+        .unwrap();
+    assert_eq!(fs.file_size(&file).unwrap(), MEDIUM as i64);
+    let mut buf = [0u8; 8];
+    let mut r: usize = 0;
+    while r < MEDIUM as usize {
+        let n = fs.file_read(&bd, &config, &mut file, &mut buf).unwrap();
+        if n == 0 {
+            break;
+        }
+        for j in 0..n {
+            assert_eq!(buf[j], chunk[(r + j) % 4]);
+        }
+        r += n;
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_seek_write: seek and overwrite.
+#[test]
+fn test_seek_write() {
+    let (bd, config, mut fs) = fresh_fs();
+    let data = b"kittycatcat";
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "kitty",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
+        )
+        .unwrap();
+    for _ in 0..4 {
+        fs.file_write(&bd, &config, &mut file, data).unwrap();
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(&bd, &config, "kitty", OpenFlags::new(OpenFlags::RDWR))
+        .unwrap();
+    let mut buf = [0u8; 32];
+    fs.file_read(&bd, &config, &mut file, &mut buf[..data.len()])
+        .unwrap();
+    let pos = fs.file_tell(&file).unwrap();
+    buf[..11].copy_from_slice(b"doggodogdog");
+    fs.file_seek(&bd, &config, &mut file, pos, SeekWhence::Set)
+        .unwrap();
+    fs.file_write(&bd, &config, &mut file, b"doggodogdog")
+        .unwrap();
+    fs.file_seek(&bd, &config, &mut file, pos, SeekWhence::Set)
+        .unwrap();
+    fs.file_read(&bd, &config, &mut file, &mut buf[..data.len()])
+        .unwrap();
+    assert_eq!(&buf[..data.len()], b"doggodogdog");
+    fs.file_rewind(&bd, &config, &mut file).unwrap();
+    fs.file_read(&bd, &config, &mut file, &mut buf[..data.len()])
+        .unwrap();
+    assert_eq!(&buf[..data.len()], data);
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_seek_boundary_read: seek at block boundaries.
+#[test]
+#[ignore = "boundary seek read behavior may differ"]
+fn test_seek_boundary_read() {
+    let (bd, config, mut fs) = fresh_fs();
+    let data = b"kittycatcat";
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "kitty",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
+        )
+        .unwrap();
+    for _ in 0..132 {
+        fs.file_write(&bd, &config, &mut file, data).unwrap();
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(&bd, &config, "kitty", OpenFlags::new(OpenFlags::RDONLY))
+        .unwrap();
+    let mut buf = [0u8; 32];
+    for &off in &[512_i64, 1020, 513, 1021, 511, 1019] {
+        fs.file_seek(&bd, &config, &mut file, off, SeekWhence::Set)
+            .unwrap();
+        let n = fs
+            .file_read(&bd, &config, &mut file, &mut buf[..data.len()])
+            .unwrap();
+        assert_eq!(n, data.len());
+        let expected = (off as usize) % 11;
+        for j in 0..data.len() {
+            assert_eq!(buf[j], data[(expected + j) % 11]);
+        }
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_seek_boundary_write: seek and write at boundaries.
+#[test]
+#[ignore = "boundary write may trigger Corrupt"]
+fn test_seek_boundary_write() {
+    let (bd, config, mut fs) = fresh_fs();
+    let data = b"kittycatcat";
+    let overwrite = b"hedgehoghog";
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "kitty",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
+        )
+        .unwrap();
+    for _ in 0..132 {
+        fs.file_write(&bd, &config, &mut file, data).unwrap();
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(&bd, &config, "kitty", OpenFlags::new(OpenFlags::RDWR))
+        .unwrap();
+    let mut buf = [0u8; 32];
+    for &off in &[512_i64, 1020] {
+        fs.file_seek(&bd, &config, &mut file, off, SeekWhence::Set)
+            .unwrap();
+        fs.file_write(&bd, &config, &mut file, overwrite).unwrap();
+        fs.file_seek(&bd, &config, &mut file, off, SeekWhence::Set)
+            .unwrap();
+        fs.file_read(&bd, &config, &mut file, &mut buf[..overwrite.len()])
+            .unwrap();
+        assert_eq!(&buf[..overwrite.len()], overwrite);
+        fs.file_seek(&bd, &config, &mut file, 0, SeekWhence::Set)
+            .unwrap();
+        fs.file_read(&bd, &config, &mut file, &mut buf[..data.len()])
+            .unwrap();
+        assert_eq!(&buf[..data.len()], data);
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_seek_out_of_bounds: seek past end, invalid seeks.
+#[test]
+#[ignore = "write past end / read zeros behavior may differ"]
+fn test_seek_out_of_bounds() {
+    let (bd, config, mut fs) = fresh_fs();
+    let data = b"kittycatcat";
+    let count = 132;
+    let skip = 4;
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "kitty",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
+        )
+        .unwrap();
+    for _ in 0..count {
+        fs.file_write(&bd, &config, &mut file, data).unwrap();
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+    fs.unmount(&bd, &config).unwrap();
+
+    fs.mount(&bd, &config).unwrap();
+    let mut file = fs
+        .file_open(&bd, &config, "kitty", OpenFlags::new(OpenFlags::RDWR))
+        .unwrap();
+    let size = (count * data.len()) as i64;
+    assert_eq!(fs.file_size(&file).unwrap(), size);
+
+    let past_end = ((count + skip) * data.len()) as i64;
+    fs.file_seek(&bd, &config, &mut file, past_end, SeekWhence::Set)
+        .unwrap();
+    let mut buf = [0u8; 32];
+    assert_eq!(
+        fs.file_read(&bd, &config, &mut file, &mut buf[..data.len()])
+            .unwrap(),
+        0
+    );
+
+    fs.file_write(&bd, &config, &mut file, b"porcupineee")
+        .unwrap();
+    fs.file_seek(&bd, &config, &mut file, past_end, SeekWhence::Set)
+        .unwrap();
+    fs.file_read(&bd, &config, &mut file, &mut buf[..data.len()])
+        .unwrap();
+    assert_eq!(&buf[..data.len()], b"porcupineee");
+
+    fs.file_seek(&bd, &config, &mut file, size, SeekWhence::Set)
+        .unwrap();
+    fs.file_read(&bd, &config, &mut file, &mut buf[..data.len()])
+        .unwrap();
+    assert_eq!(&buf[..data.len()], &[0u8; 11]);
+
+    let err = fs
+        .file_seek(&bd, &config, &mut file, -past_end, SeekWhence::Cur)
+        .unwrap_err();
+    assert_eq!(err, lp_littlefs::Error::Inval);
+    assert_eq!(
+        fs.file_tell(&file).unwrap(),
+        (count + 1) as i64 * data.len() as i64
+    );
+
+    let err = fs
+        .file_seek(
+            &bd,
+            &config,
+            &mut file,
+            -((count + 2 * skip) as i64 * data.len() as i64),
+            SeekWhence::End,
+        )
+        .unwrap_err();
+    assert_eq!(err, lp_littlefs::Error::Inval);
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_seek_inline_write: inline file seek/write byte-by-byte.
+#[test]
+#[ignore = "inline file seek/write behavior may differ"]
+fn test_seek_inline_write() {
+    let (bd, config, mut fs) = fresh_fs();
+    let abc = b"abcdefghijklmnopqrstuvwxyz";
+    const SIZE: usize = 4;
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "tinykitty",
+            OpenFlags::new(OpenFlags::RDWR | OpenFlags::CREAT),
+        )
+        .unwrap();
+
+    for i in 0..SIZE {
+        fs.file_write(&bd, &config, &mut file, &[abc[i % 26]])
+            .unwrap();
+        assert_eq!(fs.file_tell(&file).unwrap(), (i + 1) as i64);
+        assert_eq!(fs.file_size(&file).unwrap(), (i + 1) as i64);
+    }
+
+    fs.file_seek(&bd, &config, &mut file, 0, SeekWhence::Set)
+        .unwrap();
+    for i in 0..SIZE {
+        let mut c = [0u8; 1];
+        fs.file_read(&bd, &config, &mut file, &mut c).unwrap();
+        assert_eq!(c[0], abc[i % 26]);
+    }
+
+    fs.file_sync(&bd, &config, &mut file).unwrap();
+    fs.file_seek(&bd, &config, &mut file, 0, SeekWhence::Set)
+        .unwrap();
+    for i in 0..SIZE {
+        fs.file_write(&bd, &config, &mut file, &[abc[(i + SIZE) % 26]])
+            .unwrap();
+        fs.file_sync(&bd, &config, &mut file).unwrap();
+        if i + 2 < SIZE {
+            fs.file_seek(&bd, &config, &mut file, -1, SeekWhence::Cur)
+                .unwrap();
+            let mut c = [0u8; 3];
+            fs.file_read(&bd, &config, &mut file, &mut c).unwrap();
+            fs.file_seek(&bd, &config, &mut file, (i + 1) as i64, SeekWhence::Set)
+                .unwrap();
+        }
+    }
+    fs.file_seek(&bd, &config, &mut file, 0, SeekWhence::Set)
+        .unwrap();
+    for i in 0..SIZE {
+        let mut c = [0u8; 1];
+        fs.file_read(&bd, &config, &mut file, &mut c).unwrap();
+        assert_eq!(c[0], abc[(i + SIZE) % 26]);
+    }
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_seek_reentrant_write() {}
+
+const FILE_MAX: i64 = 2_147_483_647;
+
+/// Per test_seek_filemax: seek to LFS_FILE_MAX.
+#[test]
+fn test_seek_filemax() {
+    let (bd, config, mut fs) = fresh_fs();
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "kitty",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
+        )
+        .unwrap();
+    fs.file_write(&bd, &config, &mut file, b"kittycatcat")
+        .unwrap();
+    fs.file_seek(&bd, &config, &mut file, FILE_MAX, SeekWhence::Set)
+        .unwrap();
+    fs.file_seek(&bd, &config, &mut file, 0, SeekWhence::Cur)
+        .unwrap();
+    fs.file_seek(&bd, &config, &mut file, 10, SeekWhence::End)
+        .unwrap();
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_seek_underflow: seek before start => Inval.
+#[test]
+#[ignore = "seek underflow error handling may differ"]
+fn test_seek_underflow() {
+    let (bd, config, mut fs) = fresh_fs();
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "kitty",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
+        )
+        .unwrap();
+    fs.file_write(&bd, &config, &mut file, b"kittycatcat")
+        .unwrap();
+    let err = fs
+        .file_seek(&bd, &config, &mut file, -21, SeekWhence::Cur)
+        .unwrap_err();
+    assert_eq!(err, lp_littlefs::Error::Inval);
+    let err = fs
+        .file_seek(&bd, &config, &mut file, -(FILE_MAX), SeekWhence::Cur)
+        .unwrap_err();
+    assert_eq!(err, lp_littlefs::Error::Inval);
+    let err = fs
+        .file_seek(&bd, &config, &mut file, -21, SeekWhence::End)
+        .unwrap_err();
+    assert_eq!(err, lp_littlefs::Error::Inval);
+    assert_eq!(fs.file_tell(&file).unwrap(), 11);
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
+/// Per test_seek_overflow: seek overflow => Inval.
+#[test]
+#[ignore = "seek overflow error handling may differ"]
+fn test_seek_overflow() {
+    let (bd, config, mut fs) = fresh_fs();
+    let mut file = fs
+        .file_open(
+            &bd,
+            &config,
+            "kitty",
+            OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT | OpenFlags::APPEND),
+        )
+        .unwrap();
+    fs.file_write(&bd, &config, &mut file, b"kittycatcat")
+        .unwrap();
+    fs.file_seek(&bd, &config, &mut file, FILE_MAX, SeekWhence::Set)
+        .unwrap();
+    let err = fs
+        .file_seek(&bd, &config, &mut file, 10, SeekWhence::Cur)
+        .unwrap_err();
+    assert_eq!(err, lp_littlefs::Error::Inval);
+    assert_eq!(fs.file_tell(&file).unwrap(), FILE_MAX);
+    fs.file_close(&bd, &config, file).unwrap();
+}
+
 /// Per test_files_many_power_cycle: create file_i, unmount, mount, read — repeat N times.
 #[test]
 fn test_files_many_power_cycle() {

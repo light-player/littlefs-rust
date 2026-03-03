@@ -552,3 +552,214 @@ fn test_dirs_file_rename() {
     names.sort();
     assert_eq!(names, ["x000", "x001", "x002", "x003", "x004"]);
 }
+
+// --- test_dirs_kitty_seek ---
+// Upstream: dirs_many_creation in hello/, then seek/tell/rewind per entry
+#[test]
+#[ignore = "dir_seek/dir_tell/dir_rewind not implemented"]
+fn test_dirs_kitty_seek() {
+    init_log();
+    let (bd, config, mut lfs) = fresh_fs();
+
+    lfs.mkdir(&bd, &config, "hello").unwrap();
+    for i in 0..4 {
+        lfs.mkdir(&bd, &config, &format!("hello/kitty{i:03}"))
+            .unwrap_or_else(|e| panic!("mkdir hello/kitty{i:03} failed: {e:?}"));
+    }
+    lfs.unmount(&bd, &config).unwrap();
+
+    for j in 0..4 {
+        lfs.mount(&bd, &config).unwrap();
+        let mut dir = lfs.dir_open(&bd, &config, "hello").unwrap();
+        let mut info = Info::new(FileType::Reg, 0);
+
+        lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+        assert_eq!(info.name().unwrap(), ".");
+        lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+        assert_eq!(info.name().unwrap(), "..");
+
+        for i in 0..j {
+            lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+            assert_eq!(info.name().unwrap(), &format!("kitty{i:03}"));
+        }
+
+        let pos = lfs.dir_tell(&bd, &config, &dir).unwrap();
+        assert!(pos >= 0);
+
+        lfs.dir_seek(&bd, &config, &mut dir, pos as u32).unwrap();
+        lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+        assert_eq!(info.name().unwrap(), &format!("kitty{j:03}"));
+
+        lfs.dir_rewind(&bd, &config, &mut dir).unwrap();
+        lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+        assert_eq!(info.name().unwrap(), ".");
+
+        lfs.dir_close(dir).unwrap();
+        lfs.unmount(&bd, &config).unwrap();
+    }
+}
+
+// --- test_dirs_toot_seek ---
+// Upstream: dirs in root, seek/tell/rewind on "/"
+#[test]
+#[ignore = "dir_seek/dir_tell/dir_rewind not implemented"]
+fn test_dirs_toot_seek() {
+    init_log();
+    let (bd, config, mut lfs) = fresh_fs();
+
+    for i in 0..4 {
+        lfs.mkdir(&bd, &config, &format!("hi{i:03}"))
+            .unwrap_or_else(|e| panic!("mkdir hi{i:03} failed: {e:?}"));
+    }
+    lfs.unmount(&bd, &config).unwrap();
+
+    for j in 0..4 {
+        lfs.mount(&bd, &config).unwrap();
+        let mut dir = lfs.dir_open(&bd, &config, "/").unwrap();
+        let mut info = Info::new(FileType::Reg, 0);
+
+        lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+        assert_eq!(info.name().unwrap(), ".");
+        lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+        assert_eq!(info.name().unwrap(), "..");
+
+        for i in 0..j {
+            lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+            assert_eq!(info.name().unwrap(), &format!("hi{i:03}"));
+        }
+
+        let pos = lfs.dir_tell(&bd, &config, &dir).unwrap();
+        assert!(pos >= 0);
+
+        lfs.dir_seek(&bd, &config, &mut dir, pos as u32).unwrap();
+        lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+        assert_eq!(info.name().unwrap(), &format!("hi{j:03}"));
+
+        lfs.dir_rewind(&bd, &config, &mut dir).unwrap();
+        lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+        assert_eq!(info.name().unwrap(), ".");
+
+        lfs.dir_close(dir).unwrap();
+        lfs.unmount(&bd, &config).unwrap();
+    }
+}
+
+// --- test_dirs_many_reentrant ---
+// Upstream: mkdir hi*, remove hello*, dir_read, rename hi*->hello*, dir_read, remove hello*, dir_read.
+// Uses reentrant=true (powerloss at random points).
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_dirs_many_reentrant() {
+    init_log();
+    let (bd, config, mut lfs) = fresh_fs();
+
+    for i in 0..5 {
+        let _ = lfs.mkdir(&bd, &config, &format!("hi{i:03}"));
+    }
+
+    for i in 0..5 {
+        let _ = lfs.remove(&bd, &config, &format!("hello{i:03}"));
+    }
+
+    let mut dir = lfs.dir_open(&bd, &config, "/").unwrap();
+    let mut info = Info::new(FileType::Reg, 0);
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    assert!(matches!(info.typ, FileType::Dir));
+    assert_eq!(info.name().unwrap(), ".");
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    assert_eq!(info.name().unwrap(), "..");
+    for i in 0..5 {
+        let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+        assert_eq!(info.name().unwrap(), &format!("hi{i:03}"));
+    }
+    let n = lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+    assert_eq!(n, 0);
+    lfs.dir_close(dir).unwrap();
+
+    for i in 0..5 {
+        lfs.rename(&bd, &config, &format!("hi{i:03}"), &format!("hello{i:03}"))
+            .unwrap();
+    }
+
+    let mut dir = lfs.dir_open(&bd, &config, "/").unwrap();
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    for i in 0..5 {
+        let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+        assert_eq!(info.name().unwrap(), &format!("hello{i:03}"));
+    }
+    let n = lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+    assert_eq!(n, 0);
+    lfs.dir_close(dir).unwrap();
+
+    for i in 0..5 {
+        lfs.remove(&bd, &config, &format!("hello{i:03}")).unwrap();
+    }
+
+    let mut dir = lfs.dir_open(&bd, &config, "/").unwrap();
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    let n = lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+    assert_eq!(n, 0);
+    lfs.dir_close(dir).unwrap();
+
+    lfs.unmount(&bd, &config).unwrap();
+}
+
+// --- test_dirs_file_reentrant ---
+// Upstream: create hi* files, remove hello*, dir_read, rename hi*->hello*, dir_read, remove hello*.
+// Uses reentrant=true (powerloss at random points).
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_dirs_file_reentrant() {
+    init_log();
+    let (bd, config, mut lfs) = fresh_fs();
+
+    for i in 0..5 {
+        let file = lfs
+            .file_open(
+                &bd,
+                &config,
+                &format!("hi{i:03}"),
+                OpenFlags::new(OpenFlags::WRONLY | OpenFlags::CREAT),
+            )
+            .unwrap();
+        lfs.file_close(&bd, &config, file).unwrap();
+    }
+
+    for i in 0..5 {
+        let _ = lfs.remove(&bd, &config, &format!("hello{i:03}"));
+    }
+
+    let mut dir = lfs.dir_open(&bd, &config, "/").unwrap();
+    let mut info = Info::new(FileType::Reg, 0);
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    for i in 0..5 {
+        let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+        assert_eq!(info.name().unwrap(), &format!("hi{i:03}"));
+    }
+    let n = lfs.dir_read(&bd, &config, &mut dir, &mut info).unwrap();
+    assert_eq!(n, 0);
+    lfs.dir_close(dir).unwrap();
+
+    for i in 0..5 {
+        lfs.rename(&bd, &config, &format!("hi{i:03}"), &format!("hello{i:03}"))
+            .unwrap();
+    }
+
+    let mut dir = lfs.dir_open(&bd, &config, "/").unwrap();
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+    for i in 0..5 {
+        let _ = lfs.dir_read(&bd, &config, &mut dir, &mut info);
+        assert_eq!(info.name().unwrap(), &format!("hello{i:03}"));
+    }
+    lfs.dir_close(dir).unwrap();
+
+    for i in 0..5 {
+        lfs.remove(&bd, &config, &format!("hello{i:03}")).unwrap();
+    }
+
+    lfs.unmount(&bd, &config).unwrap();
+}

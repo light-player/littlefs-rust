@@ -242,6 +242,48 @@ impl LittleFs {
         Ok(())
     }
 
+    /// Get custom attribute. Stub: not implemented, returns Error::Inval.
+    /// Per lfs_getattr (lfs.h).
+    #[allow(dead_code)]
+    pub fn getattr<B: BlockDevice>(
+        &self,
+        _bd: &B,
+        _config: &Config,
+        _path: &str,
+        _type_: u8,
+        _buffer: &mut [u8],
+    ) -> Result<i32, Error> {
+        Err(Error::Inval)
+    }
+
+    /// Set custom attribute. Stub: not implemented, returns Error::Inval.
+    /// Per lfs_setattr (lfs.h).
+    #[allow(dead_code)]
+    pub fn setattr<B: BlockDevice>(
+        &mut self,
+        _bd: &B,
+        _config: &Config,
+        _path: &str,
+        _type_: u8,
+        _buffer: &[u8],
+        _size: usize,
+    ) -> Result<(), Error> {
+        Err(Error::Inval)
+    }
+
+    /// Remove custom attribute. Stub: not implemented, returns Error::Inval.
+    /// Per lfs_removeattr (lfs.h).
+    #[allow(dead_code)]
+    pub fn removeattr<B: BlockDevice>(
+        &mut self,
+        _bd: &B,
+        _config: &Config,
+        _path: &str,
+        _type_: u8,
+    ) -> Result<(), Error> {
+        Err(Error::Inval)
+    }
+
     pub fn stat<B: BlockDevice>(&self, bd: &B, config: &Config, path: &str) -> Result<Info, Error> {
         trace!("stat path={:?}", path);
         let state = self.require_mounted()?;
@@ -320,6 +362,64 @@ impl LittleFs {
 
     pub fn dir_close(&self, _dir: Dir) -> Result<(), Error> {
         Ok(())
+    }
+
+    /// Seek directory to offset. Stub: not implemented, returns Error::Inval.
+    /// Per lfs_dir_seek (lfs.h).
+    #[allow(dead_code)]
+    pub fn dir_seek<B: BlockDevice>(
+        &self,
+        _bd: &B,
+        _config: &Config,
+        _dir: &mut Dir,
+        _off: u32,
+    ) -> Result<(), Error> {
+        let _ = self.require_mounted()?;
+        Err(Error::Inval)
+    }
+
+    /// Tell current directory offset. Stub: not implemented, returns Error::Inval.
+    /// Per lfs_dir_tell (lfs.h).
+    #[allow(dead_code)]
+    pub fn dir_tell<B: BlockDevice>(
+        &self,
+        _bd: &B,
+        _config: &Config,
+        _dir: &Dir,
+    ) -> Result<i32, Error> {
+        let _ = self.require_mounted()?;
+        Err(Error::Inval)
+    }
+
+    /// Rewind directory to start. Stub: not implemented, returns Error::Inval.
+    /// Per lfs_dir_rewind (lfs.h).
+    #[allow(dead_code)]
+    pub fn dir_rewind<B: BlockDevice>(
+        &self,
+        _bd: &B,
+        _config: &Config,
+        _dir: &mut Dir,
+    ) -> Result<(), Error> {
+        let _ = self.require_mounted()?;
+        Err(Error::Inval)
+    }
+
+    /// Open file with extra config (attrs). Stub: attrs not implemented, returns Error::Inval.
+    /// Per lfs_file_opencfg (lfs.h).
+    #[allow(dead_code)]
+    pub fn file_opencfg<B: BlockDevice>(
+        &mut self,
+        bd: &B,
+        config: &Config,
+        path: &str,
+        flags: crate::info::OpenFlags,
+        file_config: &crate::info::FileOpenConfig,
+    ) -> Result<file::File, Error> {
+        if file_config.attr_count > 0 {
+            let _ = (bd, config, path, flags);
+            return Err(Error::Inval);
+        }
+        self.file_open(bd, config, path, flags)
     }
 
     pub fn file_open<B: BlockDevice>(
@@ -924,5 +1024,11 @@ impl Dir {
     #[doc(hidden)]
     pub fn revision(&self) -> u32 {
         self.mdir.rev
+    }
+
+    /// Write offset in the directory block. For power-loss simulation (partial_prog).
+    #[doc(hidden)]
+    pub fn off(&self) -> usize {
+        self.mdir.off
     }
 }

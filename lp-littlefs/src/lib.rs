@@ -20,7 +20,7 @@ pub use block::{BlockDevice, PowerLossBlockDevice, RamBlockDevice};
 pub use config::Config;
 pub use error::Error;
 pub use fs::{create_inline_file, Dir, File, LittleFs};
-pub use info::{FileType, FsInfo, Info, OpenFlags, SeekWhence};
+pub use info::{FileOpenConfig, FileType, FsInfo, Info, OpenFlags, SeekWhence, ATTR_MAX};
 pub use superblock::{MAGIC, MAGIC_OFFSET};
 
 #[cfg(test)]

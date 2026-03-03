@@ -118,3 +118,70 @@ fn test_superblocks_stat() {
     assert_eq!(info.file_max, 2_147_483_647);
     assert_eq!(info.attr_max, 1022);
 }
+
+// --- test_superblocks_mount_unknown_block_count ---
+// Upstream: mount with block_count=0 (unknown), then query
+#[test]
+#[ignore = "block_count=0 / unknown geometry not supported"]
+fn test_superblocks_mount_unknown_block_count() {}
+
+// --- test_superblocks_reentrant_format ---
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_superblocks_reentrant_format() {}
+
+// --- test_superblocks_stat_tweaked ---
+#[test]
+#[ignore = "custom block_size/block_count at format may not match"]
+fn test_superblocks_stat_tweaked() {}
+
+// --- test_superblocks_expand ---
+// Upstream: format with fewer blocks, then expand
+#[test]
+#[ignore = "fs_grow/block_count change not implemented"]
+fn test_superblocks_expand() {}
+
+// --- test_superblocks_magic_expand ---
+#[test]
+#[ignore = "fs_grow not implemented"]
+fn test_superblocks_magic_expand() {}
+
+// --- test_superblocks_expand_power_cycle ---
+#[test]
+#[ignore = "fs_grow + powerloss not implemented"]
+fn test_superblocks_expand_power_cycle() {}
+
+// --- test_superblocks_reentrant_expand ---
+#[test]
+#[ignore = "fs_grow + powerloss not implemented"]
+fn test_superblocks_reentrant_expand() {}
+
+// --- test_superblocks_unknown_blocks ---
+#[test]
+#[ignore = "block_count=0 not supported"]
+fn test_superblocks_unknown_blocks() {}
+
+// --- test_superblocks_fewer_blocks ---
+#[test]
+#[ignore = "shrink/grow not implemented"]
+fn test_superblocks_fewer_blocks() {}
+
+// --- test_superblocks_more_blocks ---
+#[test]
+#[ignore = "grow not implemented"]
+fn test_superblocks_more_blocks() {}
+
+// --- test_superblocks_grow ---
+#[test]
+#[ignore = "fs_grow not implemented"]
+fn test_superblocks_grow() {}
+
+// --- test_superblocks_shrink ---
+#[test]
+#[ignore = "fs_shrink not implemented"]
+fn test_superblocks_shrink() {}
+
+// --- test_superblocks_metadata_max ---
+#[test]
+#[ignore = "metadata_max config not exercised"]
+fn test_superblocks_metadata_max() {}
