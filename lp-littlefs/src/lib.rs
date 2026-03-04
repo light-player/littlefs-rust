@@ -22,6 +22,7 @@ mod lfs_gstate;
 mod lfs_info;
 mod lfs_superblock;
 mod lfs_type;
+mod macros;
 mod tag;
 mod types;
 mod util;

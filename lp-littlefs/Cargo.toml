@@ -20,7 +20,7 @@ env_logger = "0.10"
 default = ["alloc"]
 alloc = []
 std = []
-trace = ["log"]
+log = ["dep:log"]
 # LittleFS compile-time flags (match C -DLFS_*)
 readonly = []      # Omit all write operations
 no_malloc = []     # lfs_file_open disabled; use lfs_file_opencfg only
