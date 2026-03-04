@@ -1,5 +1,19 @@
 //! remove. Per lfs.c remove_.
-//
+
+use crate::dir::commit::{lfs_dir_commit, lfs_dir_drop};
+use crate::dir::fetch::lfs_dir_fetch;
+use crate::dir::find::lfs_dir_find;
+use crate::dir::traverse::lfs_dir_get;
+use crate::dir::{LfsMdir, LfsMlist};
+use crate::error::{LFS_ERR_INVAL, LFS_ERR_NOTEMPTY};
+use crate::fs::parent::lfs_fs_pred;
+use crate::fs::superblock::{lfs_fs_forceconsistency, lfs_fs_preporphans};
+use crate::lfs_gstate::lfs_gstate_hasorphans;
+use crate::lfs_type::lfs_type::{LFS_TYPE_DELETE, LFS_TYPE_DIR, LFS_TYPE_STRUCT};
+use crate::tag::{lfs_mattr, lfs_mktag, lfs_tag_id, lfs_tag_type3};
+use crate::types::lfs_block_t;
+use crate::util::lfs_pair_fromle32;
+
 /// Per lfs.c lfs_remove_ (lines 3880-3960)
 ///
 /// C:
@@ -86,6 +100,96 @@
 ///
 /// #ifndef LFS_READONLY
 /// ```
-pub fn lfs_remove_(_lfs: *mut super::lfs::Lfs, _path: *const i8) -> i32 {
-    todo!("lfs_remove_")
+pub fn lfs_remove_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
+    let err = lfs_fs_forceconsistency(lfs);
+    if err != 0 {
+        return err;
+    }
+
+    unsafe {
+        let mut cwd = LfsMdir {
+            pair: [0, 0],
+            rev: 0,
+            off: 0,
+            etag: 0,
+            count: 0,
+            erased: false,
+            split: false,
+            tail: [(*lfs).root[0], (*lfs).root[1]],
+        };
+
+        let mut path_ptr = path;
+        let tag = lfs_dir_find(lfs, &mut cwd, &mut path_ptr, core::ptr::null_mut());
+        if tag < 0 || lfs_tag_id(tag as u32) == 0x3ff {
+            return if tag < 0 { tag } else { LFS_ERR_INVAL };
+        }
+
+        let mut dir = LfsMlist {
+            next: (*lfs).mlist,
+            id: 0,
+            type_: 0,
+            m: core::mem::zeroed(),
+        };
+
+        if u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_DIR {
+            let mut pair: [lfs_block_t; 2] = [0, 0];
+            let res = lfs_dir_get(
+                lfs,
+                &cwd,
+                lfs_mktag(0x700, 0x3ff, 0),
+                lfs_mktag(LFS_TYPE_STRUCT, lfs_tag_id(tag as u32) as u32, 8),
+                pair.as_mut_ptr() as *mut core::ffi::c_void,
+            );
+            if res < 0 {
+                return res;
+            }
+            lfs_pair_fromle32(&mut pair);
+
+            let err = lfs_dir_fetch(lfs, &mut dir.m, &pair);
+            if err != 0 {
+                return err;
+            }
+
+            if dir.m.count > 0 || dir.m.split {
+                return LFS_ERR_NOTEMPTY;
+            }
+
+            let err = lfs_fs_preporphans(lfs, 1);
+            if err != 0 {
+                return err;
+            }
+
+            dir.type_ = 0;
+            dir.id = 0;
+            (*lfs).mlist = &dir as *const _ as *mut _;
+        }
+
+        let attrs = [lfs_mattr {
+            tag: lfs_mktag(LFS_TYPE_DELETE, lfs_tag_id(tag as u32) as u32, 0),
+            buffer: core::ptr::null(),
+        }];
+        let err = lfs_dir_commit(lfs, &mut cwd, attrs.as_ptr() as *const _, 1);
+        (*lfs).mlist = dir.next;
+        if err != 0 {
+            return err;
+        }
+
+        if lfs_gstate_hasorphans(&(*lfs).gstate) {
+            crate::lfs_assert!(u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_DIR);
+
+            let err = lfs_fs_preporphans(lfs, -1);
+            if err != 0 {
+                return err;
+            }
+
+            let err = lfs_fs_pred(lfs, &dir.m.pair, &mut cwd);
+            if err != 0 {
+                return err;
+            }
+
+            lfs_dir_drop(lfs, &mut cwd, &dir.m)
+        } else {
+            0
+        }
+    }
 }

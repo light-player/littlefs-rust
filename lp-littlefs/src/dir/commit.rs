@@ -581,12 +581,26 @@ pub fn lfs_dir_alloc(lfs: *mut crate::fs::Lfs, dir: *mut LfsMdir) -> i32 {
 ///     return 0;
 /// }
 /// ```
-pub fn lfs_dir_drop(
-    _lfs: *const core::ffi::c_void,
-    _dir: *mut LfsMdir,
-    _tail: *const LfsMdir,
-) -> i32 {
-    todo!("lfs_dir_drop")
+pub fn lfs_dir_drop(lfs: *mut crate::fs::Lfs, dir: *mut LfsMdir, tail: *const LfsMdir) -> i32 {
+    use crate::lfs_type::lfs_type::LFS_TYPE_TAIL;
+    use crate::tag::lfs_mktag;
+    use crate::util::lfs_pair_tole32;
+
+    unsafe {
+        let err = lfs_dir_getgstate(lfs, tail, &mut (*lfs).gdelta);
+        if err != 0 {
+            return err;
+        }
+
+        let tail_ref = &*tail;
+        let mut tail_pair = tail_ref.tail;
+        lfs_pair_tole32(&mut tail_pair);
+        let attrs = [crate::tag::lfs_mattr {
+            tag: lfs_mktag(LFS_TYPE_TAIL + if tail_ref.split { 1 } else { 0 }, 0x3ff, 8),
+            buffer: tail_pair.as_ptr() as *const core::ffi::c_void,
+        }];
+        lfs_dir_commit(lfs, dir, attrs.as_ptr() as *const _, 1)
+    }
 }
 
 /// Per lfs.c lfs_dir_split (lines 1880-1913)

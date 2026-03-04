@@ -54,8 +54,32 @@ pub fn lfs_alloc_drop(lfs: *mut Lfs) {
 /// }
 /// #endif
 /// ```
-pub fn lfs_alloc_lookahead(_p: *mut Lfs, _block: lfs_block_t) -> i32 {
-    todo!("lfs_alloc_lookahead")
+/// Callback wrapper for lfs_fs_traverse_: C expects (void* data, block), we pass lfs as data.
+unsafe extern "C" fn lfs_alloc_lookahead_cb(
+    data: *mut core::ffi::c_void,
+    block: lfs_block_t,
+) -> i32 {
+    lfs_alloc_lookahead(data as *mut Lfs, block)
+}
+
+pub fn lfs_alloc_lookahead(p: *mut Lfs, block: lfs_block_t) -> i32 {
+    unsafe {
+        let lfs = &mut *p;
+        // off = ((block - start) + block_count) % block_count
+        let off = (block.wrapping_sub(lfs.lookahead.start)).wrapping_add(lfs.block_count)
+            % lfs.block_count;
+
+        if off < lfs.lookahead.size {
+            let buf = lfs.lookahead.buffer;
+            if !buf.is_null() {
+                // buffer[off/8] |= 1 << (off%8)
+                let byte_idx = (off / 8) as usize;
+                let bit = 1u8 << (off % 8);
+                *buf.add(byte_idx) |= bit;
+            }
+        }
+        0
+    }
 }
 
 /// Per lfs.c lfs_alloc_scan (lines 641-663)
@@ -87,8 +111,41 @@ pub fn lfs_alloc_lookahead(_p: *mut Lfs, _block: lfs_block_t) -> i32 {
 /// }
 /// #endif
 /// ```
-pub fn lfs_alloc_scan(_lfs: *mut Lfs) -> i32 {
-    todo!("lfs_alloc_scan")
+pub fn lfs_alloc_scan(lfs: *mut Lfs) -> i32 {
+    use crate::fs::traverse::lfs_fs_traverse_;
+    use crate::util::lfs_min;
+
+    unsafe {
+        let lfs_ref = &mut *lfs;
+        let cfg = lfs_ref.cfg.as_ref().expect("cfg");
+        let buf = lfs_ref.lookahead.buffer;
+        if buf.is_null() {
+            return crate::error::LFS_ERR_NOSPC;
+        }
+
+        // move lookahead buffer to the first unused block
+        lfs_ref.lookahead.start =
+            (lfs_ref.lookahead.start + lfs_ref.lookahead.next) % lfs_ref.block_count;
+        lfs_ref.lookahead.next = 0;
+        // note we limit the lookahead buffer to at most the amount of blocks
+        // checkpointed, this prevents the math in lfs_alloc from underflowing
+        lfs_ref.lookahead.size = lfs_min(8 * cfg.lookahead_size, lfs_ref.lookahead.ckpoint);
+
+        // find mask of free blocks from tree
+        core::ptr::write_bytes(buf, 0, cfg.lookahead_size as usize);
+
+        let err = lfs_fs_traverse_(
+            lfs,
+            Some(lfs_alloc_lookahead_cb),
+            lfs as *mut core::ffi::c_void,
+            true,
+        );
+        if err != 0 {
+            lfs_alloc_drop(lfs);
+            return err;
+        }
+        0
+    }
 }
 
 /// Per lfs.c lfs_alloc (lines 666-716)
@@ -153,21 +210,22 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
 
     unsafe {
         let lfs = &mut *lfs;
-        let cfg = &*lfs.cfg;
         let buf = lfs.lookahead.buffer;
         if buf.is_null() {
             return LFS_ERR_NOSPC;
         }
 
         loop {
+            // scan our lookahead buffer for free blocks
             while lfs.lookahead.next < lfs.lookahead.size {
-                let byte_idx = (lfs.lookahead.next / 8) as usize;
-                let bit_mask = 1u8 << (lfs.lookahead.next % 8);
-                let used = (*buf.add(byte_idx)) & bit_mask != 0;
-
-                if !used {
+                if (*buf.add((lfs.lookahead.next / 8) as usize)) & (1u8 << (lfs.lookahead.next % 8))
+                    == 0
+                {
+                    // found a free block
                     *block = (lfs.lookahead.start + lfs.lookahead.next) % lfs.block_count;
 
+                    // eagerly find next free block to maximize how many blocks
+                    // lfs_alloc_ckpoint makes available for scanning
                     loop {
                         lfs.lookahead.next += 1;
                         lfs.lookahead.ckpoint = lfs.lookahead.ckpoint.wrapping_sub(1);
@@ -187,6 +245,11 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
                 lfs.lookahead.ckpoint = lfs.lookahead.ckpoint.wrapping_sub(1);
             }
 
+            // In order to keep our block allocator from spinning forever when our
+            // filesystem is full, we mark points where there are no in-flight
+            // allocations with a checkpoint before starting a set of allocations.
+            // If we've looked at all blocks since the last checkpoint, we report
+            // the filesystem as out of storage.
             if lfs.lookahead.ckpoint == 0 {
                 crate::lfs_error!(
                     "No more free space 0x{:08x}",
@@ -195,6 +258,8 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
                 return LFS_ERR_NOSPC;
             }
 
+            // No blocks in our lookahead buffer, we need to scan the filesystem for
+            // unused blocks in the next lookahead window.
             let err = lfs_alloc_scan(lfs);
             if err != 0 {
                 return err;

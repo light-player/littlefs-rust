@@ -242,6 +242,52 @@ pub fn dump_block_hex(block: &[u8], label: &str, len: usize) {
     }
 }
 
+/// Null-terminated path for lfs_* calls. Caller keeps vec in scope while using pointer.
+pub fn path_bytes(s: &str) -> Vec<u8> {
+    let mut v: Vec<u8> = s.bytes().collect();
+    v.push(0);
+    v
+}
+
+/// Read directory entry names (excluding "." and "..") from path. For use in dir tests.
+pub fn dir_entry_names(
+    lfs: *mut lp_littlefs::Lfs,
+    _config: *const LfsConfig,
+    path_str: &str,
+) -> Result<Vec<String>, i32> {
+    use lp_littlefs::{lfs_dir_close, lfs_dir_open, lfs_dir_read, LfsDir, LfsInfo};
+
+    let path = path_bytes(path_str);
+    let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
+    let err = lfs_dir_open(lfs, dir.as_mut_ptr(), path.as_ptr());
+    if err != 0 {
+        return Err(err);
+    }
+
+    let mut names = Vec::new();
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    loop {
+        let n = lfs_dir_read(lfs, dir.as_mut_ptr(), info.as_mut_ptr());
+        if n == 0 {
+            break;
+        }
+        if n < 0 {
+            let _ = lfs_dir_close(lfs, dir.as_mut_ptr());
+            return Err(n);
+        }
+        let info_ref = unsafe { &*info.as_ptr() };
+        let nul = info_ref.name.iter().position(|&b| b == 0).unwrap_or(256);
+        let name = core::str::from_utf8(&info_ref.name[..nul])
+            .unwrap_or("")
+            .to_string();
+        if name != "." && name != ".." {
+            names.push(name);
+        }
+    }
+    let _ = lfs_dir_close(lfs, dir.as_mut_ptr());
+    Ok(names)
+}
+
 /// Format fs, sync, return raw content of superblock blocks 0 and 1.
 /// Helper for debug tests. Caller must init_context before.
 pub fn format_and_read_superblock_blocks(env: &mut TestEnv) -> Result<(Vec<u8>, Vec<u8>), i32> {

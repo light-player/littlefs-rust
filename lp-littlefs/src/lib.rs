@@ -81,13 +81,13 @@ pub fn lfs_unmount(lfs: *mut Lfs) -> i32 {
 /// Remove a file or directory. Per lfs.h lfs_remove (lfs.c:6193-6195).
 #[inline(never)]
 pub fn lfs_remove(lfs: *mut Lfs, path: *const u8) -> i32 {
-    todo!("lfs_remove")
+    crate::fs::remove::lfs_remove_(lfs, path)
 }
 
 /// Rename or move a file or directory. Per lfs.h lfs_rename (lfs.c:6227-6231).
 #[inline(never)]
 pub fn lfs_rename(lfs: *mut Lfs, oldpath: *const u8, newpath: *const u8) -> i32 {
-    todo!("lfs_rename")
+    crate::fs::rename::lfs_rename_(lfs, oldpath, newpath)
 }
 
 /// Find info about a file or directory. Per lfs.h lfs_stat (lfs.c:6263-6267).
@@ -216,7 +216,7 @@ pub fn lfs_file_size(lfs: *mut Lfs, file: *mut LfsFile) -> lfs_soff_t {
 /// Create a directory. Per lfs.h lfs_mkdir (lfs.c:6503-6507).
 #[inline(never)]
 pub fn lfs_mkdir(lfs: *mut Lfs, path: *const u8) -> i32 {
-    todo!("lfs_mkdir")
+    crate::fs::mkdir::lfs_mkdir_(lfs, path)
 }
 
 /// Open a directory. Per lfs.h lfs_dir_open (lfs.c:6511-6515).

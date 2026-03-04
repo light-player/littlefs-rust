@@ -50,7 +50,7 @@ pub fn lfs_mlist_remove(lfs: *mut crate::fs::Lfs, mlist: *mut LfsMlist) {
     unsafe {
         let mut p = &mut (*lfs).mlist;
         while !(*p).is_null() {
-            if *p == mlist as *mut LfsMlist {
+            if core::ptr::eq(*p, mlist) {
                 *p = (*mlist).next;
                 break;
             }

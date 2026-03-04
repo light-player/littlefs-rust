@@ -2,6 +2,12 @@
 
 use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t};
 
+#[repr(C)]
+pub struct LfsCtz {
+    pub head: lfs_block_t,
+    pub size: lfs_size_t,
+}
+
 /// Per lfs.c lfs_ctz_fromle32 (lines 475-479)
 ///
 /// C:
@@ -11,8 +17,15 @@ use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t};
 ///     ctz->size = lfs_fromle32(ctz->size);
 /// }
 /// ```
-pub fn lfs_ctz_fromle32(_ctz: *mut core::ffi::c_void) {
-    todo!("lfs_ctz_fromle32")
+pub fn lfs_ctz_fromle32(ctz: *mut LfsCtz) {
+    if ctz.is_null() {
+        return;
+    }
+    unsafe {
+        let ctz = &mut *ctz;
+        ctz.head = crate::util::lfs_fromle32(ctz.head);
+        ctz.size = crate::util::lfs_fromle32(ctz.size);
+    }
 }
 
 /// Per lfs.c lfs_ctz_tole32 (lines 481-486)
@@ -25,8 +38,15 @@ pub fn lfs_ctz_fromle32(_ctz: *mut core::ffi::c_void) {
 /// }
 /// #endif
 /// ```
-pub fn lfs_ctz_tole32(_ctz: *mut core::ffi::c_void) {
-    todo!("lfs_ctz_tole32")
+pub fn lfs_ctz_tole32(ctz: *mut LfsCtz) {
+    if ctz.is_null() {
+        return;
+    }
+    unsafe {
+        let ctz = &mut *ctz;
+        ctz.head = crate::util::lfs_tole32(ctz.head);
+        ctz.size = crate::util::lfs_tole32(ctz.size);
+    }
 }
 
 /// Per lfs.c lfs_ctz_index (lines 2873-2884)
@@ -46,8 +66,24 @@ pub fn lfs_ctz_tole32(_ctz: *mut core::ffi::c_void) {
 ///     return i;
 /// }
 /// ```
-pub fn lfs_ctz_index(_lfs: *const core::ffi::c_void, _off: *mut lfs_off_t) -> i32 {
-    todo!("lfs_ctz_index")
+pub fn lfs_ctz_index(lfs: *const crate::fs::Lfs, off: *mut lfs_off_t) -> i32 {
+    use crate::util::lfs_popc;
+
+    if lfs.is_null() || off.is_null() {
+        return 0;
+    }
+    unsafe {
+        let size = *off;
+        let block_size = (*lfs).cfg.as_ref().expect("cfg").block_size;
+        let b = block_size - 8;
+        let mut i = size / b;
+        if i == 0 {
+            return 0;
+        }
+        i = (size - 4 * (lfs_popc(i - 1) + 2)) / b;
+        *off = size - b * i - 4 * lfs_popc(i);
+        i as i32
+    }
 }
 
 /// Per lfs.c lfs_ctz_find (lines 2886-2919)
@@ -145,15 +181,68 @@ pub fn lfs_ctz_find(
 /// }
 /// ```
 pub fn lfs_ctz_traverse(
-    _lfs: *const core::ffi::c_void,
-    _pcache: *mut core::ffi::c_void,
-    _rcache: *mut core::ffi::c_void,
-    _block: lfs_block_t,
-    _size: lfs_size_t,
-    _cb: Option<unsafe extern "C" fn(*mut core::ffi::c_void, lfs_block_t) -> i32>,
-    _data: *mut core::ffi::c_void,
+    lfs: *const crate::fs::Lfs,
+    _pcache: *const crate::bd::LfsCache,
+    rcache: *mut crate::bd::LfsCache,
+    head: lfs_block_t,
+    size: lfs_size_t,
+    cb: Option<unsafe extern "C" fn(*mut core::ffi::c_void, lfs_block_t) -> i32>,
+    data: *mut core::ffi::c_void,
 ) -> i32 {
-    todo!("lfs_ctz_traverse")
+    use crate::bd::bd::lfs_bd_read;
+    use crate::util::lfs_fromle32;
+
+    if size == 0 || cb.is_none() {
+        return 0;
+    }
+    let cb = cb.unwrap();
+
+    unsafe {
+        let mut index_off = size - 1;
+        let mut index = lfs_ctz_index(lfs, &mut index_off) as u32;
+        let mut current_head = head;
+        let lfs = lfs as *mut crate::fs::Lfs;
+
+        loop {
+            let err = cb(data, current_head);
+            if err != 0 {
+                return err;
+            }
+
+            if index == 0 {
+                return 0;
+            }
+
+            let count = (2 - (index & 1)) as usize;
+            let mut heads = [0u32; 2];
+            let read_size = (count * core::mem::size_of::<lfs_block_t>()) as u32;
+            let err = lfs_bd_read(
+                lfs,
+                core::ptr::null(),
+                &mut *rcache,
+                (*lfs).cfg.as_ref().expect("cfg").block_size,
+                current_head,
+                0,
+                heads.as_mut_ptr() as *mut u8,
+                read_size,
+            );
+            if err != 0 {
+                return err;
+            }
+            heads[0] = lfs_fromle32(heads[0]);
+            heads[1] = lfs_fromle32(heads[1]);
+
+            for i in 0..count - 1 {
+                let err = cb(data, heads[i]);
+                if err != 0 {
+                    return err;
+                }
+            }
+
+            current_head = heads[count - 1];
+            index = index.wrapping_sub(count as u32);
+        }
+    }
 }
 
 /// Per lfs.c lfs_ctz_extend (lines 2921-3018)

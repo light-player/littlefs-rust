@@ -86,6 +86,16 @@ pub fn lfs_fs_pred(
     }
 }
 
+/// C: lfs.c:4835-4853
+#[repr(C)]
+pub struct LfsFsParentMatch {
+    pub lfs: *mut crate::fs::Lfs,
+    pub pair: [crate::types::lfs_block_t; 2],
+}
+
+const LFS_CMP_EQ: i32 = 0;
+const LFS_CMP_LT: i32 = -1;
+
 /// Per lfs.c lfs_fs_parent_match (lines 4835-4853)
 ///
 /// C:
@@ -96,25 +106,47 @@ pub fn lfs_fs_pred(
 ///     lfs_t *lfs = find->lfs;
 ///     const struct lfs_diskoff *disk = buffer;
 ///     (void)tag;
-///
 ///     lfs_block_t child[2];
-///     int err = lfs_bd_read(lfs,
-///             &lfs->pcache, &lfs->rcache, lfs->cfg->block_size,
-///             disk->block, disk->off, &child, sizeof(child));
-///     if (err) {
-///         return err;
-///     }
-///
+///     int err = lfs_bd_read(lfs, ...);
 ///     lfs_pair_fromle32(child);
 ///     return (lfs_pair_cmp(child, find->pair) == 0) ? LFS_CMP_EQ : LFS_CMP_LT;
 /// }
-/// #endif
 /// ```
-pub fn lfs_fs_parent_match(
-    _data: *mut core::ffi::c_void,
-    _block: crate::types::lfs_block_t,
+pub unsafe extern "C" fn lfs_fs_parent_match(
+    data: *mut core::ffi::c_void,
+    _tag: crate::types::lfs_tag_t,
+    buffer: *const core::ffi::c_void,
 ) -> i32 {
-    todo!("lfs_fs_parent_match")
+    use crate::bd::bd::lfs_bd_read;
+    use crate::tag::lfs_diskoff;
+    use crate::util::{lfs_pair_cmp, lfs_pair_fromle32};
+
+    if data.is_null() || buffer.is_null() {
+        return LFS_CMP_LT;
+    }
+    let find = &*(data as *const LfsFsParentMatch);
+    let disk = &*(buffer as *const lfs_diskoff);
+
+    let mut child: [crate::types::lfs_block_t; 2] = [0, 0];
+    let err = lfs_bd_read(
+        find.lfs,
+        core::ptr::null(),
+        &mut (*find.lfs).rcache,
+        (*find.lfs).cfg.as_ref().expect("cfg").block_size,
+        disk.block,
+        disk.off,
+        child.as_mut_ptr() as *mut u8,
+        8,
+    );
+    if err != 0 {
+        return err;
+    }
+    lfs_pair_fromle32(&mut child);
+    if lfs_pair_cmp(&child, &find.pair) == 0 {
+        LFS_CMP_EQ
+    } else {
+        LFS_CMP_LT
+    }
 }
 
 /// Per lfs.c lfs_fs_parent (lines 4856-4892)
@@ -154,9 +186,51 @@ pub fn lfs_fs_parent_match(
 /// #endif
 /// ```
 pub fn lfs_fs_parent(
-    _lfs: *mut crate::fs::Lfs,
-    _pair: *const [crate::types::lfs_block_t; 2],
-    _parent: *mut crate::dir::LfsMdir,
+    lfs: *mut crate::fs::Lfs,
+    pair: *const [crate::types::lfs_block_t; 2],
+    parent: *mut crate::dir::LfsMdir,
 ) -> crate::types::lfs_stag_t {
-    todo!("lfs_fs_parent")
+    use crate::dir::fetch::lfs_dir_fetchmatch;
+    use crate::fs::mount::{lfs_tortoise_detectcycles, LfsTortoise};
+    use crate::lfs_type::lfs_type::LFS_TYPE_DIRSTRUCT;
+    use crate::tag::lfs_mktag;
+    use crate::types::{lfs_block_t, LFS_BLOCK_NULL};
+    use crate::util::lfs_pair_isnull;
+
+    unsafe {
+        (*parent).tail = [0, 1];
+        let mut tortoise = LfsTortoise {
+            pair: [LFS_BLOCK_NULL, LFS_BLOCK_NULL],
+            i: 1,
+            period: 1,
+        };
+
+        while !lfs_pair_isnull(&(*parent).tail) {
+            let err = lfs_tortoise_detectcycles(parent, &mut tortoise);
+            if err < 0 {
+                return err;
+            }
+
+            let find_match = LfsFsParentMatch {
+                lfs,
+                pair: [(*pair)[0], (*pair)[1]],
+            };
+            let tag = lfs_dir_fetchmatch(
+                lfs as *mut _ as *const core::ffi::c_void,
+                parent,
+                &(*parent).tail as *const _,
+                lfs_mktag(0x7ff, 0, 0x3ff),
+                lfs_mktag(LFS_TYPE_DIRSTRUCT, 0, 8),
+                core::ptr::null_mut(),
+                Some(lfs_fs_parent_match),
+                &find_match as *const _ as *mut core::ffi::c_void,
+            );
+
+            if tag != 0 && tag != crate::error::LFS_ERR_NOENT {
+                return tag;
+            }
+        }
+
+        crate::error::LFS_ERR_NOENT
+    }
 }

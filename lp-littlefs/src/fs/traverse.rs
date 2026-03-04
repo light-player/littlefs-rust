@@ -107,11 +107,113 @@
 /// }
 ///
 /// ```
+/// Translation docs: Traverses all blocks in use by the filesystem, calling cb for each.
+/// Used by block allocator (lfs_alloc_scan) to build the free-block bitmap.
+/// includeorphans: when true, include directory struct blocks in the traversal.
+///
+/// C: lfs.c:4693-4794
 pub fn lfs_fs_traverse_(
-    _lfs: *mut super::lfs::Lfs,
-    _cb: Option<unsafe extern "C" fn(*mut core::ffi::c_void, crate::types::lfs_block_t) -> i32>,
-    _data: *mut core::ffi::c_void,
-    _powerloss: bool,
+    lfs: *mut super::lfs::Lfs,
+    cb: Option<unsafe extern "C" fn(*mut core::ffi::c_void, crate::types::lfs_block_t) -> i32>,
+    data: *mut core::ffi::c_void,
+    includeorphans: bool,
 ) -> i32 {
-    todo!("lfs_fs_traverse_")
+    use crate::dir::fetch::lfs_dir_fetch;
+    use crate::dir::traverse::lfs_dir_get;
+    use crate::error::LFS_ERR_CORRUPT;
+    use crate::file::ctz::lfs_ctz_traverse;
+    use crate::fs::mount::{lfs_tortoise_detectcycles, LfsTortoise};
+    use crate::lfs_type::lfs_type::{LFS_TYPE_CTZSTRUCT, LFS_TYPE_DIRSTRUCT};
+    use crate::tag::{lfs_mktag, lfs_tag_type3};
+    use crate::types::{lfs_block_t, LFS_BLOCK_NULL};
+    use crate::util::{lfs_pair_fromle32, lfs_pair_isnull};
+
+    if cb.is_none() {
+        return 0;
+    }
+    let cb = cb.unwrap();
+
+    unsafe {
+        // iterate over metadata pairs
+        let mut dir = crate::dir::LfsMdir {
+            pair: [0, 0],
+            rev: 0,
+            off: 0,
+            etag: 0,
+            count: 0,
+            erased: false,
+            split: false,
+            tail: [0, 1],
+        };
+        let mut tortoise = LfsTortoise {
+            pair: [LFS_BLOCK_NULL, LFS_BLOCK_NULL],
+            i: 1,
+            period: 1,
+        };
+
+        while !lfs_pair_isnull(&dir.tail) {
+            let err = lfs_tortoise_detectcycles(&dir, &mut tortoise);
+            if err < 0 {
+                return LFS_ERR_CORRUPT;
+            }
+
+            for i in 0..2 {
+                let err = cb(data, dir.tail[i]);
+                if err != 0 {
+                    return err;
+                }
+            }
+
+            // iterate through ids in directory
+            let err = lfs_dir_fetch(lfs, &mut dir, &dir.tail);
+            if err != 0 {
+                return err;
+            }
+
+            for id in 0..dir.count {
+                let mut raw: [lfs_block_t; 2] = [0, 0];
+                let tag = lfs_dir_get(
+                    lfs,
+                    &dir,
+                    lfs_mktag(0x700, 0x3ff, 0),
+                    lfs_mktag(crate::lfs_type::lfs_type::LFS_TYPE_STRUCT, id as u32, 8),
+                    raw.as_mut_ptr() as *mut core::ffi::c_void,
+                );
+                if tag < 0 {
+                    if tag == crate::error::LFS_ERR_NOENT {
+                        continue;
+                    }
+                    return tag;
+                }
+                lfs_pair_fromle32(&mut raw);
+
+                if u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_CTZSTRUCT {
+                    let err = lfs_ctz_traverse(
+                        lfs,
+                        core::ptr::null(),
+                        &mut (*lfs).rcache,
+                        raw[0],
+                        raw[1],
+                        Some(cb),
+                        data,
+                    );
+                    if err != 0 {
+                        return err;
+                    }
+                } else if includeorphans
+                    && u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_DIRSTRUCT
+                {
+                    for i in 0..2 {
+                        let err = cb(data, raw[i]);
+                        if err != 0 {
+                            return err;
+                        }
+                    }
+                }
+            }
+        }
+
+        // iterate over any open files (Phase 4+; for now mlist is empty for alloc)
+        0
+    }
 }
