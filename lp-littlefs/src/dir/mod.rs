@@ -7,7 +7,7 @@ mod lfs_commit;
 mod lfs_dir;
 mod lfs_fcrc;
 mod lfs_mdir;
-mod lfs_mlist;
+pub(crate) mod lfs_mlist;
 pub(crate) mod open;
 pub(crate) mod traverse;
 

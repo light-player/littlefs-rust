@@ -224,6 +224,21 @@ pub fn lfs_strcspn(p: *const u8, c: u8) -> u32 {
     n
 }
 
+/// Per C: slice from NUL-terminated string. Max 256 bytes.
+#[inline(always)]
+pub fn lfs_path_slice_from_cstr(p: *const u8) -> &'static [u8] {
+    if p.is_null() {
+        return &[];
+    }
+    unsafe {
+        let mut len = 0;
+        while len < 256 && *p.add(len) != 0 {
+            len += 1;
+        }
+        core::slice::from_raw_parts(p, len)
+    }
+}
+
 /// Per lfs.c lfs_path_namelen (lines 289-291)
 ///
 /// C:

@@ -88,6 +88,9 @@ pub fn lfs_ctz_index(lfs: *const crate::fs::Lfs, off: *mut lfs_off_t) -> i32 {
 
 /// Per lfs.c lfs_ctz_find (lines 2886-2919)
 ///
+/// Translation docs: Traverses the CTZ skip-list from head to find the block
+/// containing the given file position. Returns block index and offset.
+///
 /// C:
 /// ```c
 /// static int lfs_ctz_find(lfs_t *lfs,
@@ -125,12 +128,66 @@ pub fn lfs_ctz_index(lfs: *const crate::fs::Lfs, off: *mut lfs_off_t) -> i32 {
 /// }
 /// ```
 pub fn lfs_ctz_find(
-    _lfs: *const core::ffi::c_void,
-    _ctz: *const core::ffi::c_void,
-    _block: *mut lfs_block_t,
-    _off: *mut lfs_off_t,
+    lfs: *mut crate::fs::Lfs,
+    pcache: *const crate::bd::LfsCache,
+    rcache: *mut crate::bd::LfsCache,
+    head: lfs_block_t,
+    size: lfs_size_t,
+    pos: lfs_size_t,
+    block: *mut lfs_block_t,
+    off: *mut lfs_off_t,
 ) -> i32 {
-    todo!("lfs_ctz_find")
+    use crate::bd::bd::lfs_bd_read;
+    use crate::types::LFS_BLOCK_NULL;
+    use crate::util::{lfs_ctz, lfs_fromle32, lfs_min, lfs_npw2};
+
+    if size == 0 {
+        unsafe {
+            *block = LFS_BLOCK_NULL;
+            *off = 0;
+        }
+        return 0;
+    }
+
+    unsafe {
+        let lfs_ref = &*lfs;
+        let block_size = lfs_ref.cfg.as_ref().expect("cfg").block_size;
+        let mut current_off = size - 1;
+        let mut target_off = pos;
+        let mut current = lfs_ctz_index(lfs as *const crate::fs::Lfs, &mut current_off);
+        let target = lfs_ctz_index(lfs as *const crate::fs::Lfs, &mut target_off);
+
+        let mut head_val = head;
+
+        while current > target {
+            let skip = lfs_min(
+                lfs_npw2((current - target + 1) as u32) - 1,
+                lfs_ctz(current as u32),
+            );
+
+            let mut head_buf: u32 = 0;
+            let err = lfs_bd_read(
+                lfs,
+                pcache,
+                rcache,
+                block_size,
+                head_val,
+                4 * skip,
+                &mut head_buf as *mut u32 as *mut u8,
+                4,
+            );
+            if err != 0 {
+                return err;
+            }
+            head_val = lfs_fromle32(head_buf);
+
+            current -= 1 << skip;
+        }
+
+        *block = head_val;
+        *off = pos;
+    }
+    0
 }
 
 /// Per lfs.c lfs_ctz_traverse (lines 3020-3063)

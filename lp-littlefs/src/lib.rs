@@ -14,6 +14,8 @@ mod bd;
 mod block_alloc;
 mod crc;
 mod dir;
+#[cfg(feature = "alloc")]
+mod lfs_alloc_module;
 
 mod error;
 mod file;
@@ -33,11 +35,11 @@ mod util;
 
 use core::ffi::c_void;
 
-use crate::file::LfsFile;
 use crate::lfs_info::LfsFileConfig;
 
 pub use crate::dir::LfsDir;
 pub use crate::error::LFS_ERR_CORRUPT;
+pub use crate::file::LfsFile;
 pub use crate::fs::Lfs;
 pub use crate::lfs_config::LfsConfig;
 pub use crate::lfs_info::LfsInfo;
@@ -129,7 +131,7 @@ pub fn lfs_removeattr(lfs: *mut Lfs, path: *const u8, r#type: u8) -> i32 {
 /// Open a file. Per lfs.h lfs_file_open (lfs.c:6140-6146).
 #[inline(never)]
 pub fn lfs_file_open(lfs: *mut Lfs, file: *mut LfsFile, path: *const u8, flags: i32) -> i32 {
-    todo!("lfs_file_open")
+    crate::file::ops::lfs_file_open_(lfs, file, path as *const i8, flags)
 }
 
 /// Open a file with extra configuration. Per lfs.h lfs_file_opencfg (lfs.c:6193-6197).
@@ -141,13 +143,13 @@ pub fn lfs_file_opencfg(
     flags: i32,
     config: *const LfsFileConfig,
 ) -> i32 {
-    todo!("lfs_file_opencfg")
+    crate::file::ops::lfs_file_opencfg_(lfs, file, path as *const i8, flags, config)
 }
 
 /// Close a file. Per lfs.h lfs_file_close (lfs.c:6227-6231).
 #[inline(never)]
 pub fn lfs_file_close(lfs: *mut Lfs, file: *mut LfsFile) -> i32 {
-    todo!("lfs_file_close")
+    crate::file::ops::lfs_file_close_(lfs, file)
 }
 
 /// Synchronize a file on storage. Per lfs.h lfs_file_sync (lfs.c:6263-6267).
@@ -164,7 +166,7 @@ pub fn lfs_file_read(
     buffer: *mut c_void,
     size: lfs_size_t,
 ) -> lfs_ssize_t {
-    todo!("lfs_file_read")
+    crate::file::ops::lfs_file_read_(lfs, file, buffer, size)
 }
 
 /// Write data to file. Per lfs.h lfs_file_write (lfs.c:6228-6242).
@@ -175,7 +177,7 @@ pub fn lfs_file_write(
     buffer: *const c_void,
     size: lfs_size_t,
 ) -> lfs_ssize_t {
-    todo!("lfs_file_write")
+    crate::file::ops::lfs_file_write_(lfs, file, buffer, size)
 }
 
 /// Change the position of the file. Per lfs.h lfs_file_seek (lfs.c:6246-6260).
@@ -186,7 +188,7 @@ pub fn lfs_file_seek(
     off: lfs_soff_t,
     whence: i32,
 ) -> lfs_soff_t {
-    todo!("lfs_file_seek")
+    crate::file::ops::lfs_file_seek_(lfs, file, off, whence)
 }
 
 /// Truncate the size of the file. Per lfs.h lfs_file_truncate (lfs.c:6471-6475).
@@ -197,20 +199,20 @@ pub fn lfs_file_truncate(lfs: *mut Lfs, file: *mut LfsFile, size: lfs_off_t) -> 
 
 /// Return the position of the file. Per lfs.h lfs_file_tell.
 #[inline(never)]
-pub fn lfs_file_tell(lfs: *mut Lfs, file: *mut LfsFile) -> lfs_soff_t {
-    todo!("lfs_file_tell")
+pub fn lfs_file_tell(_lfs: *mut Lfs, file: *mut LfsFile) -> lfs_soff_t {
+    crate::file::ops::lfs_file_tell_(core::ptr::null(), file)
 }
 
 /// Change the position to the beginning of the file. Per lfs.h lfs_file_rewind (lfs.c:6487-6491).
 #[inline(never)]
 pub fn lfs_file_rewind(lfs: *mut Lfs, file: *mut LfsFile) -> i32 {
-    todo!("lfs_file_rewind")
+    crate::file::ops::lfs_file_rewind_(lfs, file)
 }
 
 /// Return the size of the file. Per lfs.h lfs_file_size (lfs.c:6495-6499).
 #[inline(never)]
-pub fn lfs_file_size(lfs: *mut Lfs, file: *mut LfsFile) -> lfs_soff_t {
-    todo!("lfs_file_size")
+pub fn lfs_file_size(_lfs: *mut Lfs, file: *mut LfsFile) -> lfs_soff_t {
+    crate::file::ops::lfs_file_size_(core::ptr::null(), file)
 }
 
 /// Create a directory. Per lfs.h lfs_mkdir (lfs.c:6503-6507).

@@ -202,6 +202,9 @@ pub fn lfs_dir_get(
 
 /// Per lfs.c lfs_dir_getread (lines 793-850)
 ///
+/// Translation docs: Read inline file data from directory entry. Uses pcache/rcache
+/// to avoid repeated dir reads. Copies bytes from [off, off+size) into buffer.
+///
 /// C:
 /// ```c
 /// static int lfs_dir_getread(lfs_t *lfs, const lfs_mdir_t *dir,
@@ -215,67 +218,104 @@ pub fn lfs_dir_get(
 ///
 ///     while (size > 0) {
 ///         lfs_size_t diff = size;
-///
-///         if (pcache && pcache->block == LFS_BLOCK_INLINE &&
-///                 off < pcache->off + pcache->size) {
-///             if (off >= pcache->off) {
-///                 // is already in pcache?
-///                 diff = lfs_min(diff, pcache->size - (off-pcache->off));
-///                 memcpy(data, &pcache->buffer[off-pcache->off], diff);
-///
-///                 data += diff;
-///                 off += diff;
-///                 size -= diff;
-///                 continue;
-///             }
-///
-///             // pcache takes priority
-///             diff = lfs_min(diff, pcache->off-off);
-///         }
-///
-///         if (rcache->block == LFS_BLOCK_INLINE &&
-///                 off < rcache->off + rcache->size) {
-///             if (off >= rcache->off) {
-///                 // is already in rcache?
-///                 diff = lfs_min(diff, rcache->size - (off-rcache->off));
-///                 memcpy(data, &rcache->buffer[off-rcache->off], diff);
-///
-///                 data += diff;
-///                 off += diff;
-///                 size -= diff;
-///                 continue;
-///             }
-///         }
-///
-///         // load to cache, first condition can no longer fail
-///         rcache->block = LFS_BLOCK_INLINE;
-///         rcache->off = lfs_aligndown(off, lfs->cfg->read_size);
-///         rcache->size = lfs_min(lfs_alignup(off+hint, lfs->cfg->read_size),
-///                 lfs->cfg->cache_size);
-///         int err = lfs_dir_getslice(lfs, dir, gmask, gtag,
-///                 rcache->off, rcache->buffer, rcache->size);
-///         if (err < 0) {
-///             return err;
-///         }
+///         ... (pcache/rcache checks, then load via getslice)
 ///     }
-///
 ///     return 0;
 /// }
-///
 /// ```
 pub fn lfs_dir_getread(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const LfsMdir,
-    _pcache: *const LfsCache,
-    _rcache: *mut LfsCache,
-    _hint: lfs_size_t,
-    _gmask: lfs_tag_t,
-    _gtag: lfs_tag_t,
-    _off: lfs_off_t,
-    _buffer: *mut core::ffi::c_void,
-    _size: lfs_size_t,
+    lfs: *mut crate::fs::Lfs,
+    dir: *const LfsMdir,
+    pcache: *const LfsCache,
+    rcache: *mut LfsCache,
+    hint: lfs_size_t,
+    gmask: lfs_tag_t,
+    gtag: lfs_tag_t,
+    off: lfs_off_t,
+    buffer: *mut core::ffi::c_void,
+    size: lfs_size_t,
 ) -> i32 {
-    todo!("lfs_dir_getread")
+    use crate::error::LFS_ERR_CORRUPT;
+    use crate::types::LFS_BLOCK_INLINE;
+    use crate::util::{lfs_aligndown, lfs_alignup, lfs_min};
+
+    if buffer.is_null() {
+        return 0;
+    }
+    let data = buffer as *mut u8;
+
+    unsafe {
+        let lfs_ref = &*lfs;
+        let cfg = lfs_ref.cfg.as_ref().expect("cfg");
+        if off + size > cfg.block_size {
+            return LFS_ERR_CORRUPT;
+        }
+
+        let mut off = off;
+        let mut size = size;
+        let mut data = data;
+
+        while size > 0 {
+            let mut diff = size;
+
+            if !pcache.is_null() {
+                let pcache_ref = &*pcache;
+                if pcache_ref.block == LFS_BLOCK_INLINE && off < pcache_ref.off + pcache_ref.size {
+                    if off >= pcache_ref.off {
+                        diff = lfs_min(diff, pcache_ref.size - (off - pcache_ref.off));
+                        if !pcache_ref.buffer.is_null() {
+                            core::ptr::copy_nonoverlapping(
+                                pcache_ref.buffer.add((off - pcache_ref.off) as usize),
+                                data,
+                                diff as usize,
+                            );
+                        }
+                        data = data.add(diff as usize);
+                        off += diff;
+                        size -= diff;
+                        continue;
+                    }
+                    diff = lfs_min(diff, pcache_ref.off - off);
+                }
+            }
+
+            let rcache_ref = &mut *rcache;
+            if rcache_ref.block == LFS_BLOCK_INLINE
+                && off < rcache_ref.off + rcache_ref.size
+                && off >= rcache_ref.off
+            {
+                diff = lfs_min(diff, rcache_ref.size - (off - rcache_ref.off));
+                if !rcache_ref.buffer.is_null() {
+                    core::ptr::copy_nonoverlapping(
+                        rcache_ref.buffer.add((off - rcache_ref.off) as usize),
+                        data,
+                        diff as usize,
+                    );
+                }
+                data = data.add(diff as usize);
+                off += diff;
+                size -= diff;
+                continue;
+            }
+
+            rcache_ref.block = LFS_BLOCK_INLINE;
+            rcache_ref.off = lfs_aligndown(off, cfg.read_size);
+            rcache_ref.size = lfs_min(lfs_alignup(off + hint, cfg.read_size), cfg.cache_size);
+            let res = lfs_dir_getslice(
+                lfs,
+                dir,
+                gmask,
+                gtag,
+                rcache_ref.off,
+                rcache_ref.buffer as *mut core::ffi::c_void,
+                rcache_ref.size,
+            );
+            if res < 0 {
+                return res as i32;
+            }
+        }
+    }
+    0
 }
 
 /// Per lfs.c lfs_dir_traverse_filter (lines 852-910)

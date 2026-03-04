@@ -288,6 +288,61 @@ pub fn dir_entry_names(
     Ok(names)
 }
 
+/// Format, mount, create "hello" file with "Hello World!\0", unmount.
+/// Returns env. Caller mounts again before reading.
+pub fn fs_with_hello(env: &mut TestEnv) -> Result<(), i32> {
+    use lp_littlefs::{
+        lfs_file_close, lfs_file_open, lfs_file_write, lfs_format, lfs_mount, lfs_unmount, Lfs,
+        LfsConfig, LfsFile,
+    };
+
+    init_context(env);
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    let err = lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig);
+    if err != 0 {
+        return Err(err);
+    }
+    let err = lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig);
+    if err != 0 {
+        return Err(err);
+    }
+
+    let path = path_bytes("hello");
+    let data = b"Hello World!\0";
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    let err = lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        0x0100 | 2,
+    );
+    if err != 0 {
+        let _ = lfs_unmount(lfs.as_mut_ptr());
+        return Err(err);
+    }
+    let n = lfs_file_write(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        data.as_ptr() as *const core::ffi::c_void,
+        data.len() as u32,
+    );
+    if n != data.len() as i32 {
+        let _ = lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr());
+        let _ = lfs_unmount(lfs.as_mut_ptr());
+        return Err(if n < 0 { n } else { -1 });
+    }
+    let err = lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr());
+    if err != 0 {
+        let _ = lfs_unmount(lfs.as_mut_ptr());
+        return Err(err);
+    }
+    let err = lfs_unmount(lfs.as_mut_ptr());
+    if err != 0 {
+        return Err(err);
+    }
+    Ok(())
+}
+
 /// Format fs, sync, return raw content of superblock blocks 0 and 1.
 /// Helper for debug tests. Caller must init_context before.
 pub fn format_and_read_superblock_blocks(env: &mut TestEnv) -> Result<(Vec<u8>, Vec<u8>), i32> {
