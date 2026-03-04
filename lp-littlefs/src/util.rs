@@ -190,6 +190,40 @@ pub fn lfs_tobe32(a: u32) -> u32 {
 
 // --- lfs.c path operations ---
 
+/// Per C strspn: count leading bytes equal to `c`, stop at first unequal or null.
+#[inline(always)]
+pub fn lfs_strspn(p: *const u8, c: u8) -> u32 {
+    if p.is_null() {
+        return 0;
+    }
+    let mut n: u32 = 0;
+    unsafe {
+        let mut q = p;
+        while *q == c {
+            n += 1;
+            q = q.add(1);
+        }
+    }
+    n
+}
+
+/// Per C strcspn: count bytes until we hit `c` or null.
+#[inline(always)]
+pub fn lfs_strcspn(p: *const u8, c: u8) -> u32 {
+    if p.is_null() {
+        return 0;
+    }
+    let mut n: u32 = 0;
+    unsafe {
+        let mut q = p;
+        while *q != c && *q != 0 {
+            n += 1;
+            q = q.add(1);
+        }
+    }
+    n
+}
+
 /// Per lfs.c lfs_path_namelen (lines 289-291)
 ///
 /// C:

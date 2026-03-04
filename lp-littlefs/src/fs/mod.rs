@@ -14,7 +14,7 @@ mod mount;
 pub(crate) mod parent;
 mod remove;
 mod rename;
-mod stat;
+pub(crate) mod stat;
 pub(crate) mod superblock;
 mod traverse;
 

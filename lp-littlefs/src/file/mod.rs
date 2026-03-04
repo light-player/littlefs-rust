@@ -1,7 +1,7 @@
 //! File operations. Per lfs.c lfs_file_*, lfs_ctz_*.
 
 mod ctz;
-mod lfs_ctz;
+pub(crate) mod lfs_ctz;
 mod lfs_file;
 mod ops;
 

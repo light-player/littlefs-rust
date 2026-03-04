@@ -750,10 +750,70 @@ pub fn lfs_dir_getgstate(
 /// }
 /// ```
 pub fn lfs_dir_getinfo(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const LfsMdir,
-    _id: u16,
-    _info: *mut LfsInfo,
+    lfs: *mut crate::fs::Lfs,
+    dir: *const LfsMdir,
+    id: u16,
+    info: *mut LfsInfo,
 ) -> i32 {
-    todo!("lfs_dir_getinfo")
+    use crate::dir::traverse::lfs_dir_get;
+    use crate::file::lfs_ctz::{lfs_ctz_fromle32, LfsCtz};
+    use crate::lfs_type::lfs_type::{
+        LFS_TYPE_CTZSTRUCT, LFS_TYPE_DIR, LFS_TYPE_INLINESTRUCT, LFS_TYPE_NAME, LFS_TYPE_STRUCT,
+    };
+    use crate::tag::{lfs_mktag, lfs_tag_size, lfs_tag_type3};
+    use core::mem;
+
+    if lfs.is_null() || dir.is_null() || info.is_null() {
+        return crate::error::LFS_ERR_INVAL;
+    }
+    unsafe {
+        let info = &mut *info;
+        let lfs = &*lfs;
+        let dir_ref = &*dir;
+
+        // C: lfs.c:1415-1420
+        if id == 0x3ff {
+            info.type_ = LFS_TYPE_DIR as u8;
+            info.name[0] = b'/';
+            info.name[1] = 0;
+            return 0;
+        }
+
+        // C: lfs.c:1422-1426
+        let name_max = lfs.name_max;
+        let tag = lfs_dir_get(
+            lfs as *const _ as *mut _,
+            dir,
+            lfs_mktag(0x780, 0x3ff, 0),
+            lfs_mktag(LFS_TYPE_NAME, id as u32, name_max + 1),
+            info.name.as_mut_ptr() as *mut core::ffi::c_void,
+        );
+        if tag < 0 {
+            return tag;
+        }
+
+        info.type_ = lfs_tag_type3(tag as u32) as u8;
+
+        // C: lfs.c:1430-1441
+        let mut ctz = LfsCtz { head: 0, size: 0 };
+        let tag = lfs_dir_get(
+            lfs as *const _ as *mut _,
+            dir,
+            lfs_mktag(0x700, 0x3ff, 0),
+            lfs_mktag(LFS_TYPE_STRUCT, id as u32, mem::size_of::<LfsCtz>() as u32),
+            &mut ctz as *mut _ as *mut core::ffi::c_void,
+        );
+        if tag < 0 {
+            return tag;
+        }
+        lfs_ctz_fromle32(&mut ctz);
+
+        if u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_CTZSTRUCT {
+            info.size = ctz.size;
+        } else if u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_INLINESTRUCT {
+            info.size = lfs_tag_size(tag as u32);
+        }
+
+        0
+    }
 }

@@ -1,7 +1,5 @@
 //! Open list node. Per lfs.h struct lfs_mlist.
 
-use core::ffi::c_void;
-
 use super::lfs_mdir::LfsMdir;
 
 /// Per lfs.h struct lfs_mlist
@@ -45,8 +43,20 @@ pub fn lfs_mlist_isopen(_head: *mut LfsMlist, _node: *const LfsMlist) -> bool {
 ///     }
 /// }
 /// ```
-pub fn lfs_mlist_remove(_lfs: *mut c_void, _mlist: *mut LfsMlist) {
-    todo!("lfs_mlist_remove")
+pub fn lfs_mlist_remove(lfs: *mut crate::fs::Lfs, mlist: *mut LfsMlist) {
+    if lfs.is_null() || mlist.is_null() {
+        return;
+    }
+    unsafe {
+        let mut p = &mut (*lfs).mlist;
+        while !(*p).is_null() {
+            if *p == mlist as *mut LfsMlist {
+                *p = (*mlist).next;
+                break;
+            }
+            p = &mut (*(*p)).next;
+        }
+    }
 }
 
 /// Per lfs.c lfs_mlist_append (lines 529-533)
@@ -58,6 +68,13 @@ pub fn lfs_mlist_remove(_lfs: *mut c_void, _mlist: *mut LfsMlist) {
 ///     lfs->mlist = mlist;
 /// }
 /// ```
-pub fn lfs_mlist_append(_lfs: *mut c_void, _mlist: *mut LfsMlist) {
-    todo!("lfs_mlist_append")
+pub fn lfs_mlist_append(lfs: *mut crate::fs::Lfs, mlist: *mut LfsMlist) {
+    if lfs.is_null() || mlist.is_null() {
+        return;
+    }
+    unsafe {
+        let head = (*lfs).mlist;
+        (*mlist).next = head;
+        (*lfs).mlist = mlist;
+    }
 }

@@ -22,7 +22,7 @@ mod lfs_config;
 mod lfs_gstate;
 mod lfs_info;
 mod lfs_superblock;
-mod lfs_type;
+pub mod lfs_type;
 #[cfg(test)]
 mod test;
 #[macro_use]
@@ -33,13 +33,14 @@ mod util;
 
 use core::ffi::c_void;
 
-use crate::dir::LfsDir;
 use crate::file::LfsFile;
-use crate::lfs_info::{LfsFileConfig, LfsInfo};
+use crate::lfs_info::LfsFileConfig;
 
+pub use crate::dir::LfsDir;
 pub use crate::error::LFS_ERR_CORRUPT;
 pub use crate::fs::Lfs;
 pub use crate::lfs_config::LfsConfig;
+pub use crate::lfs_info::LfsInfo;
 
 // Test helpers for integration tests (bypass, traverse isolation).
 #[doc(hidden)]
@@ -92,7 +93,7 @@ pub fn lfs_rename(lfs: *mut Lfs, oldpath: *const u8, newpath: *const u8) -> i32 
 /// Find info about a file or directory. Per lfs.h lfs_stat (lfs.c:6263-6267).
 #[inline(never)]
 pub fn lfs_stat(lfs: *mut Lfs, path: *const u8, info: *mut LfsInfo) -> i32 {
-    todo!("lfs_stat")
+    crate::fs::stat::lfs_stat_(lfs, path, info)
 }
 
 /// Get a custom attribute. Per lfs.h lfs_getattr (lfs.c:6090-6105).
@@ -221,19 +222,19 @@ pub fn lfs_mkdir(lfs: *mut Lfs, path: *const u8) -> i32 {
 /// Open a directory. Per lfs.h lfs_dir_open (lfs.c:6511-6515).
 #[inline(never)]
 pub fn lfs_dir_open(lfs: *mut Lfs, dir: *mut LfsDir, path: *const u8) -> i32 {
-    todo!("lfs_dir_open")
+    crate::dir::open::lfs_dir_open_(lfs, dir, path)
 }
 
 /// Close a directory. Per lfs.h lfs_dir_close.
 #[inline(never)]
 pub fn lfs_dir_close(lfs: *mut Lfs, dir: *mut LfsDir) -> i32 {
-    todo!("lfs_dir_close")
+    crate::dir::open::lfs_dir_close_(lfs, dir)
 }
 
 /// Read an entry in the directory. Per lfs.h lfs_dir_read.
 #[inline(never)]
 pub fn lfs_dir_read(lfs: *mut Lfs, dir: *mut LfsDir, info: *mut LfsInfo) -> i32 {
-    todo!("lfs_dir_read")
+    crate::dir::open::lfs_dir_read_(lfs, dir, info)
 }
 
 /// Change the position of the directory. Per lfs.h lfs_dir_seek.
