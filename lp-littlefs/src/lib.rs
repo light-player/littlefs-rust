@@ -266,7 +266,7 @@ pub fn lfs_fs_stat(lfs: *mut Lfs, fsinfo: *mut LfsFsinfo) -> i32 {
 /// Find the current size of the filesystem. Per lfs.h lfs_fs_size (lfs.c:6449-6453).
 #[inline(never)]
 pub fn lfs_fs_size(lfs: *mut Lfs) -> lfs_ssize_t {
-    todo!("lfs_fs_size")
+    crate::fs::stat::lfs_fs_size_(lfs)
 }
 
 /// Callback type for lfs_fs_traverse. Per lfs.h int (*cb)(void*, lfs_block_t).
@@ -275,19 +275,37 @@ pub type LfsTraverseCb = unsafe extern "C" fn(data: *mut c_void, block: lfs_bloc
 /// Traverse through all blocks in use by the filesystem. Per lfs.h lfs_fs_traverse.
 #[inline(never)]
 pub fn lfs_fs_traverse(lfs: *mut Lfs, cb: LfsTraverseCb, data: *mut c_void) -> i32 {
-    todo!("lfs_fs_traverse")
+    crate::fs::traverse::lfs_fs_traverse_(lfs, Some(cb), data, false)
 }
 
 /// Attempt to make the filesystem consistent. Per lfs.h lfs_fs_mkconsistent (lfs.c:6479-6483).
 #[inline(never)]
 pub fn lfs_fs_mkconsistent(lfs: *mut Lfs) -> i32 {
-    todo!("lfs_fs_mkconsistent")
+    crate::fs::consistent::lfs_fs_mkconsistent_(lfs)
 }
 
 /// Attempt any janitorial work. Per lfs.h lfs_fs_gc (lfs.c:6495-6499).
 #[inline(never)]
 pub fn lfs_fs_gc(lfs: *mut Lfs) -> i32 {
-    todo!("lfs_fs_gc")
+    crate::fs::consistent::lfs_fs_gc_(lfs)
+}
+
+/// Force consistency (deorphan, demove, desuperblock). For testing.
+#[doc(hidden)]
+pub fn lfs_fs_forceconsistency(lfs: *mut Lfs) -> i32 {
+    crate::fs::superblock::lfs_fs_forceconsistency(lfs)
+}
+
+/// Prepend orphan count delta to gstate. For testing power-loss paths.
+#[doc(hidden)]
+pub fn lfs_fs_preporphans(lfs: *mut Lfs, orphans: i8) -> i32 {
+    crate::fs::superblock::lfs_fs_preporphans(lfs, orphans)
+}
+
+/// True if gstate has pending orphans. For testing.
+#[doc(hidden)]
+pub unsafe fn lfs_fs_hasorphans(lfs: *const Lfs) -> bool {
+    crate::lfs_gstate::lfs_gstate_hasorphans(&(*lfs).gstate)
 }
 
 /// Grow the filesystem to a new size. Per lfs.h lfs_fs_grow (lfs.c:6511-6515).

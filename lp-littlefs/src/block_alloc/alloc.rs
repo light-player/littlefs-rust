@@ -251,6 +251,13 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
             // If we've looked at all blocks since the last checkpoint, we report
             // the filesystem as out of storage.
             if lfs.lookahead.ckpoint == 0 {
+                crate::lfs_trace!(
+                    "lfs_alloc NOSPC: ckpoint==0 start={} next={} size={} block_count={}",
+                    lfs.lookahead.start,
+                    lfs.lookahead.next,
+                    lfs.lookahead.size,
+                    lfs.block_count
+                );
                 crate::lfs_error!(
                     "No more free space 0x{:08x}",
                     (lfs.lookahead.start + lfs.lookahead.next) % lfs.block_count
@@ -262,6 +269,12 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
             // unused blocks in the next lookahead window.
             let err = lfs_alloc_scan(lfs);
             if err != 0 {
+                crate::lfs_trace!(
+                    "lfs_alloc NOSPC: alloc_scan returned {} start={} next={}",
+                    err,
+                    lfs.lookahead.start,
+                    lfs.lookahead.next
+                );
                 return err;
             }
         }

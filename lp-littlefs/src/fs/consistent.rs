@@ -1,5 +1,11 @@
 //! Consistency. Per lfs.c lfs_fs_mkconsistent_, lfs_fs_gc_.
 
+use crate::dir::fetch::lfs_dir_fetch;
+use crate::dir::LfsMdir;
+
+/// Translation docs: Deorphan, complete moves, persist gstate. If pending gstate
+/// (delta != 0), fetches root and commits empty to write MOVESTATE.
+///
 /// Per lfs.c lfs_fs_mkconsistent_ (lines 5143-5170)
 ///
 /// C:
@@ -33,8 +39,38 @@
 /// }
 /// #endif
 /// ```
-pub fn lfs_fs_mkconsistent_(_lfs: *mut super::lfs::Lfs) -> i32 {
-    todo!("lfs_fs_mkconsistent_")
+pub fn lfs_fs_mkconsistent_(lfs: *mut super::lfs::Lfs) -> i32 {
+    use crate::dir::commit::lfs_dir_commit;
+    use crate::lfs_gstate::{lfs_gstate_iszero, lfs_gstate_xor};
+
+    let err = super::superblock::lfs_fs_forceconsistency(lfs);
+    if err != 0 {
+        return err;
+    }
+
+    unsafe {
+        let mut delta = crate::lfs_gstate::LfsGstate {
+            tag: 0,
+            pair: [0, 0],
+        };
+        lfs_gstate_xor(&mut delta, &(*lfs).gdisk);
+        lfs_gstate_xor(&mut delta, &(*lfs).gstate);
+
+        if !lfs_gstate_iszero(&delta) {
+            let mut root = core::mem::zeroed::<LfsMdir>();
+            let err = lfs_dir_fetch(lfs, &mut root, &(*lfs).root);
+            if err != 0 {
+                return err;
+            }
+
+            let err = lfs_dir_commit(lfs, &mut root, core::ptr::null(), 0);
+            if err != 0 {
+                return err;
+            }
+        }
+    }
+
+    0
 }
 
 /// Per lfs.c lfs_fs_gc_ (lines 5191-5240)
@@ -92,6 +128,69 @@ pub fn lfs_fs_mkconsistent_(_lfs: *mut super::lfs::Lfs) -> i32 {
 /// }
 /// #endif
 /// ```
-pub fn lfs_fs_gc_(_lfs: *mut super::lfs::Lfs) -> i32 {
-    todo!("lfs_fs_gc_")
+pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
+    use crate::block_alloc::alloc::lfs_alloc_scan;
+    use crate::dir::commit::lfs_dir_commit;
+    use crate::util::{lfs_min, lfs_pair_isnull};
+
+    let err = super::superblock::lfs_fs_forceconsistency(lfs);
+    if err != 0 {
+        return err;
+    }
+
+    unsafe {
+        let lfs_ref = &*lfs;
+        let cfg = lfs_ref.cfg.as_ref().expect("cfg");
+        let block_size = cfg.block_size;
+        let prog_size = cfg.prog_size;
+        let compact_thresh = cfg.compact_thresh;
+
+        if compact_thresh < block_size.saturating_sub(prog_size) {
+            let mut mdir = LfsMdir {
+                pair: [0, 0],
+                rev: 0,
+                off: 0,
+                etag: 0,
+                count: 0,
+                erased: false,
+                split: false,
+                tail: [0, 1],
+            };
+
+            while !lfs_pair_isnull(&mdir.tail) {
+                let err = lfs_dir_fetch(lfs, &mut mdir, &mdir.tail);
+                if err != 0 {
+                    return err;
+                }
+
+                let should_compact = !mdir.erased
+                    || if compact_thresh == 0 {
+                        mdir.off > block_size - block_size / 8
+                    } else {
+                        mdir.off > compact_thresh
+                    };
+
+                if should_compact {
+                    let mdir_ref = &mut mdir;
+                    mdir_ref.erased = false;
+                    let err = lfs_dir_commit(lfs, mdir_ref, core::ptr::null(), 0);
+                    if err != 0 {
+                        return err;
+                    }
+                }
+            }
+        }
+
+        let lfs_ref = &*lfs;
+        let lookahead_size = cfg.lookahead_size;
+        let block_count = lfs_ref.block_count;
+        if lfs_ref.lookahead.size < lfs_min(8 * lookahead_size, block_count) {
+            let err = lfs_alloc_scan(lfs);
+            if err != 0 {
+                return err;
+            }
+        }
+    }
+
+    0
 }

@@ -1013,19 +1013,12 @@ pub fn lfs_dir_traverse(
                 cb = frame.cb;
                 data = frame.data;
                 disk = frame.disk;
-                let (proc_tag, proc_buffer) = if crate::tag::lfs_tag_type3(frame.tag)
-                    == crate::lfs_type::lfs_type::LFS_FROM_NOOP as u16
-                    && frame.redundant_tag != 0xffff_ffff
-                {
-                    crate::lfs_trace!(
-                        "traverse PopAndProcess: using redundant tag=0x{:08x} buffer={:p}",
-                        frame.redundant_tag,
-                        frame.redundant_buffer
-                    );
-                    (frame.redundant_tag, frame.redundant_buffer)
-                } else {
-                    (frame.tag, frame.buffer)
-                };
+                // Per C: when filter marks redundant it sets *filtertag = NOOP. We pop and
+                // dispatch that NOOP (emit nothing). The attr that triggered redundancy is
+                // "given back" because we restore attr_i; we'll get it on the next GetNextTag
+                // and emit it once. Using redundant_tag here would emit the attr now, but
+                // we also restore attr_i, so we'd emit it again on next iteration = duplicate.
+                let (proc_tag, proc_buffer) = (frame.tag, frame.buffer);
                 sp -= 1;
                 phase = TraversePhase::ProcessTag {
                     tag: proc_tag,

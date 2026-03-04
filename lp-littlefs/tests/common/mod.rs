@@ -177,6 +177,13 @@ pub fn assert_ok(result: i32) {
     }
 }
 
+/// Panic if result is not 0, with step name for debugging.
+pub fn assert_ok_at(step: &str, result: i32) {
+    if result != 0 {
+        panic!("{} failed: {} (expected 0)", step, result);
+    }
+}
+
 /// Panic if actual is not expected error code.
 pub fn assert_err(expected: i32, actual: i32) {
     if actual != expected {
