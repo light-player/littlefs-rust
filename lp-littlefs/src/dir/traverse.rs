@@ -113,7 +113,7 @@ pub fn lfs_dir_getslice(
             let err = lfs_bd_read(
                 lfs,
                 core::ptr::null_mut(),
-                &mut (*lfs).rcache,
+                unsafe { &mut (*lfs).rcache },
                 4,
                 dir_ref.pair[0],
                 off,
@@ -147,7 +147,7 @@ pub fn lfs_dir_getslice(
                 let err = lfs_bd_read(
                     lfs,
                     core::ptr::null_mut(),
-                    &mut (*lfs).rcache,
+                    unsafe { &mut (*lfs).rcache },
                     diff,
                     dir_ref.pair[0],
                     off + 4 + goff,
@@ -342,12 +342,59 @@ pub fn lfs_dir_getread(
 ///     struct lfs_diskoff disk;
 /// };
 /// ```
-pub fn lfs_dir_traverse_filter(
-    _p: *mut core::ffi::c_void,
-    _tag: lfs_tag_t,
+pub unsafe extern "C" fn lfs_dir_traverse_filter(
+    p: *mut core::ffi::c_void,
+    tag: lfs_tag_t,
     _buffer: *const core::ffi::c_void,
 ) -> i32 {
-    todo!("lfs_dir_traverse_filter")
+    use crate::lfs_type::lfs_type::{LFS_FROM_NOOP, LFS_TYPE_DELETE, LFS_TYPE_SPLICE};
+    use crate::tag::{lfs_mktag, lfs_tag_id, lfs_tag_isdelete, lfs_tag_splice, lfs_tag_type1};
+
+    let filtertag = p as *mut lfs_tag_t;
+
+    let mask = if (tag & lfs_mktag(0x100, 0, 0)) != 0 {
+        lfs_mktag(0x7ff, 0x3ff, 0)
+    } else {
+        lfs_mktag(0x700, 0x3ff, 0)
+    };
+
+    let ft = unsafe { *filtertag };
+    if (mask & tag) == (mask & ft)
+        || lfs_tag_isdelete(ft)
+        || (lfs_mktag(0x7ff, 0x3ff, 0) & tag)
+            == (lfs_mktag(LFS_TYPE_DELETE, 0, 0) | (lfs_mktag(0, 0x3ff, 0) & ft))
+    {
+        unsafe { *filtertag = lfs_mktag(LFS_FROM_NOOP, 0, 0) };
+        return 1;
+    }
+
+    if u32::from(lfs_tag_type1(tag)) == LFS_TYPE_SPLICE && lfs_tag_id(tag) <= lfs_tag_id(ft) {
+        unsafe {
+            *filtertag = ft.wrapping_add(lfs_mktag(0, lfs_tag_splice(tag) as u32, 0));
+        }
+    }
+
+    0
+}
+
+/// Maximum recursive depth. C: LFS_DIR_TRAVERSE_DEPTH 3.
+const LFS_DIR_TRAVERSE_DEPTH: usize = 3;
+
+/// Stack frame for lfs_dir_traverse recursion. Per lfs.c struct lfs_dir_traverse.
+struct LfsDirTraverseStack {
+    dir: *const LfsMdir,
+    off: lfs_off_t,
+    ptag: lfs_tag_t,
+    attr_i: usize,
+    tmask: lfs_tag_t,
+    ttag: lfs_tag_t,
+    begin: u16,
+    end: u16,
+    diff: i16,
+    cb: unsafe extern "C" fn(*mut core::ffi::c_void, lfs_tag_t, *const core::ffi::c_void) -> i32,
+    data: *mut core::ffi::c_void,
+    tag: lfs_tag_t,
+    disk: crate::tag::lfs_diskoff,
 }
 
 /// Per lfs.c lfs_dir_traverse (lines 912-1105)
@@ -568,6 +615,7 @@ pub fn lfs_dir_traverse(
     data: *mut core::ffi::c_void,
 ) -> i32 {
     use crate::bd::bd::lfs_bd_read;
+    use crate::lfs_type::lfs_type::LFS_FROM_NOOP;
     use crate::tag::{lfs_mktag, lfs_tag_dsize, lfs_tag_id, lfs_tag_type3};
     use crate::types::lfs_tag_t;
     use crate::util::lfs_frombe32;
@@ -577,81 +625,160 @@ pub fn lfs_dir_traverse(
         None => return 0,
     };
 
-    unsafe {
-        let mut off = off;
-        let mut ptag = ptag;
-        let mut attrs = attrs;
-        let mut attrcount = attrcount;
-        let dir_ref = &*dir;
-        let mask = lfs_mktag(0x7ff, 0, 0);
+    let mut stack: [core::mem::MaybeUninit<LfsDirTraverseStack>; LFS_DIR_TRAVERSE_DEPTH - 1] =
+        core::array::from_fn(|_| core::mem::MaybeUninit::uninit());
+    let mut sp: usize = 0;
+    let mut res: i32 = 0;
 
-        let attrs_slice = if attrcount > 0 && !attrs.is_null() {
+    let mut dir = dir;
+    let mut off = off;
+    let mut ptag = ptag;
+    let mut attr_i: usize = 0;
+    let mut tmask = tmask;
+    let mut ttag = ttag;
+    let mut begin = begin;
+    let mut end = end;
+    let mut diff = diff;
+    let mut cb = cb;
+    let mut data = data;
+
+    let attrs_slice = if attrcount > 0 && !attrs.is_null() {
+        unsafe {
             core::slice::from_raw_parts(attrs as *const crate::tag::lfs_mattr, attrcount as usize)
+        }
+    } else {
+        &[]
+    };
+
+    let mut disk = crate::tag::lfs_diskoff { block: 0, off: 0 };
+
+    let mask = lfs_mktag(0x7ff, 0, 0);
+
+    'outer: loop {
+        let mut from_pop = false;
+        let (tag, buffer) = if sp > 0 {
+            from_pop = true;
+            let frame = unsafe { &*stack[sp - 1].as_ptr() };
+            dir = frame.dir;
+            off = frame.off;
+            ptag = frame.ptag;
+            attr_i = frame.attr_i;
+            tmask = frame.tmask;
+            ttag = frame.ttag;
+            begin = frame.begin;
+            end = frame.end;
+            diff = frame.diff;
+            cb = frame.cb;
+            data = frame.data;
+            disk = frame.disk;
+            sp -= 1;
+            (frame.tag, &disk as *const _ as *const _)
         } else {
-            &[]
-        };
-        let mut attr_i: usize = 0;
+            let dir_ref = unsafe { &*dir };
 
-        loop {
-            let (tag, buffer): (lfs_tag_t, *const core::ffi::c_void) =
-                if off + lfs_tag_dsize(ptag) < dir_ref.off {
-                    let mut tag: lfs_tag_t = 0;
-                    let err = lfs_bd_read(
-                        lfs,
-                        core::ptr::null_mut(),
-                        &mut (*lfs).rcache,
-                        core::mem::size_of::<lfs_tag_t>() as u32,
-                        dir_ref.pair[0],
-                        off,
-                        &mut tag as *mut _ as *mut u8,
-                        core::mem::size_of::<lfs_tag_t>() as u32,
-                    );
-                    if err != 0 {
-                        return err;
-                    }
-                    off += lfs_tag_dsize(ptag);
-                    let tag_val = (lfs_frombe32(tag) ^ ptag) | 0x8000_0000;
-                    let disk = crate::tag::lfs_diskoff {
-                        block: dir_ref.pair[0],
-                        off: off + 4,
-                    };
-                    ptag = tag_val;
-                    (tag_val, &disk as *const _ as *const _)
-                } else if attr_i < attrs_slice.len() {
-                    let attr = &attrs_slice[attr_i];
-                    attr_i += 1;
-                    (attr.tag, attr.buffer)
-                } else {
-                    return 0;
-                };
-
-            if (mask & tmask & tag) != (mask & tmask & ttag) {
-                continue;
-            }
-
-            if crate::tag::lfs_tag_id(tmask) != 0
-                && !(crate::tag::lfs_tag_id(tag) >= begin && crate::tag::lfs_tag_id(tag) < end)
-            {
-                continue;
-            }
-
-            let type3 = lfs_tag_type3(tag);
-            if type3 == crate::lfs_type::lfs_type::LFS_FROM_NOOP as u16 {
-                // noop
-            } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_MOVE as u16 {
-                todo!("lfs_dir_traverse LFS_FROM_MOVE")
-            } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_USERATTRS as u16 {
-                todo!("lfs_dir_traverse LFS_FROM_USERATTRS")
-            } else {
-                let out_tag = tag.wrapping_add(lfs_mktag(0, diff as u32, 0));
-                let res = cb(data, out_tag, buffer);
-                if res < 0 {
-                    return res;
+            if off + lfs_tag_dsize(ptag) < dir_ref.off {
+                let mut tag_raw: lfs_tag_t = 0;
+                let err = lfs_bd_read(
+                    lfs,
+                    core::ptr::null_mut(),
+                    unsafe { &mut (*lfs).rcache },
+                    core::mem::size_of::<lfs_tag_t>() as u32,
+                    dir_ref.pair[0],
+                    off,
+                    &mut tag_raw as *mut _ as *mut u8,
+                    core::mem::size_of::<lfs_tag_t>() as u32,
+                );
+                if err != 0 {
+                    return err;
                 }
-                if res != 0 {
-                    return res;
+                off += lfs_tag_dsize(ptag);
+                let tag_val = (lfs_frombe32(tag_raw) ^ ptag) | 0x8000_0000;
+                disk = crate::tag::lfs_diskoff {
+                    block: dir_ref.pair[0],
+                    off: off + 4,
+                };
+                ptag = tag_val;
+                (tag_val, &disk as *const _ as *const _)
+            } else if attr_i < attrs_slice.len() {
+                let attr = &attrs_slice[attr_i];
+                attr_i += 1;
+                (attr.tag, attr.buffer)
+            } else {
+                res = 0;
+                if sp == 0 {
+                    break 'outer;
+                }
+                continue 'outer;
+            }
+        };
+
+        if !from_pop {
+            if (mask & tmask & tag) != (mask & tmask & ttag) {
+                continue 'outer;
+            }
+            if crate::tag::lfs_tag_id(tmask) != 0 {
+                crate::lfs_assert!(sp < LFS_DIR_TRAVERSE_DEPTH);
+                unsafe {
+                    let frame = LfsDirTraverseStack {
+                        dir,
+                        off,
+                        ptag,
+                        attr_i,
+                        tmask,
+                        ttag,
+                        begin,
+                        end,
+                        diff,
+                        cb,
+                        data,
+                        tag,
+                        disk,
+                    };
+                    stack[sp].write(frame);
+                }
+                sp += 1;
+                tmask = 0;
+                ttag = 0;
+                begin = 0;
+                end = 0;
+                diff = 0;
+                cb = lfs_dir_traverse_filter;
+                data = unsafe { &mut (*stack[sp - 1].as_mut_ptr()).tag as *mut _ as *mut _ };
+                continue 'outer;
+            }
+        }
+
+        if crate::tag::lfs_tag_id(tmask) != 0
+            && !(crate::tag::lfs_tag_id(tag) >= begin && crate::tag::lfs_tag_id(tag) < end)
+        {
+            continue 'outer;
+        }
+
+        let type3 = lfs_tag_type3(tag);
+        if type3 == LFS_FROM_NOOP as u16 {
+            // noop
+        } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_MOVE as u16 {
+            if core::ptr::eq(cb as *const (), lfs_dir_traverse_filter as *const ()) {
+                continue 'outer;
+            }
+            todo!("lfs_dir_traverse LFS_FROM_MOVE recursion")
+        } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_USERATTRS as u16 {
+            todo!("lfs_dir_traverse LFS_FROM_USERATTRS")
+        } else {
+            let out_tag = tag.wrapping_add(lfs_mktag(0, diff as u32, 0));
+            res = unsafe { cb(data, out_tag, buffer) };
+            if res < 0 {
+                return res;
+            }
+            if res != 0 {
+                if sp > 0 {
+                    continue 'outer;
+                } else {
+                    break 'outer;
                 }
             }
         }
     }
+
+    res
 }

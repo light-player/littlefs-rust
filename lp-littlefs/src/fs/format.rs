@@ -1,5 +1,6 @@
 //! Format. Per lfs.c lfs_format_.
 
+use crate::bd::bd::lfs_bd_sync;
 use crate::block_alloc::alloc::lfs_alloc_ckpoint;
 use crate::dir::commit::lfs_dir_alloc;
 use crate::dir::commit::lfs_dir_commit;
@@ -179,6 +180,13 @@ pub fn lfs_format_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::Lfs
 
         // sanity check that fetch works
         err = lfs_dir_fetch(lfs, &mut root, &root.pair);
+        if err != 0 {
+            lfs_deinit(lfs as *mut _);
+            return err;
+        }
+
+        // flush pcache so raw block reads (e.g. test_superblocks_magic) see data
+        err = lfs_bd_sync(lfs, &mut lfs.pcache, &mut lfs.rcache, false);
         if err != 0 {
             lfs_deinit(lfs as *mut _);
             return err;

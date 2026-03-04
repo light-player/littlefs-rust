@@ -190,6 +190,7 @@ pub struct lfs_mattr {
 /// };
 /// ```
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct lfs_diskoff {
     pub block: lfs_block_t,
     pub off: lfs_off_t,
