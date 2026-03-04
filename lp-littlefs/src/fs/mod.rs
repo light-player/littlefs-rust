@@ -5,6 +5,8 @@ mod consistent;
 pub(crate) mod format;
 mod grow;
 mod init;
+#[cfg(test)]
+pub(crate) use init::lfs_init;
 mod lfs;
 mod lfs_lookahead;
 mod mkdir;

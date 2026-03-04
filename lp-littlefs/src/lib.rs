@@ -14,6 +14,7 @@ mod bd;
 mod block_alloc;
 mod crc;
 mod dir;
+
 mod error;
 mod file;
 mod fs;
@@ -22,6 +23,8 @@ mod lfs_gstate;
 mod lfs_info;
 mod lfs_superblock;
 mod lfs_type;
+#[cfg(test)]
+mod test;
 #[macro_use]
 mod macros;
 mod tag;
@@ -37,6 +40,12 @@ use crate::lfs_info::{LfsFileConfig, LfsInfo};
 pub use crate::error::LFS_ERR_CORRUPT;
 pub use crate::fs::Lfs;
 pub use crate::lfs_config::LfsConfig;
+
+// Test helpers for integration tests (bypass, traverse isolation).
+#[doc(hidden)]
+pub use crate::dir::traverse::TraverseTestOut;
+#[doc(hidden)]
+pub use crate::fs::format::{test_format_minimal_superblock, test_traverse_format_attrs};
 pub use crate::lfs_info::LfsFsinfo;
 use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t, lfs_soff_t, lfs_ssize_t};
 
