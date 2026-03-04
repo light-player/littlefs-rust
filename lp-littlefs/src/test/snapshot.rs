@@ -53,8 +53,8 @@ impl SuperblockSnapshot {
         let o = MAGIC_OFFSET as usize;
         let mag0 = self.block0.get(o..o + 8).map(|s| s as &[u8]).unwrap_or(&[]);
         let mag1 = self.block1.get(o..o + 8).map(|s| s as &[u8]).unwrap_or(&[]);
-        std::eprintln!("bytes 12..20 block0: {:?}", mag0);
-        std::eprintln!("bytes 12..20 block1: {:?}", mag1);
+        std::eprintln!("bytes {}..{} block0: {:?}", o, o + 8, mag0);
+        std::eprintln!("bytes {}..{} block1: {:?}", o, o + 8, mag1);
     }
 }
 

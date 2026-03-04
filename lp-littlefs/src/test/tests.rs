@@ -91,7 +91,7 @@ fn test_context_buffers_writable() {
 fn test_context_format() {
     let mut ctx = TestContext::default_blocks();
     let mut lfs = core::mem::MaybeUninit::<crate::Lfs>::zeroed();
-    let err = crate::lfs_format(lfs.as_mut_ptr() as *mut crate::Lfs, ctx.config());
+    let err = crate::lfs_format(lfs.as_mut_ptr(), ctx.config());
     assert_eq!(err, 0);
     assert_blocks_0_and_1_have_magic(ctx.config());
 }
@@ -101,7 +101,7 @@ fn test_context_format() {
 fn test_context_bypass() {
     let mut ctx = TestContext::default_blocks();
     let mut lfs = core::mem::MaybeUninit::<crate::Lfs>::zeroed();
-    let err = test_format_minimal_superblock(lfs.as_mut_ptr() as *mut _, ctx.config());
+    let err = unsafe { test_format_minimal_superblock(lfs.as_mut_ptr(), ctx.config()) };
     assert_eq!(err, 0);
     let mut has_magic = false;
     let mut buf = [0u8; 24];
@@ -128,7 +128,7 @@ fn test_context_traverse() {
     let mut lfs = core::mem::MaybeUninit::<crate::Lfs>::zeroed();
     let mut out = TraverseTestOut::default();
     let err =
-        test_traverse_format_attrs(lfs.as_mut_ptr() as *mut _, ctx.config(), &mut out as *mut _);
+        unsafe { test_traverse_format_attrs(lfs.as_mut_ptr(), ctx.config(), &mut out as *mut _) };
     assert_eq!(err, 0);
     assert_eq!(out.call_count, 3);
     assert_eq!(out.tags[1], 0x0ff);

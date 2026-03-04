@@ -608,6 +608,24 @@ pub fn lfs_bd_prog(
             if block == pcache.block && off >= pcache.off && off < pcache.off + cfg.cache_size {
                 let diff = lfs_min(size, cfg.cache_size - (off - pcache.off));
                 if !pcache.buffer.is_null() && !data.is_null() {
+                    // Trace superblock magic region (offset 12-20 in block 0/1)
+                    if (block == 0 || block == 1) && off <= 12 && off + diff > 12 {
+                        let magic_start = 12usize.saturating_sub(off as usize);
+                        let magic_len = (8).min(diff as usize - magic_start);
+                        if magic_len > 0 {
+                            let slice =
+                                core::slice::from_raw_parts(data.add(magic_start), magic_len);
+                            crate::lfs_trace!(
+                                "bd_prog superblock block={} off={} size={} magic_region[{}..{}]={:?}",
+                                block,
+                                off,
+                                size,
+                                magic_start,
+                                magic_start + magic_len,
+                                slice
+                            );
+                        }
+                    }
                     core::ptr::copy_nonoverlapping(
                         data,
                         pcache.buffer.add((off - pcache.off) as usize),

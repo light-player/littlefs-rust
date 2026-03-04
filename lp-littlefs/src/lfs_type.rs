@@ -1,6 +1,6 @@
 //! File types and flags. Per lfs.h enum lfs_type, lfs_open_flags, lfs_whence_flags.
 
-#![allow(non_camel_case_types)]
+#![allow(clippy::module_inception, non_camel_case_types)]
 
 /// File types. Per lfs.h enum lfs_type.
 pub mod lfs_type {

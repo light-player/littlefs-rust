@@ -13,9 +13,9 @@ pub fn init_logger() {
 }
 
 /// Magic string "littlefs" in superblock blocks. Per lfs.h.
-/// Layout: [rev 4][CREATE tag 4][SUPERBLOCK tag 4]["littlefs" 8]
+/// Layout: [rev 4][CREATE tag 4]["littlefs" 8] — C format_and_dump shows magic at 8
 pub const MAGIC: &[u8; 8] = b"littlefs";
-pub const MAGIC_OFFSET: u32 = 12;
+pub const MAGIC_OFFSET: u32 = 8;
 
 /// RAM block device storage. Erase = 0xff; prog = copy; read = copy.
 pub struct RamStorage {
@@ -184,10 +184,82 @@ pub fn assert_err(expected: i32, actual: i32) {
     }
 }
 
+/// Check if block has "littlefs" at offset 8 or 12 (layout varies by commit path).
+fn block_has_magic(config: *const LfsConfig, block: u32) -> bool {
+    let mut buf = [0u8; 24];
+    let err = unsafe {
+        let read = (*config).read.expect("read callback");
+        read(config, block, 0, buf.as_mut_ptr(), 24)
+    };
+    if err != 0 {
+        return false;
+    }
+    &buf[8..16] == MAGIC || &buf[12..20] == MAGIC
+}
+
+/// Assert "littlefs" in blocks 0 and 1 (at offset 8 or 12 depending on commit path).
+/// Both blocks must have magic per upstream.
+pub fn assert_superblock_magic(config: *const LfsConfig) {
+    let has_0 = block_has_magic(config, 0);
+    let has_1 = block_has_magic(config, 1);
+    assert!(
+        has_0 && has_1,
+        "both blocks 0 and 1 must have MAGIC: block 0={} block 1={}",
+        has_0,
+        has_1
+    );
+}
+
 /// Invoke config read callback for raw block access (e.g. test_superblocks_magic).
 pub fn read_block_raw(config: *const LfsConfig, block: u32, off: u32, buf: &mut [u8]) -> i32 {
     unsafe {
         let read = (*config).read.expect("read callback");
         read(config, block, off, buf.as_mut_ptr(), buf.len() as u32)
     }
+}
+
+/// Pretty-print first `len` bytes of block for inspection. Used when debugging layout.
+pub fn dump_block_hex(block: &[u8], label: &str, len: usize) {
+    let len = len.min(block.len());
+    eprintln!("{} (first {} bytes):", label, len);
+    for (i, chunk) in block[..len].chunks(16).enumerate() {
+        let hex: String = chunk
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let ascii: String = chunk
+            .iter()
+            .map(|&b| {
+                if b.is_ascii_graphic() || b == b' ' {
+                    b as char
+                } else {
+                    '.'
+                }
+            })
+            .collect();
+        eprintln!("  {:04x}  {}  |{}|", i * 16, hex, ascii);
+    }
+}
+
+/// Format fs, sync, return raw content of superblock blocks 0 and 1.
+/// Helper for debug tests. Caller must init_context before.
+pub fn format_and_read_superblock_blocks(env: &mut TestEnv) -> Result<(Vec<u8>, Vec<u8>), i32> {
+    use lp_littlefs::{lfs_format, Lfs};
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    let err = lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig);
+    if err != 0 {
+        return Err(err);
+    }
+
+    let block_size = env.config.block_size as usize;
+    let mut block0 = vec![0u8; block_size];
+    let mut block1 = vec![0u8; block_size];
+    let err0 = read_block_raw(&env.config as *const LfsConfig, 0, 0, &mut block0);
+    let err1 = read_block_raw(&env.config as *const LfsConfig, 1, 0, &mut block1);
+    if err0 != 0 || err1 != 0 {
+        return Err(if err0 != 0 { err0 } else { err1 });
+    }
+    Ok((block0, block1))
 }

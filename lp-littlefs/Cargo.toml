@@ -20,6 +20,7 @@ rstest = "0.26"
 [features]
 default = ["alloc"]
 alloc = []
+# Enable for debugging: RUST_LOG=lp_littlefs=trace cargo test --features log ...
 std = []
 log = ["dep:log"]
 # LittleFS compile-time flags (match C -DLFS_*)

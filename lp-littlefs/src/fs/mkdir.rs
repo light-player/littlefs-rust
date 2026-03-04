@@ -100,7 +100,6 @@
 /// }
 /// #endif
 /// ```
-
 pub fn lfs_mkdir_(_lfs: *mut super::lfs::Lfs, _path: *const i8) -> i32 {
     todo!("lfs_mkdir_")
 }

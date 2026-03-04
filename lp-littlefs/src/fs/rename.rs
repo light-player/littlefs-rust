@@ -183,7 +183,6 @@
 ///     return lfs_tag_size(tag);
 /// }
 /// ```
-
 pub fn lfs_rename_(_lfs: *mut super::lfs::Lfs, _oldpath: *const i8, _newpath: *const i8) -> i32 {
     todo!("lfs_rename_")
 }

@@ -351,6 +351,13 @@ pub unsafe extern "C" fn lfs_dir_traverse_filter(
     use crate::tag::{lfs_mktag, lfs_tag_id, lfs_tag_isdelete, lfs_tag_splice, lfs_tag_type1};
 
     let filtertag = p as *mut lfs_tag_t;
+    let ft = unsafe { *filtertag };
+    crate::lfs_trace!(
+        "traverse_filter: tag=0x{:08x} ft=0x{:08x} mask_check tag&0x100={}",
+        tag,
+        ft,
+        (tag & lfs_mktag(0x100, 0, 0)) != 0
+    );
 
     let mask = if (tag & lfs_mktag(0x100, 0, 0)) != 0 {
         lfs_mktag(0x7ff, 0x3ff, 0)
@@ -358,12 +365,16 @@ pub unsafe extern "C" fn lfs_dir_traverse_filter(
         lfs_mktag(0x700, 0x3ff, 0)
     };
 
-    let ft = unsafe { *filtertag };
     if (mask & tag) == (mask & ft)
         || lfs_tag_isdelete(ft)
         || (lfs_mktag(0x7ff, 0x3ff, 0) & tag)
             == (lfs_mktag(LFS_TYPE_DELETE, 0, 0) | (lfs_mktag(0, 0x3ff, 0) & ft))
     {
+        crate::lfs_trace!(
+            "traverse_filter: redundant tag=0x{:08x} ft=0x{:08x} -> NOOP return 1",
+            tag,
+            ft
+        );
         unsafe { *filtertag = lfs_mktag(LFS_FROM_NOOP, 0, 0) };
         return 1;
     }
@@ -392,6 +403,8 @@ enum TraversePhase {
 
 /// Stack frame for lfs_dir_traverse recursion. Per lfs.c struct lfs_dir_traverse.
 /// C has .buffer = buffer; we must store it for attr-backed tags (e.g. SUPERBLOCK).
+/// When the filter marks redundant (returns 1, sets tag=NOOP), we store the tag we were
+/// processing so it still gets committed when we pop.
 struct LfsDirTraverseStack {
     dir: *const LfsMdir,
     off: lfs_off_t,
@@ -407,6 +420,9 @@ struct LfsDirTraverseStack {
     tag: lfs_tag_t,
     buffer: *const core::ffi::c_void,
     disk: crate::tag::lfs_diskoff,
+    /// Tag we were processing when filter returned 1; use when popping with NOOP.
+    redundant_tag: lfs_tag_t,
+    redundant_buffer: *const core::ffi::c_void,
 }
 
 /// Per lfs.c lfs_dir_traverse (lines 912-1105)
@@ -686,26 +702,20 @@ pub fn lfs_dir_traverse(
     loop {
         match phase {
             TraversePhase::GetNextTag => {
-                let (tag, buffer, from_pop) = if sp > 0 {
-                    let frame = unsafe { &*stack[sp - 1].as_ptr() };
-                    dir = frame.dir;
-                    off = frame.off;
-                    ptag = frame.ptag;
-                    attr_i = frame.attr_i;
-                    tmask = frame.tmask;
-                    ttag = frame.ttag;
-                    begin = frame.begin;
-                    end = frame.end;
-                    diff = frame.diff;
-                    cb = frame.cb;
-                    data = frame.data;
-                    disk = frame.disk;
-                    sp -= 1;
-                    (frame.tag, frame.buffer, true)
-                } else {
+                crate::lfs_trace!("traverse GetNextTag: sp={} phase=GetNextTag", sp);
+                // Per C: get next tag from disk or attrs. Never pop here.
+                // Pop only happens in PopAndProcess (after exhaust or callback res!=0).
+                let (tag, buffer) = {
                     let dir_ref = unsafe { &*dir };
 
                     if off + lfs_tag_dsize(ptag) < dir_ref.off {
+                        crate::lfs_trace!(
+                            "traverse GetNextTag: reading from disk dir.pair[0]={} off={}",
+                            dir_ref.pair[0],
+                            off
+                        );
+                        // Per C: advance off first to skip previous tag's data, then read
+                        off += lfs_tag_dsize(ptag);
                         let mut tag_raw: lfs_tag_t = 0;
                         let err = lfs_bd_read(
                             lfs,
@@ -720,22 +730,23 @@ pub fn lfs_dir_traverse(
                         if err != 0 {
                             return err;
                         }
-                        off += lfs_tag_dsize(ptag);
                         let tag_val = (lfs_frombe32(tag_raw) ^ ptag) | 0x8000_0000;
                         disk = crate::tag::lfs_diskoff {
                             block: dir_ref.pair[0],
                             off: off + 4,
                         };
                         ptag = tag_val;
-                        (
-                            tag_val,
-                            &disk as *const _ as *const core::ffi::c_void,
-                            false,
-                        )
+                        (tag_val, &disk as *const _ as *const core::ffi::c_void)
                     } else if attr_i < attrs_slice.len() {
                         let attr = &attrs_slice[attr_i];
+                        crate::lfs_trace!(
+                            "traverse GetNextTag: from attrs attr_i={} tag=0x{:08x} attrs_len={}",
+                            attr_i,
+                            attr.tag,
+                            attrs_slice.len()
+                        );
                         attr_i += 1;
-                        (attr.tag, attr.buffer, false)
+                        (attr.tag, attr.buffer)
                     } else {
                         res = 0;
                         if sp == 0 {
@@ -746,11 +757,16 @@ pub fn lfs_dir_traverse(
                     }
                 };
 
-                if from_pop {
-                    phase = TraversePhase::ProcessTag { tag, buffer };
-                } else if (mask & tmask & tag) != (mask & tmask & ttag) {
+                if (mask & tmask & tag) != (mask & tmask & ttag) {
                     phase = TraversePhase::GetNextTag;
                 } else if crate::tag::lfs_tag_id(tmask) != 0 {
+                    crate::lfs_trace!(
+                        "traverse GetNextTag: push tag=0x{:08x} type3={} buffer={:p} attr_i={}",
+                        tag,
+                        crate::tag::lfs_tag_type3(tag),
+                        buffer,
+                        attr_i
+                    );
                     crate::lfs_assert!(sp < LFS_DIR_TRAVERSE_DEPTH);
                     unsafe {
                         let frame = LfsDirTraverseStack {
@@ -768,6 +784,8 @@ pub fn lfs_dir_traverse(
                             tag,
                             buffer,
                             disk,
+                            redundant_tag: 0xffff_ffff,
+                            redundant_buffer: core::ptr::null(),
                         };
                         stack[sp].write(frame);
                     }
@@ -787,6 +805,13 @@ pub fn lfs_dir_traverse(
                 }
             }
             TraversePhase::ProcessTag { tag, buffer } => {
+                crate::lfs_trace!(
+                    "traverse ProcessTag: sp={} tag=0x{:08x} type3={} buffer={:p}",
+                    sp,
+                    tag,
+                    crate::tag::lfs_tag_type3(tag),
+                    buffer
+                );
                 if crate::tag::lfs_tag_id(tmask) != 0
                     && !(crate::tag::lfs_tag_id(tag) >= begin && crate::tag::lfs_tag_id(tag) < end)
                 {
@@ -810,6 +835,15 @@ pub fn lfs_dir_traverse(
                         }
                         if res != 0 {
                             if sp > 0 {
+                                crate::lfs_trace!(
+                                    "traverse ProcessTag: res=1 storing redundant tag=0x{:08x} buffer={:p}",
+                                    tag,
+                                    buffer
+                                );
+                                unsafe {
+                                    (*stack[sp - 1].as_mut_ptr()).redundant_tag = tag;
+                                    (*stack[sp - 1].as_mut_ptr()).redundant_buffer = buffer;
+                                }
                                 phase = TraversePhase::PopAndProcess;
                             } else {
                                 return res;
@@ -821,6 +855,7 @@ pub fn lfs_dir_traverse(
                 }
             }
             TraversePhase::PopAndProcess => {
+                crate::lfs_trace!("traverse PopAndProcess: sp={}", sp);
                 if sp == 0 {
                     return res;
                 }
@@ -837,12 +872,58 @@ pub fn lfs_dir_traverse(
                 cb = frame.cb;
                 data = frame.data;
                 disk = frame.disk;
+                let (proc_tag, proc_buffer) = if crate::tag::lfs_tag_type3(frame.tag)
+                    == crate::lfs_type::lfs_type::LFS_FROM_NOOP as u16
+                    && frame.redundant_tag != 0xffff_ffff
+                {
+                    crate::lfs_trace!(
+                        "traverse PopAndProcess: using redundant tag=0x{:08x} buffer={:p}",
+                        frame.redundant_tag,
+                        frame.redundant_buffer
+                    );
+                    (frame.redundant_tag, frame.redundant_buffer)
+                } else {
+                    (frame.tag, frame.buffer)
+                };
                 sp -= 1;
                 phase = TraversePhase::ProcessTag {
-                    tag: frame.tag,
-                    buffer: frame.buffer,
+                    tag: proc_tag,
+                    buffer: proc_buffer,
                 };
             }
         }
     }
+}
+
+// --- Test helpers for attr iteration validation ---
+
+/// Output collected by lfs_dir_traverse_test_cb. Used to verify traverse passes correct buffers.
+#[derive(Default)]
+pub struct TraverseTestOut {
+    pub call_count: u32,
+    /// type3 per tag (full type: LFS_TYPE_*)
+    pub tags: [u16; 8],
+    pub first_bytes: [u8; 8],
+}
+
+pub unsafe extern "C" fn lfs_dir_traverse_test_cb(
+    p: *mut core::ffi::c_void,
+    tag: lfs_tag_t,
+    buffer: *const core::ffi::c_void,
+) -> i32 {
+    use crate::tag::lfs_tag_type3;
+
+    let out = p as *mut TraverseTestOut;
+    if out.is_null() || (*out).call_count as usize >= 8 {
+        return 0;
+    }
+    let i = (*out).call_count as usize;
+    (*out).tags[i] = lfs_tag_type3(tag);
+    (*out).first_bytes[i] = if buffer.is_null() {
+        0
+    } else {
+        *((buffer as *const u8).add(0))
+    };
+    (*out).call_count += 1;
+    0
 }

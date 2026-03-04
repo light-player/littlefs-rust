@@ -55,7 +55,7 @@ impl TestContext {
     }
 
     pub fn lfs_mut(&mut self) -> *mut Lfs {
-        self.lfs.as_mut_ptr() as *mut Lfs
+        self.lfs.as_mut_ptr()
     }
 
     /// Format the filesystem. Panics on error.

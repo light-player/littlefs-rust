@@ -52,6 +52,7 @@ pub fn lfs_fs_pred(
             i: 1,
             period: 1,
         };
+        let mut have_fetched = false;
 
         while !lfs_pair_isnull(&(*pdir).tail) {
             let err = lfs_tortoise_detectcycles(pdir, &mut tortoise);
@@ -60,6 +61,17 @@ pub fn lfs_fs_pred(
             }
 
             if lfs_pair_cmp(&(*pdir).tail, pair) == 0 {
+                if !have_fetched {
+                    // Matched before any fetch: tail [0,1] == pair (root).
+                    // The root has no predecessor.
+                    let err = lfs_dir_fetch(lfs, pdir, &(*pdir).tail);
+                    if err != 0 {
+                        return err;
+                    }
+                    if lfs_pair_isnull(&(*pdir).tail) {
+                        return crate::error::LFS_ERR_NOENT;
+                    }
+                }
                 return 0;
             }
 
@@ -67,6 +79,7 @@ pub fn lfs_fs_pred(
             if err != 0 {
                 return err;
             }
+            have_fetched = true;
         }
 
         crate::error::LFS_ERR_NOENT

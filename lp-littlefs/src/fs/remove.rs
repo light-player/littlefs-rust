@@ -86,7 +86,6 @@
 ///
 /// #ifndef LFS_READONLY
 /// ```
-
 pub fn lfs_remove_(_lfs: *mut super::lfs::Lfs, _path: *const i8) -> i32 {
     todo!("lfs_remove_")
 }

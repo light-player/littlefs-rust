@@ -4,7 +4,7 @@ use crate::LfsConfig;
 
 /// Magic string "littlefs" in superblock blocks. Per lfs.h.
 pub const MAGIC: &[u8; 8] = b"littlefs";
-/// Layout: [rev 4][CREATE tag 4][SUPERBLOCK tag 4]["littlefs" 8]
+/// Offset of magic in first commit. Layout varies (8 or 12); this is the bypass/attr path.
 pub const MAGIC_OFFSET: u32 = 12;
 
 /// RAM block device storage.

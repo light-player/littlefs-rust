@@ -1,0 +1,28 @@
+   Compiling lp-littlefs v0.1.0 (/Users/yona/dev/photomancer/feature/lp-littlefs-rewrite1/lp-littlefs)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.88s
+     Running unittests src/lib.rs (target/debug/deps/lp_littlefs-faaea26fb6626b77)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/test_superblocks.rs (target/debug/deps/test_superblocks-310383ffcad1203b)
+
+running 2 tests
+
+thread 'test_superblocks_magic' (78719788) panicked at lp-littlefs/tests/common/mod.rs:193:5:
+assertion `left == right` failed: block 0: expected MAGIC at offset 12, got [0, 0, 0, 0, 48, 0, 0, 20]
+  left: [0, 0, 0, 0, 48, 0, 0, 20]
+ right: [108, 105, 116, 116, 108, 101, 102, 115]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test test_superblocks_magic_bypass ... ok
+test test_superblocks_magic ... FAILED
+
+failures:
+
+failures:
+    test_superblocks_magic
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lp-littlefs --test test_superblocks`

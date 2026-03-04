@@ -224,7 +224,7 @@ pub fn lfs_mount_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsC
         return err;
     }
 
-    let result = unsafe {
+    unsafe {
         let lfs = &mut *lfs;
         let cfg = &*cfg;
 
@@ -366,9 +366,7 @@ pub fn lfs_mount_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsC
 
             0
         }
-    };
-
-    result
+    }
 }
 
 /// Per lfs.c lfs_unmount_ (lines 4647-4651)

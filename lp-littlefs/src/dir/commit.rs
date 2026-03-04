@@ -126,6 +126,24 @@ pub fn lfs_dir_commitattr(
             return err;
         }
 
+        if u32::from(crate::tag::lfs_tag_type1(tag))
+            == crate::lfs_type::lfs_type::LFS_TYPE_SUPERBLOCK
+        {
+            crate::lfs_trace!(
+                "commitattr SUPERBLOCK: dsize={} buffer={:p} commit.block={} commit.off={}",
+                dsize,
+                buffer,
+                commit_ref.block,
+                commit_ref.off
+            );
+            if !buffer.is_null() && dsize >= 8 {
+                crate::lfs_trace!(
+                    "commitattr SUPERBLOCK data (first 8): {:?}",
+                    core::slice::from_raw_parts(buffer as *const u8, 8)
+                );
+            }
+        }
+
         if lfs_tag_isvalid(tag) {
             err = lfs_dir_commitprog(lfs, commit, buffer, dsize.saturating_sub(4));
             if err != 0 {
@@ -1757,6 +1775,24 @@ unsafe extern "C" fn lfs_dir_commit_commit_raw(
     tag: lfs_tag_t,
     buffer: *const core::ffi::c_void,
 ) -> i32 {
+    crate::lfs_trace!(
+        "commit_commit_raw: tag=0x{:08x} type1={} buffer={:p}",
+        tag,
+        crate::tag::lfs_tag_type1(tag),
+        buffer
+    );
+    if u32::from(crate::tag::lfs_tag_type1(tag)) == crate::lfs_type::lfs_type::LFS_TYPE_SUPERBLOCK {
+        let preview: [u8; 8] = if buffer.is_null() {
+            [0u8; 8]
+        } else {
+            unsafe { core::ptr::read(buffer as *const [u8; 8]) }
+        };
+        crate::lfs_trace!(
+            "commit_commit_raw SUPERBLOCK: buffer={:p} first 8 bytes: {:?}",
+            buffer,
+            preview
+        );
+    }
     let commit_commit = &*(p as *const (*mut Lfs, *mut LfsCommit));
     let (lfs, commit) = *commit_commit;
     lfs_dir_commitattr(lfs, commit, tag, buffer)
@@ -2014,8 +2050,6 @@ pub fn lfs_dir_orphaningcommit(
         let mut orphans = false;
         let mut state = state;
         let mut lpair = lpair;
-        let mut ldir = ldir;
-        let mut pdir = pdir;
 
         while state == crate::error::LFS_OK_RELOCATED {
             state = 0;

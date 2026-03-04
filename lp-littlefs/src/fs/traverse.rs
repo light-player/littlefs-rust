@@ -107,7 +107,6 @@
 /// }
 ///
 /// ```
-
 pub fn lfs_fs_traverse_(
     _lfs: *mut super::lfs::Lfs,
     _cb: Option<unsafe extern "C" fn(*mut core::ffi::c_void, crate::types::lfs_block_t) -> i32>,
