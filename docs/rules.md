@@ -2,7 +2,13 @@
 
 Hand-translation of LittleFS from C to Rust. These rules govern how to translate functions from the reference C source (`reference/lfs.c`, `lfs_util.c`, `lfs.h`, `lfs_util.h`).
 
-Refer to the C code in `reference/` for the original source, mostly `reference/lfs.c`.
+## Reference Location
+
+**Use the local reference only.** Read C source from `reference/` in this repo (symlink to littlefs checkout). Commit in `docs/reference.md`.
+
+- **Do NOT** fetch `lfs.c`, `lfs.h`, or other C source from the web or GitHub
+- Use `Read` or `Grep` on `reference/lfs.c`, `reference/lfs_util.c`, etc.
+- If `reference/` is missing, create a symlink to a littlefs checkout at the commit in `docs/reference.md` (e.g. `ln -s /path/to/littlefs reference`)
 
 ## 0. Before You Translate
 
@@ -27,37 +33,59 @@ Refer to the C code in `reference/` for the original source, mostly `reference/l
 - Include the original C source as a comment above or below each translated function
 - Use format like `/// C: lfs.c:1234-1280` or a fenced code block with the C excerpt
 - Include line numbers from the reference file for traceability and upstream sync
+- **Preserve C comments**: Keep relevant C comments in the translated Rust code for clarity. Inline comments that explain logic, edge cases, or non-obvious behavior should be carried over (adapted to Rust as needed).
+- **Translation docs**: For each translated function, add a doc comment section that includes:
+  - `Translation docs:` — a brief description of what the function does (high-level purpose and behavior)
+  - Any documentation from the C source (e.g. Doxygen-style `/** ... */`, block comments above the function)
 
-## 4. Signatures and Types
+  Example:
+
+  ```rust
+  /// Translation docs: Allocates a new block from the filesystem and returns its block index.
+  /// On failure returns a negative error code.
+  ///
+  /// C docs: "Allocate a block, preferring the most recently used block."
+  ///
+  /// C: lfs.c:1234-1280
+  fn lfs_alloc(lfs: *mut Lfs, block: *mut u32) -> i32 { ... }
+  ```
+
+## 4. Imports
+
+- **File-level imports**: Use `use` statements at the top of the file for crate-internal types, functions, and constants. Prefer this over `crate::module::item` repeated in the body.
+- **Avoid function-level `use` blocks**: Import once at file level rather than inside each function, unless a name conflict requires scoping (resolve with `as` or more specific paths when possible).
+- Follow normal, idiomatic Rust import style: imports at the top, unqualified names in the body.
+
+## 5. Signatures and Types
 
 - **Double-check signatures**: Compare the Rust signature to the C declaration (parameter types, return type, constness). Ensure Phase 2 structs and types are used consistently.
 - Prefer concrete pointer types over `void*`: Use `*mut Lfs`, `*const LfsMdir`, `*const lfs_mattr`, etc., instead of `*mut core::ffi::c_void` where the C type is known. For raw byte buffers, prefer `*const u8` / `*mut u8` over `*const c_void`. Do not change semantics; the goal is to avoid casts at every call site. Keep `repr(C)` struct fields matching C (e.g. `buffer: *const c_void` in `lfs_mattr`); function parameters may use more specific types.
 - Preserve pointer parameters (`*mut`, `*const`) where the C uses pointers
 - Keep the same error model: C returns negative `int` → Rust returns `i32` with `LFS_ERR_*` constants
 
-## 5. Unsafe Usage
+## 6. Unsafe Usage
 
 - Use `unsafe` for pointer dereferences and raw buffer access when translating C pointer operations
 - Do not hide pointer access behind safe abstractions in the core translation
 - The goal is a faithful translation first; safe wrappers come later (Phase 7)
 
-## 6. Divergences
+## 7. Divergences
 
 - Do not silently change behavior from C
 - If intentional divergence is required, document it (in alignment docs, function comment, or `lp-littlefs-old/docs/alignment/`) with rationale
 - When tests reveal a divergence, fix the translation before changing the test; never relax a test to accommodate a bug in the translation
 
-## 7. Macros and Helpers
+## 8. Macros and Helpers
 
 - Map C macros (`LFS_MKTAG`, `LFS_MKATTRS`, etc.) to equivalent Rust macros or functions with identical semantics
 - Do not change semantics when translating; e.g. tag encoding, CRC logic, and layout must match
 
-## 8. Call Graph
+## 9. Call Graph
 
 - Preserve the C call graph: same functions call the same callees in the same order
 - Stub with `todo!("lfs_function_name")` until implemented; the first panic guides the next implementation step
 
-## 9. Implementation Details
+## 10. Implementation Details
 
 - **Null checks**: Where C checks `ptr != NULL` before use, preserve the check in Rust (e.g. `!attrs.is_null()` before `from_raw_parts`).
 - **Error propagation**: Mirror C control flow: check `err != 0`, return early on non-recoverable errors, handle special cases (e.g. `LFS_ERR_CORRUPT` vs `LFS_ERR_NOSPC`) exactly as in C.
@@ -65,7 +93,7 @@ Refer to the C code in `reference/` for the original source, mostly `reference/l
 - **goto / control flow**: For C `goto`, preserve structure in Rust using nested blocks, `loop`/`continue`, or helper functions. Do not rewrite into different control-flow idioms if it could change behavior.
 - **C casts**: When C uses casts like `(const uint8_t*)buffer`, document the mapping in a comment (e.g. `// C: (const uint8_t*)buffer` → `buffer as *const u8`).
 
-## 10. Copying Tests from Reference
+## 11. Copying Tests from Reference
 
 Tests are defined in upstream TOML files (`tests/test_*.toml`) which contain C snippets run by the littlefs test framework. Port them to Rust integration tests, preserving alignment with the reference.
 

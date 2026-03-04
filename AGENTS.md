@@ -46,6 +46,8 @@ Fix warnings before committing. Do not ignore them.
 
 When translating functions from the reference C code (`reference/lfs.c`, `lfs_util.c`) to Rust:
 
+- **Use the local reference only**: Read from `reference/lfs.c` etc. in this repo. Do NOT fetch lfs.c or other C source from the web.
+
 - Translate callees first; ensure each function called is already implemented (or stubbed) before implementing
 - Double-check signatures against C; prefer concrete types (`*mut Lfs`, `*const u8`) over `*mut c_void` where known
 - Preserve all `LFS_ASSERT` → translate to `lfs_assert!` (or `debug_assert!` where appropriate)
