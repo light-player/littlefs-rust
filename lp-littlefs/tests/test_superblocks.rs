@@ -45,11 +45,10 @@ fn test_superblocks_mount() {
 // --- test_superblocks_magic ---
 // Upstream: format, then raw read to verify "littlefs" at MAGIC_OFFSET in both blocks.
 //
-// Known issue: the SUPERBLOCK attr payload ("littlefs") is not written to disk. The traverse
-// filter (begin==end) was fixed to process format attrs, but the magic still does not appear
-// in RAM. Root cause TBD—suspect buffer handling in commitattr or bd_prog.
+// Known issue: the SUPERBLOCK magic does not appear in raw block reads after format.
+// Traverse buffer fix (stack frame .buffer) ensures callback receives correct data; remaining
+// failure likely in commitprog/pcache or block layout.
 #[test]
-#[ignore = "raw block read does not find magic; SUPERBLOCK payload not written"]
 fn test_superblocks_magic() {
     let mut env = default_config(128);
     init_context(&mut env);

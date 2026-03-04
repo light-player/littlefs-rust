@@ -380,7 +380,18 @@ pub unsafe extern "C" fn lfs_dir_traverse_filter(
 /// Maximum recursive depth. C: LFS_DIR_TRAVERSE_DEPTH 3.
 const LFS_DIR_TRAVERSE_DEPTH: usize = 3;
 
+/// Phases for the traverse state machine. Option 3 from traverse-restructure-notes.
+enum TraversePhase {
+    GetNextTag,
+    ProcessTag {
+        tag: lfs_tag_t,
+        buffer: *const core::ffi::c_void,
+    },
+    PopAndProcess,
+}
+
 /// Stack frame for lfs_dir_traverse recursion. Per lfs.c struct lfs_dir_traverse.
+/// C has .buffer = buffer; we must store it for attr-backed tags (e.g. SUPERBLOCK).
 struct LfsDirTraverseStack {
     dir: *const LfsMdir,
     off: lfs_off_t,
@@ -394,6 +405,7 @@ struct LfsDirTraverseStack {
     cb: unsafe extern "C" fn(*mut core::ffi::c_void, lfs_tag_t, *const core::ffi::c_void) -> i32,
     data: *mut core::ffi::c_void,
     tag: lfs_tag_t,
+    buffer: *const core::ffi::c_void,
     disk: crate::tag::lfs_diskoff,
 }
 
@@ -597,6 +609,21 @@ struct LfsDirTraverseStack {
 /// #endif
 ///
 /// ```
+/// Helper: single place where the traverse callback is invoked.
+/// C: `res = cb(data, tag + LFS_MKTAG(0, diff, 0), buffer);`
+#[inline(always)]
+fn dispatch_tag(
+    cb: unsafe extern "C" fn(*mut core::ffi::c_void, lfs_tag_t, *const core::ffi::c_void) -> i32,
+    data: *mut core::ffi::c_void,
+    tag: lfs_tag_t,
+    buffer: *const core::ffi::c_void,
+    diff: i16,
+) -> i32 {
+    use crate::tag::lfs_mktag;
+    let out_tag = tag.wrapping_add(lfs_mktag(0, diff as u32, 0));
+    unsafe { cb(data, out_tag, buffer) }
+}
+
 pub fn lfs_dir_traverse(
     lfs: *mut crate::fs::Lfs,
     dir: *const LfsMdir,
@@ -654,131 +681,168 @@ pub fn lfs_dir_traverse(
 
     let mask = lfs_mktag(0x7ff, 0, 0);
 
-    'outer: loop {
-        let mut from_pop = false;
-        let (tag, buffer) = if sp > 0 {
-            from_pop = true;
-            let frame = unsafe { &*stack[sp - 1].as_ptr() };
-            dir = frame.dir;
-            off = frame.off;
-            ptag = frame.ptag;
-            attr_i = frame.attr_i;
-            tmask = frame.tmask;
-            ttag = frame.ttag;
-            begin = frame.begin;
-            end = frame.end;
-            diff = frame.diff;
-            cb = frame.cb;
-            data = frame.data;
-            disk = frame.disk;
-            sp -= 1;
-            (frame.tag, &disk as *const _ as *const _)
-        } else {
-            let dir_ref = unsafe { &*dir };
+    let mut phase = TraversePhase::GetNextTag;
 
-            if off + lfs_tag_dsize(ptag) < dir_ref.off {
-                let mut tag_raw: lfs_tag_t = 0;
-                let err = lfs_bd_read(
-                    lfs,
-                    core::ptr::null_mut(),
-                    unsafe { &mut (*lfs).rcache },
-                    core::mem::size_of::<lfs_tag_t>() as u32,
-                    dir_ref.pair[0],
-                    off,
-                    &mut tag_raw as *mut _ as *mut u8,
-                    core::mem::size_of::<lfs_tag_t>() as u32,
-                );
-                if err != 0 {
-                    return err;
-                }
-                off += lfs_tag_dsize(ptag);
-                let tag_val = (lfs_frombe32(tag_raw) ^ ptag) | 0x8000_0000;
-                disk = crate::tag::lfs_diskoff {
-                    block: dir_ref.pair[0],
-                    off: off + 4,
-                };
-                ptag = tag_val;
-                (tag_val, &disk as *const _ as *const _)
-            } else if attr_i < attrs_slice.len() {
-                let attr = &attrs_slice[attr_i];
-                attr_i += 1;
-                (attr.tag, attr.buffer)
-            } else {
-                res = 0;
-                if sp == 0 {
-                    break 'outer;
-                }
-                continue 'outer;
-            }
-        };
-
-        if !from_pop {
-            if (mask & tmask & tag) != (mask & tmask & ttag) {
-                continue 'outer;
-            }
-            if crate::tag::lfs_tag_id(tmask) != 0 {
-                crate::lfs_assert!(sp < LFS_DIR_TRAVERSE_DEPTH);
-                unsafe {
-                    let frame = LfsDirTraverseStack {
-                        dir,
-                        off,
-                        ptag,
-                        attr_i,
-                        tmask,
-                        ttag,
-                        begin,
-                        end,
-                        diff,
-                        cb,
-                        data,
-                        tag,
-                        disk,
-                    };
-                    stack[sp].write(frame);
-                }
-                sp += 1;
-                tmask = 0;
-                ttag = 0;
-                begin = 0;
-                end = 0;
-                diff = 0;
-                cb = lfs_dir_traverse_filter;
-                data = unsafe { &mut (*stack[sp - 1].as_mut_ptr()).tag as *mut _ as *mut _ };
-                continue 'outer;
-            }
-        }
-
-        if crate::tag::lfs_tag_id(tmask) != 0
-            && !(crate::tag::lfs_tag_id(tag) >= begin && crate::tag::lfs_tag_id(tag) < end)
-        {
-            continue 'outer;
-        }
-
-        let type3 = lfs_tag_type3(tag);
-        if type3 == LFS_FROM_NOOP as u16 {
-            // noop
-        } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_MOVE as u16 {
-            if core::ptr::eq(cb as *const (), lfs_dir_traverse_filter as *const ()) {
-                continue 'outer;
-            }
-            todo!("lfs_dir_traverse LFS_FROM_MOVE recursion")
-        } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_USERATTRS as u16 {
-            todo!("lfs_dir_traverse LFS_FROM_USERATTRS")
-        } else {
-            let out_tag = tag.wrapping_add(lfs_mktag(0, diff as u32, 0));
-            res = unsafe { cb(data, out_tag, buffer) };
-            if res < 0 {
-                return res;
-            }
-            if res != 0 {
-                if sp > 0 {
-                    continue 'outer;
+    loop {
+        match phase {
+            TraversePhase::GetNextTag => {
+                let (tag, buffer, from_pop) = if sp > 0 {
+                    let frame = unsafe { &*stack[sp - 1].as_ptr() };
+                    dir = frame.dir;
+                    off = frame.off;
+                    ptag = frame.ptag;
+                    attr_i = frame.attr_i;
+                    tmask = frame.tmask;
+                    ttag = frame.ttag;
+                    begin = frame.begin;
+                    end = frame.end;
+                    diff = frame.diff;
+                    cb = frame.cb;
+                    data = frame.data;
+                    disk = frame.disk;
+                    sp -= 1;
+                    (frame.tag, frame.buffer, true)
                 } else {
-                    break 'outer;
+                    let dir_ref = unsafe { &*dir };
+
+                    if off + lfs_tag_dsize(ptag) < dir_ref.off {
+                        let mut tag_raw: lfs_tag_t = 0;
+                        let err = lfs_bd_read(
+                            lfs,
+                            core::ptr::null_mut(),
+                            unsafe { &mut (*lfs).rcache },
+                            core::mem::size_of::<lfs_tag_t>() as u32,
+                            dir_ref.pair[0],
+                            off,
+                            &mut tag_raw as *mut _ as *mut u8,
+                            core::mem::size_of::<lfs_tag_t>() as u32,
+                        );
+                        if err != 0 {
+                            return err;
+                        }
+                        off += lfs_tag_dsize(ptag);
+                        let tag_val = (lfs_frombe32(tag_raw) ^ ptag) | 0x8000_0000;
+                        disk = crate::tag::lfs_diskoff {
+                            block: dir_ref.pair[0],
+                            off: off + 4,
+                        };
+                        ptag = tag_val;
+                        (
+                            tag_val,
+                            &disk as *const _ as *const core::ffi::c_void,
+                            false,
+                        )
+                    } else if attr_i < attrs_slice.len() {
+                        let attr = &attrs_slice[attr_i];
+                        attr_i += 1;
+                        (attr.tag, attr.buffer, false)
+                    } else {
+                        res = 0;
+                        if sp == 0 {
+                            return res;
+                        }
+                        phase = TraversePhase::PopAndProcess;
+                        continue;
+                    }
+                };
+
+                if from_pop {
+                    phase = TraversePhase::ProcessTag { tag, buffer };
+                } else if (mask & tmask & tag) != (mask & tmask & ttag) {
+                    phase = TraversePhase::GetNextTag;
+                } else if crate::tag::lfs_tag_id(tmask) != 0 {
+                    crate::lfs_assert!(sp < LFS_DIR_TRAVERSE_DEPTH);
+                    unsafe {
+                        let frame = LfsDirTraverseStack {
+                            dir,
+                            off,
+                            ptag,
+                            attr_i,
+                            tmask,
+                            ttag,
+                            begin,
+                            end,
+                            diff,
+                            cb,
+                            data,
+                            tag,
+                            buffer,
+                            disk,
+                        };
+                        stack[sp].write(frame);
+                    }
+                    sp += 1;
+                    tmask = 0;
+                    ttag = 0;
+                    begin = 0;
+                    end = 0;
+                    diff = 0;
+                    cb = lfs_dir_traverse_filter;
+                    data = unsafe {
+                        &mut (*stack[sp - 1].as_mut_ptr()).tag as *mut _ as *mut core::ffi::c_void
+                    };
+                    phase = TraversePhase::GetNextTag;
+                } else {
+                    phase = TraversePhase::ProcessTag { tag, buffer };
                 }
+            }
+            TraversePhase::ProcessTag { tag, buffer } => {
+                if crate::tag::lfs_tag_id(tmask) != 0
+                    && !(crate::tag::lfs_tag_id(tag) >= begin && crate::tag::lfs_tag_id(tag) < end)
+                {
+                    phase = TraversePhase::GetNextTag;
+                } else {
+                    let type3 = lfs_tag_type3(tag);
+                    if type3 == LFS_FROM_NOOP as u16 {
+                        phase = TraversePhase::GetNextTag;
+                    } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_MOVE as u16 {
+                        if core::ptr::eq(cb as *const (), lfs_dir_traverse_filter as *const ()) {
+                            phase = TraversePhase::GetNextTag;
+                        } else {
+                            todo!("lfs_dir_traverse LFS_FROM_MOVE recursion")
+                        }
+                    } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_USERATTRS as u16 {
+                        todo!("lfs_dir_traverse LFS_FROM_USERATTRS")
+                    } else {
+                        res = dispatch_tag(cb, data, tag, buffer, diff);
+                        if res < 0 {
+                            return res;
+                        }
+                        if res != 0 {
+                            if sp > 0 {
+                                phase = TraversePhase::PopAndProcess;
+                            } else {
+                                return res;
+                            }
+                        } else {
+                            phase = TraversePhase::GetNextTag;
+                        }
+                    }
+                }
+            }
+            TraversePhase::PopAndProcess => {
+                if sp == 0 {
+                    return res;
+                }
+                let frame = unsafe { &*stack[sp - 1].as_ptr() };
+                dir = frame.dir;
+                off = frame.off;
+                ptag = frame.ptag;
+                attr_i = frame.attr_i;
+                tmask = frame.tmask;
+                ttag = frame.ttag;
+                begin = frame.begin;
+                end = frame.end;
+                diff = frame.diff;
+                cb = frame.cb;
+                data = frame.data;
+                disk = frame.disk;
+                sp -= 1;
+                phase = TraversePhase::ProcessTag {
+                    tag: frame.tag,
+                    buffer: frame.buffer,
+                };
             }
         }
     }
-
-    res
 }

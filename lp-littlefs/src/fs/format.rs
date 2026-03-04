@@ -170,6 +170,14 @@ pub fn lfs_format_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::Lfs
             return err;
         }
 
+        // Flush pcache so the second commit can read the first block from disk.
+        // Otherwise the second compact reads from a block that was never written.
+        err = lfs_bd_sync(lfs, &mut lfs.pcache, &mut lfs.rcache, false);
+        if err != 0 {
+            lfs_deinit(lfs as *mut _);
+            return err;
+        }
+
         // force compaction to prevent accidentally mounting any older version
         root.erased = false;
         err = lfs_dir_commit(lfs, &mut root, core::ptr::null(), 0);
