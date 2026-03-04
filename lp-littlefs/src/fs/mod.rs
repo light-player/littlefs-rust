@@ -1,6 +1,6 @@
 //! High-level filesystem operations. Per lfs.c lfs_format_, lfs_mount_, lfs_fs_*, etc.
 
-mod attr;
+pub(crate) mod attr;
 pub(crate) mod consistent;
 pub(crate) mod format;
 mod grow;

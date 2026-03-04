@@ -35,8 +35,6 @@ mod util;
 
 use core::ffi::c_void;
 
-use crate::lfs_info::LfsFileConfig;
-
 pub use crate::dir::LfsDir;
 pub use crate::error::{
     LFS_ERR_CORRUPT, LFS_ERR_NOATTR, LFS_ERR_NOENT, LFS_ERR_NOMEM, LFS_ERR_NOSPC,
@@ -44,7 +42,7 @@ pub use crate::error::{
 pub use crate::file::LfsFile;
 pub use crate::fs::Lfs;
 pub use crate::lfs_config::LfsConfig;
-pub use crate::lfs_info::LfsInfo;
+pub use crate::lfs_info::{LfsAttr, LfsFileConfig, LfsInfo};
 
 // Test helpers for integration tests (bypass, traverse isolation).
 #[doc(hidden)]
@@ -109,7 +107,7 @@ pub fn lfs_getattr(
     buffer: *mut c_void,
     size: lfs_size_t,
 ) -> lfs_ssize_t {
-    todo!("lfs_getattr")
+    crate::fs::attr::lfs_getattr_(lfs, path, r#type, buffer, size)
 }
 
 /// Set custom attributes. Per lfs.h lfs_setattr (lfs.c:6471-6475).
@@ -121,13 +119,13 @@ pub fn lfs_setattr(
     buffer: *const c_void,
     size: lfs_size_t,
 ) -> i32 {
-    todo!("lfs_setattr")
+    crate::fs::attr::lfs_setattr_(lfs, path, r#type, buffer, size)
 }
 
 /// Remove a custom attribute. Per lfs.h lfs_removeattr (lfs.c:6487-6491).
 #[inline(never)]
 pub fn lfs_removeattr(lfs: *mut Lfs, path: *const u8, r#type: u8) -> i32 {
-    todo!("lfs_removeattr")
+    crate::fs::attr::lfs_removeattr_(lfs, path, r#type)
 }
 
 /// Open a file. Per lfs.h lfs_file_open (lfs.c:6140-6146).

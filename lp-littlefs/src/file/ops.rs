@@ -204,11 +204,13 @@ pub fn lfs_file_opencfg_(
     use crate::dir::traverse::lfs_dir_get;
     use crate::error::{
         LFS_ERR_EXIST, LFS_ERR_ISDIR, LFS_ERR_NAMETOOLONG, LFS_ERR_NOENT, LFS_ERR_NOMEM,
+        LFS_ERR_NOSPC,
     };
     use crate::file::lfs_ctz::lfs_ctz_fromle32;
     use crate::fs::superblock::lfs_fs_forceconsistency;
-    use crate::lfs_type::lfs_open_flags::{LFS_O_CREAT, LFS_O_EXCL, LFS_O_TRUNC};
-    use crate::lfs_type::lfs_type::{LFS_TYPE_CREATE, LFS_TYPE_REG};
+    use crate::lfs_info::LfsAttr;
+    use crate::lfs_type::lfs_open_flags::{LFS_O_CREAT, LFS_O_EXCL, LFS_O_TRUNC, LFS_O_WRONLY};
+    use crate::lfs_type::lfs_type::{LFS_TYPE_CREATE, LFS_TYPE_REG, LFS_TYPE_USERATTR};
     use crate::tag::{lfs_mktag, lfs_tag_size, lfs_tag_type3};
     use crate::types::LFS_BLOCK_INLINE;
     use crate::util::{
@@ -316,6 +318,38 @@ pub fn lfs_file_opencfg_(
             }
             tag = struct_tag;
             lfs_ctz_fromle32(&mut file_ref.ctz);
+        }
+
+        // C: lfs.c:3162-3187 — fetch attrs
+        if !cfg.is_null() && (*cfg).attr_count > 0 && !(*cfg).attrs.is_null() {
+            let attr_count = (*cfg).attr_count as usize;
+            for i in 0..attr_count {
+                let attr = &*(*cfg).attrs.add(i);
+                if (file_ref.flags as i32 & LFS_O_RDONLY) == LFS_O_RDONLY {
+                    let res = lfs_dir_get(
+                        lfs,
+                        &file_ref.m as *const _,
+                        lfs_mktag(0x7ff, 0x3ff, 0),
+                        lfs_mktag(
+                            LFS_TYPE_USERATTR + attr.type_ as u32,
+                            file_ref.id as u32,
+                            attr.size,
+                        ),
+                        attr.buffer,
+                    );
+                    if res < 0 && res != LFS_ERR_NOENT {
+                        lfs_file_close_(lfs, file);
+                        return res;
+                    }
+                }
+                if (file_ref.flags as i32 & LFS_O_WRONLY) == LFS_O_WRONLY {
+                    if attr.size > (*lfs).attr_max {
+                        lfs_file_close_(lfs, file);
+                        return LFS_ERR_NOSPC;
+                    }
+                    file_ref.flags |= LFS_F_DIRTY as u32;
+                }
+            }
         }
 
         if !cfg.is_null() && !(*cfg).buffer.is_null() {
