@@ -6,9 +6,10 @@ use crate::tag::lfs_tag_size;
 use crate::types::lfs_tag_t;
 use crate::util::lfs_min;
 
+// Per lfs.c enum: LFS_CMP_EQ=0, LFS_CMP_LT=1, LFS_CMP_GT=2 (positive = not error)
 const LFS_CMP_EQ: i32 = 0;
-const LFS_CMP_LT: i32 = -1;
-const LFS_CMP_GT: i32 = 1;
+const LFS_CMP_LT: i32 = 1;
+const LFS_CMP_GT: i32 = 2;
 
 /// Per lfs.c struct lfs_dir_find_match (lines 1447-1475)
 #[repr(C)]

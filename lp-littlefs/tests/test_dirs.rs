@@ -185,11 +185,7 @@ fn test_dirs_many_rename() {
     for i in 0..n {
         let old_path = path_bytes(&format!("d{i}"));
         let new_path = path_bytes(&format!("x{i}"));
-        let err = lfs_rename(
-            lfs.as_mut_ptr(),
-            old_path.as_ptr(),
-            new_path.as_ptr(),
-        );
+        let err = lfs_rename(lfs.as_mut_ptr(), old_path.as_ptr(), new_path.as_ptr());
         assert_ok(err);
     }
 

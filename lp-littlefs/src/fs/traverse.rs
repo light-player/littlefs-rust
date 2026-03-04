@@ -203,6 +203,7 @@ pub fn lfs_fs_traverse_(
                 } else if includeorphans
                     && u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_DIRSTRUCT
                 {
+                    #[allow(clippy::needless_range_loop)] // Rule 2: preserve C loop structure
                     for i in 0..2 {
                         let err = cb(data, raw[i]);
                         if err != 0 {

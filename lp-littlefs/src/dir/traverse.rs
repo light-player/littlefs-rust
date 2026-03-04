@@ -401,6 +401,9 @@ enum TraversePhase {
     PopAndProcess,
 }
 
+/// Empty attrs slice for LFS_FROM_MOVE recursion (we traverse source dir from disk only).
+const EMPTY_ATTRS: &[crate::tag::lfs_mattr] = &[];
+
 /// Stack frame for lfs_dir_traverse recursion. Per lfs.c struct lfs_dir_traverse.
 /// C has .buffer = buffer; we must store it for attr-backed tags (e.g. SUPERBLOCK).
 /// When the filter marks redundant (returns 1, sets tag=NOOP), we store the tag we were
@@ -410,6 +413,7 @@ struct LfsDirTraverseStack {
     off: lfs_off_t,
     ptag: lfs_tag_t,
     attr_i: usize,
+    use_empty_attrs: bool,
     tmask: lfs_tag_t,
     ttag: lfs_tag_t,
     begin: u16,
@@ -684,6 +688,7 @@ pub fn lfs_dir_traverse(
     let mut diff = diff;
     let mut cb = cb;
     let mut data = data;
+    let mut use_empty_attrs = false;
 
     let attrs_slice = if attrcount > 0 && !attrs.is_null() {
         unsafe {
@@ -737,13 +742,25 @@ pub fn lfs_dir_traverse(
                         };
                         ptag = tag_val;
                         (tag_val, &disk as *const _ as *const core::ffi::c_void)
-                    } else if attr_i < attrs_slice.len() {
-                        let attr = &attrs_slice[attr_i];
+                    } else if attr_i
+                        < (if use_empty_attrs {
+                            EMPTY_ATTRS
+                        } else {
+                            attrs_slice
+                        })
+                        .len()
+                    {
+                        let current_attrs = if use_empty_attrs {
+                            EMPTY_ATTRS
+                        } else {
+                            attrs_slice
+                        };
+                        let attr = &current_attrs[attr_i];
                         crate::lfs_trace!(
                             "traverse GetNextTag: from attrs attr_i={} tag=0x{:08x} attrs_len={}",
                             attr_i,
                             attr.tag,
-                            attrs_slice.len()
+                            current_attrs.len()
                         );
                         attr_i += 1;
                         (attr.tag, attr.buffer)
@@ -774,6 +791,7 @@ pub fn lfs_dir_traverse(
                             off,
                             ptag,
                             attr_i,
+                            use_empty_attrs,
                             tmask,
                             ttag,
                             begin,
@@ -824,7 +842,48 @@ pub fn lfs_dir_traverse(
                         if core::ptr::eq(cb as *const (), lfs_dir_traverse_filter as *const ()) {
                             phase = TraversePhase::GetNextTag;
                         } else {
-                            todo!("lfs_dir_traverse LFS_FROM_MOVE recursion")
+                            // Recurse into move: traverse source dir, process only tag with fromid.
+                            // C: lfs.c lfs_dir_traverse LFS_FROM_MOVE branch.
+                            let fromid = crate::tag::lfs_tag_size(tag) as u16;
+                            let toid = crate::tag::lfs_tag_id(tag);
+                            let new_diff = (toid as i16) - (fromid as i16) + diff;
+                            crate::lfs_assert!(sp < LFS_DIR_TRAVERSE_DEPTH);
+                            unsafe {
+                                let noop_tag =
+                                    lfs_mktag(crate::lfs_type::lfs_type::LFS_FROM_NOOP, 0, 0);
+                                let frame = LfsDirTraverseStack {
+                                    dir,
+                                    off,
+                                    ptag,
+                                    attr_i,
+                                    use_empty_attrs,
+                                    tmask,
+                                    ttag,
+                                    begin,
+                                    end,
+                                    diff,
+                                    cb,
+                                    data,
+                                    tag: noop_tag,
+                                    buffer: core::ptr::null(),
+                                    disk,
+                                    redundant_tag: 0xffff_ffff,
+                                    redundant_buffer: core::ptr::null(),
+                                };
+                                stack[sp].write(frame);
+                            }
+                            sp += 1;
+                            dir = buffer as *const LfsMdir;
+                            off = 0;
+                            ptag = 0xffff_ffff;
+                            attr_i = 0;
+                            use_empty_attrs = true;
+                            tmask = lfs_mktag(0x600, 0x3ff, 0);
+                            ttag = lfs_mktag(crate::lfs_type::lfs_type::LFS_TYPE_STRUCT, 0, 0);
+                            begin = fromid;
+                            end = fromid + 1;
+                            diff = new_diff;
+                            phase = TraversePhase::GetNextTag;
                         }
                     } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_USERATTRS as u16 {
                         todo!("lfs_dir_traverse LFS_FROM_USERATTRS")
@@ -864,6 +923,7 @@ pub fn lfs_dir_traverse(
                 off = frame.off;
                 ptag = frame.ptag;
                 attr_i = frame.attr_i;
+                use_empty_attrs = frame.use_empty_attrs;
                 tmask = frame.tmask;
                 ttag = frame.ttag;
                 begin = frame.begin;

@@ -1,9 +1,27 @@
 //! Directory fetch. Per lfs.c lfs_dir_fetch, lfs_dir_getgstate, lfs_dir_getinfo.
 
+use crate::bd::bd::{lfs_bd_crc, lfs_bd_read};
+use crate::crc::lfs_crc;
+use crate::dir::lfs_fcrc::lfs_fcrc_fromle32;
+use crate::dir::traverse::lfs_dir_get;
+use crate::dir::LfsFcrc;
 use crate::dir::LfsMdir;
+use crate::error::LFS_ERR_CORRUPT;
+use crate::file::lfs_ctz::{lfs_ctz_fromle32, LfsCtz};
 use crate::lfs_gstate::LfsGstate;
+use crate::lfs_gstate::{lfs_gstate_fromle32, lfs_gstate_hasmovehere, lfs_gstate_xor};
 use crate::lfs_info::LfsInfo;
-use crate::types::{lfs_block_t, lfs_stag_t, lfs_tag_t};
+use crate::lfs_type::lfs_type::{
+    LFS_TYPE_CCRC, LFS_TYPE_CTZSTRUCT, LFS_TYPE_DELETE, LFS_TYPE_DIR, LFS_TYPE_FCRC,
+    LFS_TYPE_INLINESTRUCT, LFS_TYPE_NAME, LFS_TYPE_SPLICE, LFS_TYPE_STRUCT, LFS_TYPE_TAIL,
+};
+use crate::tag::{
+    lfs_mktag, lfs_tag_chunk, lfs_tag_dsize, lfs_tag_id, lfs_tag_isvalid, lfs_tag_size,
+    lfs_tag_splice, lfs_tag_type1, lfs_tag_type2, lfs_tag_type3,
+};
+use crate::types::{lfs_block_t, lfs_stag_t, lfs_tag_t, LFS_BLOCK_NULL};
+use crate::util::{lfs_fromle32, lfs_min, lfs_pair_swap, lfs_scmp, lfs_tole32};
+use core::mem;
 
 /// Per lfs.c lfs_dir_fetchmatch (lines 1107-1386)
 ///
@@ -302,26 +320,10 @@ pub fn lfs_dir_fetchmatch(
     >,
     _data: *mut core::ffi::c_void,
 ) -> lfs_stag_t {
-    use crate::bd::bd::{lfs_bd_crc, lfs_bd_read};
-    use crate::crc::lfs_crc;
-    use crate::dir::lfs_fcrc::lfs_fcrc_fromle32;
-    use crate::dir::LfsFcrc;
-    use crate::error::LFS_ERR_CORRUPT;
-    use crate::lfs_gstate::lfs_gstate_hasmovehere;
-    use crate::lfs_type::lfs_type::{
-        LFS_TYPE_CCRC, LFS_TYPE_DELETE, LFS_TYPE_FCRC, LFS_TYPE_NAME, LFS_TYPE_SPLICE,
-        LFS_TYPE_TAIL,
-    };
-    use crate::tag::{
-        lfs_mktag, lfs_tag_chunk, lfs_tag_dsize, lfs_tag_id, lfs_tag_isvalid, lfs_tag_splice,
-        lfs_tag_type1, lfs_tag_type2, lfs_tag_type3,
-    };
-    use crate::types::{lfs_block_t, LFS_BLOCK_NULL};
-    use crate::util::{lfs_fromle32, lfs_min, lfs_pair_swap, lfs_scmp, lfs_tole32};
-    use core::mem;
-
+    // Per lfs.c enum: LFS_CMP_EQ=0, LFS_CMP_LT=1, LFS_CMP_GT=2
     const LFS_CMP_EQ: i32 = 0;
-    const LFS_CMP_GT: i32 = 1;
+    const LFS_CMP_LT: i32 = 1;
+    const LFS_CMP_GT: i32 = 2;
 
     unsafe {
         let lfs = &mut *(_lfs as *mut crate::fs::Lfs);
@@ -481,7 +483,10 @@ pub fn lfs_dir_fetchmatch(
                         tempcount = lfs_tag_id(tag) + 1;
                     }
                 } else if u32::from(lfs_tag_type1(tag)) == LFS_TYPE_SPLICE {
-                    tempcount = (tempcount as i32 + lfs_tag_splice(tag) as i32) as u16;
+                    // Divergence: C uses tempcount += lfs_tag_splice(tag) (unsigned wrap). We clamp
+                    // to 0 to avoid underflow when splice is negative (Rule 7).
+                    let delta = lfs_tag_splice(tag) as i32;
+                    tempcount = (tempcount as i32 + delta).max(0) as u16;
 
                     let delete_tag = lfs_mktag(LFS_TYPE_DELETE, 0, 0)
                         | (lfs_mktag(0, 0x3ff, 0) & tempbesttag as lfs_tag_t);
@@ -681,9 +686,6 @@ pub fn lfs_dir_getgstate(
     dir: *const LfsMdir,
     gstate: *mut LfsGstate,
 ) -> i32 {
-    use crate::dir::traverse::lfs_dir_get;
-    use crate::lfs_gstate::{lfs_gstate_fromle32, lfs_gstate_xor};
-
     unsafe {
         let mut temp = crate::lfs_gstate::LfsGstate {
             tag: 0,
@@ -755,14 +757,6 @@ pub fn lfs_dir_getinfo(
     id: u16,
     info: *mut LfsInfo,
 ) -> i32 {
-    use crate::dir::traverse::lfs_dir_get;
-    use crate::file::lfs_ctz::{lfs_ctz_fromle32, LfsCtz};
-    use crate::lfs_type::lfs_type::{
-        LFS_TYPE_CTZSTRUCT, LFS_TYPE_DIR, LFS_TYPE_INLINESTRUCT, LFS_TYPE_NAME, LFS_TYPE_STRUCT,
-    };
-    use crate::tag::{lfs_mktag, lfs_tag_size, lfs_tag_type3};
-    use core::mem;
-
     if lfs.is_null() || dir.is_null() || info.is_null() {
         return crate::error::LFS_ERR_INVAL;
     }

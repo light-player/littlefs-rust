@@ -232,6 +232,7 @@ pub fn lfs_ctz_traverse(
             heads[0] = lfs_fromle32(heads[0]);
             heads[1] = lfs_fromle32(heads[1]);
 
+            #[allow(clippy::needless_range_loop)] // Rule 2: preserve C loop structure
             for i in 0..count - 1 {
                 let err = cb(data, heads[i]);
                 if err != 0 {

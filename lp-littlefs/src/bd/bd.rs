@@ -283,9 +283,10 @@ pub fn lfs_bd_cmp(
     buffer: *const u8,
     size: lfs_size_t,
 ) -> i32 {
+    // Per lfs.c enum: LFS_CMP_EQ=0, LFS_CMP_LT=1, LFS_CMP_GT=2 (positive = not error)
     const LFS_CMP_EQ: i32 = 0;
-    const LFS_CMP_LT: i32 = -1;
-    const LFS_CMP_GT: i32 = 1;
+    const LFS_CMP_LT: i32 = 1;
+    const LFS_CMP_GT: i32 = 2;
 
     let mut i: lfs_off_t = 0;
     while i < size {

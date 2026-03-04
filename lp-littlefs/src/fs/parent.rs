@@ -93,8 +93,9 @@ pub struct LfsFsParentMatch {
     pub pair: [crate::types::lfs_block_t; 2],
 }
 
+// Per lfs.c enum: LFS_CMP_EQ=0, LFS_CMP_LT=1, LFS_CMP_GT=2
 const LFS_CMP_EQ: i32 = 0;
-const LFS_CMP_LT: i32 = -1;
+const LFS_CMP_LT: i32 = 1;
 
 /// Per lfs.c lfs_fs_parent_match (lines 4835-4853)
 ///
