@@ -302,7 +302,326 @@ pub fn lfs_dir_fetchmatch(
     >,
     _data: *mut core::ffi::c_void,
 ) -> lfs_stag_t {
-    todo!("lfs_dir_fetchmatch")
+    use crate::bd::bd::{lfs_bd_crc, lfs_bd_read};
+    use crate::crc::lfs_crc;
+    use crate::dir::lfs_fcrc::lfs_fcrc_fromle32;
+    use crate::dir::LfsFcrc;
+    use crate::error::LFS_ERR_CORRUPT;
+    use crate::lfs_gstate::lfs_gstate_hasmovehere;
+    use crate::lfs_type::lfs_type::{
+        LFS_TYPE_CCRC, LFS_TYPE_DELETE, LFS_TYPE_FCRC, LFS_TYPE_NAME, LFS_TYPE_SPLICE,
+        LFS_TYPE_TAIL,
+    };
+    use crate::tag::{
+        lfs_mktag, lfs_tag_chunk, lfs_tag_dsize, lfs_tag_id, lfs_tag_isvalid, lfs_tag_splice,
+        lfs_tag_type1, lfs_tag_type2, lfs_tag_type3,
+    };
+    use crate::types::{lfs_block_t, LFS_BLOCK_NULL};
+    use crate::util::{lfs_fromle32, lfs_min, lfs_pair_swap, lfs_scmp, lfs_tole32};
+    use core::mem;
+
+    const LFS_CMP_EQ: i32 = 0;
+    const LFS_CMP_GT: i32 = 1;
+
+    unsafe {
+        let lfs = &mut *(_lfs as *mut crate::fs::Lfs);
+        let dir = &mut *_dir;
+        let pair = &*_pair;
+        let cfg = &*lfs.cfg;
+
+        let mut besttag: lfs_stag_t = -1;
+
+        // block_count check (C: lines 1117-1120)
+        if lfs.block_count != 0 && (pair[0] >= lfs.block_count || pair[1] >= lfs.block_count) {
+            return LFS_ERR_CORRUPT as lfs_stag_t;
+        }
+
+        // find the block with the most recent revision (C: lines 1123-1138)
+        let mut revs = [0u32; 2];
+        let mut r = 0usize;
+        for i in 0..2 {
+            let mut rev_buf = [0u8; 4];
+            let err = lfs_bd_read(
+                lfs,
+                core::ptr::null(),
+                &mut lfs.rcache,
+                4,
+                pair[i],
+                0,
+                rev_buf.as_mut_ptr(),
+                4,
+            );
+            revs[i] = u32::from_le_bytes(rev_buf);
+            if err != 0 && err != LFS_ERR_CORRUPT {
+                return err as lfs_stag_t;
+            }
+            if err != LFS_ERR_CORRUPT && lfs_scmp(revs[i], revs[(i + 1) % 2]) > 0 {
+                r = i;
+            }
+        }
+
+        dir.pair[0] = pair[r % 2];
+        dir.pair[1] = pair[(r + 1) % 2];
+        dir.rev = revs[r % 2];
+        dir.off = 0;
+
+        for _block_iter in 0..2 {
+            let mut off: u32 = 0;
+            let mut ptag: lfs_tag_t = 0xffff_ffff;
+
+            let mut tempcount: u16 = 0;
+            let mut temptail: [lfs_block_t; 2] = [LFS_BLOCK_NULL, LFS_BLOCK_NULL];
+            let mut tempsplit = false;
+            let mut tempbesttag = besttag;
+
+            let mut maybeerased = false;
+            let mut hasfcrc = false;
+            let mut fcrc = LfsFcrc { size: 0, crc: 0 };
+
+            let rev_le = lfs_tole32(dir.rev);
+            let mut crc = lfs_crc(0xffff_ffff, &rev_le as *const _ as *const u8, 4);
+            dir.rev = lfs_fromle32(dir.rev);
+
+            loop {
+                off += lfs_tag_dsize(ptag);
+
+                let mut tag_buf = [0u8; 4];
+                let err = lfs_bd_read(
+                    lfs,
+                    core::ptr::null(),
+                    &mut lfs.rcache,
+                    cfg.block_size,
+                    dir.pair[0],
+                    off,
+                    tag_buf.as_mut_ptr(),
+                    4,
+                );
+                if err != 0 {
+                    if err == LFS_ERR_CORRUPT {
+                        break;
+                    }
+                    return err as lfs_stag_t;
+                }
+
+                crc = lfs_crc(crc, tag_buf.as_ptr(), 4);
+                let tag_raw = u32::from_be_bytes(tag_buf);
+                let mut tag = tag_raw ^ ptag;
+
+                if !lfs_tag_isvalid(tag) {
+                    maybeerased = u32::from(lfs_tag_type2(ptag)) == LFS_TYPE_CCRC;
+                    break;
+                } else if off + lfs_tag_dsize(tag) > cfg.block_size {
+                    break;
+                }
+
+                ptag = tag;
+
+                if u32::from(lfs_tag_type2(tag)) == LFS_TYPE_CCRC {
+                    let mut dcrc_buf = [0u8; 4];
+                    let err = lfs_bd_read(
+                        lfs,
+                        core::ptr::null(),
+                        &mut lfs.rcache,
+                        cfg.block_size,
+                        dir.pair[0],
+                        off + 4,
+                        dcrc_buf.as_mut_ptr(),
+                        4,
+                    );
+                    if err != 0 {
+                        if err == LFS_ERR_CORRUPT {
+                            break;
+                        }
+                        return err as lfs_stag_t;
+                    }
+                    let dcrc = u32::from_le_bytes(dcrc_buf);
+
+                    if crc != dcrc {
+                        break;
+                    }
+
+                    ptag ^= (lfs_tag_chunk(tag) as lfs_tag_t & 1) << 31;
+
+                    lfs.seed = lfs_crc(lfs.seed, &crc as *const _ as *const u8, 4);
+
+                    besttag = tempbesttag;
+                    dir.off = off + lfs_tag_dsize(tag);
+                    dir.etag = ptag;
+                    dir.count = tempcount;
+                    dir.tail[0] = temptail[0];
+                    dir.tail[1] = temptail[1];
+                    dir.split = tempsplit;
+
+                    crc = 0xffff_ffff;
+                    continue;
+                }
+
+                let entry_size = lfs_tag_dsize(tag) - 4;
+                let mut crc_val = crc;
+                let err = lfs_bd_crc(
+                    lfs,
+                    core::ptr::null(),
+                    &mut lfs.rcache,
+                    cfg.block_size,
+                    dir.pair[0],
+                    off + 4,
+                    entry_size,
+                    &mut crc_val,
+                );
+                if err != 0 {
+                    if err == LFS_ERR_CORRUPT {
+                        break;
+                    }
+                    return err as lfs_stag_t;
+                }
+                crc = crc_val;
+
+                if u32::from(lfs_tag_type1(tag)) == LFS_TYPE_NAME {
+                    if lfs_tag_id(tag) >= tempcount {
+                        tempcount = lfs_tag_id(tag) + 1;
+                    }
+                } else if u32::from(lfs_tag_type1(tag)) == LFS_TYPE_SPLICE {
+                    tempcount = (tempcount as i32 + lfs_tag_splice(tag) as i32) as u16;
+
+                    let delete_tag = lfs_mktag(LFS_TYPE_DELETE, 0, 0)
+                        | (lfs_mktag(0, 0x3ff, 0) & tempbesttag as lfs_tag_t);
+                    if tag == delete_tag {
+                        tempbesttag = (tempbesttag as u32 | 0x8000_0000) as lfs_stag_t;
+                    } else if tempbesttag != -1
+                        && lfs_tag_id(tag) <= lfs_tag_id(tempbesttag as lfs_tag_t)
+                    {
+                        tempbesttag = (tempbesttag as lfs_tag_t
+                            + lfs_mktag(0, lfs_tag_splice(tag) as u32, 0))
+                            as lfs_stag_t;
+                    }
+                } else if u32::from(lfs_tag_type1(tag)) == LFS_TYPE_TAIL {
+                    tempsplit = (lfs_tag_chunk(tag) & 1) != 0;
+
+                    let mut tail_buf = [0u8; 8];
+                    let err = lfs_bd_read(
+                        lfs,
+                        core::ptr::null(),
+                        &mut lfs.rcache,
+                        cfg.block_size,
+                        dir.pair[0],
+                        off + 4,
+                        tail_buf.as_mut_ptr(),
+                        8,
+                    );
+                    if err != 0 {
+                        if err == LFS_ERR_CORRUPT {
+                            break;
+                        }
+                        return err as lfs_stag_t;
+                    }
+                    temptail[0] = u32::from_le_bytes(tail_buf[0..4].try_into().unwrap());
+                    temptail[1] = u32::from_le_bytes(tail_buf[4..8].try_into().unwrap());
+                } else if u32::from(lfs_tag_type3(tag)) == LFS_TYPE_FCRC {
+                    let mut fcrc_buf = [0u8; mem::size_of::<LfsFcrc>()];
+                    let err = lfs_bd_read(
+                        lfs,
+                        core::ptr::null(),
+                        &mut lfs.rcache,
+                        cfg.block_size,
+                        dir.pair[0],
+                        off + 4,
+                        fcrc_buf.as_mut_ptr(),
+                        fcrc_buf.len() as u32,
+                    );
+                    if err != 0 {
+                        if err == LFS_ERR_CORRUPT {
+                            break;
+                        }
+                        return err as lfs_stag_t;
+                    }
+                    core::ptr::copy_nonoverlapping(
+                        fcrc_buf.as_ptr(),
+                        &mut fcrc as *mut LfsFcrc as *mut u8,
+                        mem::size_of::<LfsFcrc>(),
+                    );
+                    lfs_fcrc_fromle32(&mut fcrc);
+                    hasfcrc = true;
+                }
+
+                if (_fmask & tag) == (_fmask & _ftag) {
+                    if let Some(cb) = _cb {
+                        let diskoff = crate::tag::lfs_diskoff {
+                            block: dir.pair[0],
+                            off: off + 4,
+                        };
+                        let res = cb(_data, tag, &diskoff as *const _ as *const core::ffi::c_void);
+                        if res < 0 {
+                            if res == LFS_ERR_CORRUPT {
+                                break;
+                            }
+                            return res as lfs_stag_t;
+                        }
+
+                        if res == LFS_CMP_EQ {
+                            tempbesttag = tag as lfs_stag_t;
+                        } else if (lfs_mktag(0x7ff, 0x3ff, 0) & tag)
+                            == (lfs_mktag(0x7ff, 0x3ff, 0) & tempbesttag as lfs_tag_t)
+                        {
+                            tempbesttag = -1;
+                        } else if res == LFS_CMP_GT
+                            && lfs_tag_id(tag) <= lfs_tag_id(tempbesttag as lfs_tag_t)
+                        {
+                            tempbesttag = (tag | 0x8000_0000) as lfs_stag_t;
+                        }
+                    }
+                }
+            }
+
+            if dir.off == 0 {
+                lfs_pair_swap(&mut dir.pair);
+                dir.rev = revs[(r + 1) % 2];
+                continue;
+            }
+
+            dir.erased = false;
+            if maybeerased && dir.off.is_multiple_of(cfg.prog_size) && hasfcrc {
+                let mut fcrc_ = 0xffff_ffffu32;
+                let err = lfs_bd_crc(
+                    lfs,
+                    core::ptr::null(),
+                    &mut lfs.rcache,
+                    cfg.block_size,
+                    dir.pair[0],
+                    dir.off,
+                    fcrc.size,
+                    &mut fcrc_,
+                );
+                if err != 0 && err != LFS_ERR_CORRUPT {
+                    return err as lfs_stag_t;
+                }
+                dir.erased = fcrc_ == fcrc.crc;
+            }
+
+            if lfs_gstate_hasmovehere(&lfs.gdisk, &dir.pair) {
+                if lfs_tag_id(lfs.gdisk.tag) == lfs_tag_id(besttag as lfs_tag_t) {
+                    besttag = (besttag as u32 | 0x8000_0000) as lfs_stag_t;
+                } else if besttag != -1
+                    && lfs_tag_id(lfs.gdisk.tag) < lfs_tag_id(besttag as lfs_tag_t)
+                {
+                    besttag -= lfs_mktag(0, 1, 0) as lfs_stag_t;
+                }
+            }
+
+            if !_id.is_null() {
+                *_id = lfs_min(lfs_tag_id(besttag as lfs_tag_t) as u32, dir.count as u32) as u16;
+            }
+
+            if lfs_tag_isvalid(besttag as lfs_tag_t) {
+                return besttag;
+            } else if lfs_tag_id(besttag as lfs_tag_t) < dir.count {
+                return crate::error::LFS_ERR_NOENT as lfs_stag_t;
+            } else {
+                return 0;
+            }
+        }
+
+        LFS_ERR_CORRUPT as lfs_stag_t
+    }
 }
 
 /// Per lfs.c lfs_dir_fetch (lines 1387-1393)
@@ -317,12 +636,22 @@ pub fn lfs_dir_fetchmatch(
 ///             (lfs_tag_t)-1, (lfs_tag_t)-1, NULL, NULL, NULL);
 /// }
 /// ```
-pub fn lfs_dir_fetch(
-    _lfs: *const core::ffi::c_void,
-    _dir: *mut LfsMdir,
-    _pair: &[lfs_block_t; 2],
-) -> i32 {
-    todo!("lfs_dir_fetch")
+pub fn lfs_dir_fetch(lfs: *mut crate::fs::Lfs, dir: *mut LfsMdir, pair: &[lfs_block_t; 2]) -> i32 {
+    let res = lfs_dir_fetchmatch(
+        lfs as *mut _ as *const core::ffi::c_void,
+        dir,
+        pair as *const _,
+        0xffff_ffff,
+        0xffff_ffff,
+        core::ptr::null_mut(),
+        None,
+        core::ptr::null_mut(),
+    );
+    if res < 0 {
+        res
+    } else {
+        0
+    }
 }
 
 /// Per lfs.c lfs_dir_getgstate (lines 1395-1411)
@@ -348,11 +677,38 @@ pub fn lfs_dir_fetch(
 /// }
 /// ```
 pub fn lfs_dir_getgstate(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const LfsMdir,
-    _gstate: *mut LfsGstate,
+    lfs: *mut crate::fs::Lfs,
+    dir: *const LfsMdir,
+    gstate: *mut LfsGstate,
 ) -> i32 {
-    todo!("lfs_dir_getgstate")
+    use crate::dir::traverse::lfs_dir_get;
+    use crate::lfs_gstate::{lfs_gstate_fromle32, lfs_gstate_xor};
+
+    unsafe {
+        let mut temp = crate::lfs_gstate::LfsGstate {
+            tag: 0,
+            pair: [0, 0],
+        };
+        let res = lfs_dir_get(
+            lfs,
+            dir,
+            crate::tag::lfs_mktag(0x7ff, 0, 0),
+            crate::tag::lfs_mktag(
+                crate::lfs_type::lfs_type::LFS_TYPE_MOVESTATE,
+                0,
+                core::mem::size_of::<LfsGstate>() as u32,
+            ),
+            &mut temp as *mut _ as *mut core::ffi::c_void,
+        );
+        if res < 0 && res != crate::error::LFS_ERR_NOENT {
+            return res;
+        }
+        if res != crate::error::LFS_ERR_NOENT {
+            lfs_gstate_fromle32(&mut temp);
+            lfs_gstate_xor(&mut *gstate, &temp);
+        }
+        0
+    }
 }
 
 /// Per lfs.c lfs_dir_getinfo (lines 1413-1445)

@@ -1,5 +1,9 @@
 //! Initialization. Per lfs.c lfs_init, lfs_deinit.
 
+use crate::bd::bd::lfs_cache_zero;
+use crate::types::{LFS_ATTR_MAX, LFS_BLOCK_NULL, LFS_FILE_MAX, LFS_NAME_MAX};
+use crate::util::{lfs_min, lfs_npw2};
+
 /// Per lfs.c lfs_init (lines 4198-4369)
 ///
 /// C:
@@ -177,8 +181,115 @@
 ///     return err;
 /// }
 /// ```
-pub fn lfs_init(_lfs: *mut super::lfs::Lfs, _cfg: *const crate::lfs_config::LfsConfig) -> i32 {
-    todo!("lfs_init")
+pub fn lfs_init(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsConfig) -> i32 {
+    unsafe {
+        let lfs = &mut *lfs;
+        let cfg = &*cfg;
+
+        // check that bool is a truthy-preserving type (C: (bool)0x80000000)
+        crate::lfs_assert!(0x8000_0000u32 != 0);
+
+        // check that the required io functions are provided
+        crate::lfs_assert!(cfg.read.is_some());
+        crate::lfs_assert!(cfg.prog.is_some());
+        crate::lfs_assert!(cfg.erase.is_some());
+        crate::lfs_assert!(cfg.sync.is_some());
+
+        // validate that the lfs-cfg sizes were initiated properly
+        crate::lfs_assert!(cfg.read_size != 0);
+        crate::lfs_assert!(cfg.prog_size != 0);
+        crate::lfs_assert!(cfg.cache_size != 0);
+
+        // check that block size is a multiple of cache size is a multiple of prog and read sizes
+        crate::lfs_assert!(cfg.cache_size.is_multiple_of(cfg.read_size));
+        crate::lfs_assert!(cfg.cache_size.is_multiple_of(cfg.prog_size));
+        crate::lfs_assert!(cfg.block_size.is_multiple_of(cfg.cache_size));
+
+        // check that the block size is large enough to fit all ctz pointers
+        crate::lfs_assert!(cfg.block_size >= 128);
+        crate::lfs_assert!(
+            4 * lfs_npw2(0xffff_ffffu32 / (cfg.block_size - 2 * 4)) <= cfg.block_size,
+            "ctz pointer math"
+        );
+
+        // block_cycles = 0 is no longer supported
+        crate::lfs_assert!(cfg.block_cycles != 0);
+
+        // check that compact_thresh makes sense
+        crate::lfs_assert!(cfg.compact_thresh == 0 || cfg.compact_thresh >= cfg.block_size / 2);
+        crate::lfs_assert!(cfg.compact_thresh == u32::MAX || cfg.compact_thresh <= cfg.block_size);
+
+        // check that metadata_max is a multiple of read_size and prog_size, and a factor of block_size
+        crate::lfs_assert!(cfg.metadata_max == 0 || cfg.metadata_max.is_multiple_of(cfg.read_size));
+        crate::lfs_assert!(cfg.metadata_max == 0 || cfg.metadata_max.is_multiple_of(cfg.prog_size));
+        crate::lfs_assert!(
+            cfg.metadata_max == 0 || cfg.block_size.is_multiple_of(cfg.metadata_max)
+        );
+
+        lfs.cfg = cfg;
+        lfs.block_count = cfg.block_count;
+
+        lfs.rcache.buffer = cfg.read_buffer as *mut u8;
+        lfs.pcache.buffer = cfg.prog_buffer as *mut u8;
+        lfs_cache_zero(lfs, &mut lfs.rcache);
+        lfs_cache_zero(lfs, &mut lfs.pcache);
+
+        crate::lfs_assert!(cfg.lookahead_size > 0);
+        lfs.lookahead.buffer = cfg.lookahead_buffer as *mut u8;
+
+        crate::lfs_assert!(cfg.name_max <= LFS_NAME_MAX as u32);
+        lfs.name_max = if cfg.name_max != 0 {
+            cfg.name_max
+        } else {
+            LFS_NAME_MAX as u32
+        };
+        crate::lfs_assert!(cfg.file_max <= LFS_FILE_MAX as u32);
+        lfs.file_max = if cfg.file_max != 0 {
+            cfg.file_max
+        } else {
+            LFS_FILE_MAX as u32
+        };
+        crate::lfs_assert!(cfg.attr_max <= LFS_ATTR_MAX as u32);
+        lfs.attr_max = if cfg.attr_max != 0 {
+            cfg.attr_max
+        } else {
+            LFS_ATTR_MAX as u32
+        };
+
+        crate::lfs_assert!(cfg.metadata_max == 0 || cfg.metadata_max <= cfg.block_size);
+        let metadata_max = if cfg.metadata_max != 0 {
+            cfg.metadata_max
+        } else {
+            cfg.block_size
+        };
+        crate::lfs_assert!(cfg.inline_max == u32::MAX || cfg.inline_max <= cfg.cache_size);
+        crate::lfs_assert!(cfg.inline_max == u32::MAX || cfg.inline_max <= lfs.attr_max);
+        crate::lfs_assert!(cfg.inline_max == u32::MAX || cfg.inline_max <= metadata_max / 8);
+        lfs.inline_max = if cfg.inline_max == u32::MAX {
+            0
+        } else if cfg.inline_max == 0 {
+            lfs_min(cfg.cache_size, lfs_min(lfs.attr_max, metadata_max / 8))
+        } else {
+            cfg.inline_max
+        };
+
+        lfs.root = [LFS_BLOCK_NULL, LFS_BLOCK_NULL];
+        lfs.mlist = core::ptr::null_mut();
+        lfs.seed = 0;
+        lfs.gstate = crate::lfs_gstate::LfsGstate {
+            tag: 0,
+            pair: [0, 0],
+        };
+        lfs.gdisk = crate::lfs_gstate::LfsGstate {
+            tag: 0,
+            pair: [0, 0],
+        };
+        lfs.gdelta = crate::lfs_gstate::LfsGstate {
+            tag: 0,
+            pair: [0, 0],
+        };
+    }
+    0
 }
 
 /// Per lfs.c lfs_deinit (lines 4371-4389)
@@ -206,5 +317,6 @@ pub fn lfs_init(_lfs: *mut super::lfs::Lfs, _cfg: *const crate::lfs_config::LfsC
 ///
 /// ```
 pub fn lfs_deinit(_lfs: *mut super::lfs::Lfs) -> i32 {
-    todo!("lfs_deinit")
+    // With provided buffers (read_buffer, prog_buffer, lookahead_buffer), no free needed
+    0
 }

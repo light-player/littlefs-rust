@@ -1,5 +1,6 @@
 //! Block allocator. Per lfs.c lfs_alloc, lfs_alloc_scan, lfs_alloc_lookahead, etc.
 
+use crate::fs::Lfs;
 use crate::types::lfs_block_t;
 
 /// Per lfs.c lfs_alloc_ckpoint (lines 614-616)
@@ -10,8 +11,11 @@ use crate::types::lfs_block_t;
 ///     lfs->lookahead.ckpoint = lfs->block_count;
 /// }
 /// ```
-pub fn lfs_alloc_ckpoint(_lfs: *const core::ffi::c_void) {
-    todo!("lfs_alloc_ckpoint")
+pub fn lfs_alloc_ckpoint(lfs: *mut Lfs) {
+    unsafe {
+        let lfs = &mut *lfs;
+        lfs.lookahead.ckpoint = lfs.block_count;
+    }
 }
 
 /// Per lfs.c lfs_alloc_drop (lines 620-624)
@@ -24,7 +28,7 @@ pub fn lfs_alloc_ckpoint(_lfs: *const core::ffi::c_void) {
 ///     lfs_alloc_ckpoint(lfs);
 /// }
 /// ```
-pub fn lfs_alloc_drop(_lfs: *const core::ffi::c_void) {
+pub fn lfs_alloc_drop(_lfs: *mut Lfs) {
     todo!("lfs_alloc_drop")
 }
 
@@ -46,7 +50,7 @@ pub fn lfs_alloc_drop(_lfs: *const core::ffi::c_void) {
 /// }
 /// #endif
 /// ```
-pub fn lfs_alloc_lookahead(_p: *mut core::ffi::c_void, _block: lfs_block_t) -> i32 {
+pub fn lfs_alloc_lookahead(_p: *mut Lfs, _block: lfs_block_t) -> i32 {
     todo!("lfs_alloc_lookahead")
 }
 
@@ -79,7 +83,7 @@ pub fn lfs_alloc_lookahead(_p: *mut core::ffi::c_void, _block: lfs_block_t) -> i
 /// }
 /// #endif
 /// ```
-pub fn lfs_alloc_scan(_lfs: *const core::ffi::c_void) -> i32 {
+pub fn lfs_alloc_scan(_lfs: *mut Lfs) -> i32 {
     todo!("lfs_alloc_scan")
 }
 
@@ -140,6 +144,57 @@ pub fn lfs_alloc_scan(_lfs: *const core::ffi::c_void) -> i32 {
 /// }
 /// #endif
 /// ```
-pub fn lfs_alloc(_lfs: *const core::ffi::c_void, _block: *mut lfs_block_t) -> i32 {
-    todo!("lfs_alloc")
+pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
+    use crate::error::LFS_ERR_NOSPC;
+
+    unsafe {
+        let lfs = &mut *lfs;
+        let cfg = &*lfs.cfg;
+        let buf = lfs.lookahead.buffer;
+        if buf.is_null() {
+            return LFS_ERR_NOSPC;
+        }
+
+        loop {
+            while lfs.lookahead.next < lfs.lookahead.size {
+                let byte_idx = (lfs.lookahead.next / 8) as usize;
+                let bit_mask = 1u8 << (lfs.lookahead.next % 8);
+                let used = (*buf.add(byte_idx)) & bit_mask != 0;
+
+                if !used {
+                    *block = (lfs.lookahead.start + lfs.lookahead.next) % lfs.block_count;
+
+                    loop {
+                        lfs.lookahead.next += 1;
+                        lfs.lookahead.ckpoint = lfs.lookahead.ckpoint.wrapping_sub(1);
+
+                        if lfs.lookahead.next >= lfs.lookahead.size {
+                            return 0;
+                        }
+                        let next_byte = (lfs.lookahead.next / 8) as usize;
+                        let next_bit = 1u8 << (lfs.lookahead.next % 8);
+                        if (*buf.add(next_byte)) & next_bit == 0 {
+                            return 0;
+                        }
+                    }
+                }
+
+                lfs.lookahead.next += 1;
+                lfs.lookahead.ckpoint = lfs.lookahead.ckpoint.wrapping_sub(1);
+            }
+
+            if lfs.lookahead.ckpoint == 0 {
+                crate::lfs_error!(
+                    "No more free space 0x{:08x}",
+                    (lfs.lookahead.start + lfs.lookahead.next) % lfs.block_count
+                );
+                return LFS_ERR_NOSPC;
+            }
+
+            let err = lfs_alloc_scan(lfs);
+            if err != 0 {
+                return err;
+            }
+        }
+    }
 }

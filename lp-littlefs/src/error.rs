@@ -18,3 +18,8 @@ pub const LFS_ERR_NOSPC: i32 = -28;
 pub const LFS_ERR_NOMEM: i32 = -12;
 pub const LFS_ERR_NOATTR: i32 = -61;
 pub const LFS_ERR_NAMETOOLONG: i32 = -36;
+
+/// Positive return values for commit/orphan machinery. Per lfs.h enum lfs_error.
+pub const LFS_OK_RELOCATED: i32 = 1;
+pub const LFS_OK_DROPPED: i32 = 2;
+pub const LFS_OK_ORPHANED: i32 = 3;

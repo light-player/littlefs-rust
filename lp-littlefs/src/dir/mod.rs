@@ -1,7 +1,7 @@
 //! Metadata and directory operations. Per lfs.c lfs_dir_*.
 
-mod commit;
-mod fetch;
+pub(crate) mod commit;
+pub(crate) mod fetch;
 mod find;
 mod lfs_commit;
 mod lfs_dir;

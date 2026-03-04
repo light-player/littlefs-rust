@@ -36,11 +36,41 @@
 /// #endif
 /// ```
 pub fn lfs_fs_pred(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const [crate::types::lfs_block_t; 2],
-    _pdir: *mut crate::dir::LfsMdir,
+    lfs: *mut crate::fs::Lfs,
+    pair: &[crate::types::lfs_block_t; 2],
+    pdir: *mut crate::dir::LfsMdir,
 ) -> i32 {
-    todo!("lfs_fs_pred")
+    use crate::dir::fetch::lfs_dir_fetch;
+    use crate::fs::mount::{lfs_tortoise_detectcycles, LfsTortoise};
+    use crate::types::LFS_BLOCK_NULL;
+    use crate::util::{lfs_pair_cmp, lfs_pair_isnull};
+
+    unsafe {
+        (*pdir).tail = [0, 1];
+        let mut tortoise = LfsTortoise {
+            pair: [LFS_BLOCK_NULL, LFS_BLOCK_NULL],
+            i: 1,
+            period: 1,
+        };
+
+        while !lfs_pair_isnull(&(*pdir).tail) {
+            let err = lfs_tortoise_detectcycles(pdir, &mut tortoise);
+            if err < 0 {
+                return crate::error::LFS_ERR_CORRUPT;
+            }
+
+            if lfs_pair_cmp(&(*pdir).tail, pair) == 0 {
+                return 0;
+            }
+
+            let err = lfs_dir_fetch(lfs, pdir, &(*pdir).tail);
+            if err != 0 {
+                return err;
+            }
+        }
+
+        crate::error::LFS_ERR_NOENT
+    }
 }
 
 /// Per lfs.c lfs_fs_parent_match (lines 4835-4853)
@@ -111,7 +141,7 @@ pub fn lfs_fs_parent_match(
 /// #endif
 /// ```
 pub fn lfs_fs_parent(
-    _lfs: *const core::ffi::c_void,
+    _lfs: *mut crate::fs::Lfs,
     _pair: *const [crate::types::lfs_block_t; 2],
     _parent: *mut crate::dir::LfsMdir,
 ) -> crate::types::lfs_stag_t {

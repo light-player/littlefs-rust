@@ -76,15 +76,99 @@ use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t, lfs_stag_t, lfs_tag_t};
 /// }
 /// ```
 pub fn lfs_dir_getslice(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const LfsMdir,
-    _gmask: lfs_tag_t,
-    _gtag: lfs_tag_t,
-    _goff: lfs_off_t,
-    _gbuffer: *mut core::ffi::c_void,
-    _gsize: lfs_size_t,
+    lfs: *mut crate::fs::Lfs,
+    dir: *const LfsMdir,
+    gmask: lfs_tag_t,
+    gtag: lfs_tag_t,
+    goff: lfs_off_t,
+    gbuffer: *mut core::ffi::c_void,
+    gsize: lfs_size_t,
 ) -> lfs_stag_t {
-    todo!("lfs_dir_getslice")
+    use crate::bd::bd::lfs_bd_read;
+    use crate::tag::{
+        lfs_mktag, lfs_tag_dsize, lfs_tag_id, lfs_tag_isdelete, lfs_tag_size, lfs_tag_type1,
+    };
+    use crate::util::{lfs_frombe32, lfs_min};
+
+    unsafe {
+        let dir_ref = &*dir;
+        let mut off = dir_ref.off;
+        let mut ntag = dir_ref.etag;
+        let mut gdiff: lfs_stag_t = 0;
+
+        if crate::lfs_gstate::lfs_gstate_hasmovehere(&(*lfs).gdisk, &dir_ref.pair)
+            && lfs_tag_id(gmask) != 0
+        {
+            if lfs_tag_id((*lfs).gdisk.tag) == lfs_tag_id(gtag) {
+                return crate::error::LFS_ERR_NOENT;
+            } else if lfs_tag_id((*lfs).gdisk.tag) < lfs_tag_id(gtag) {
+                gdiff = gdiff.wrapping_sub(lfs_mktag(0, 1, 0) as i32);
+            }
+        }
+
+        while off >= 4 + lfs_tag_dsize(ntag) {
+            off -= lfs_tag_dsize(ntag);
+            let tag = ntag;
+            let mut ntag_buf: lfs_tag_t = 0;
+            let err = lfs_bd_read(
+                lfs,
+                core::ptr::null_mut(),
+                &mut (*lfs).rcache,
+                4,
+                dir_ref.pair[0],
+                off,
+                &mut ntag_buf as *mut _ as *mut u8,
+                4,
+            );
+            if err != 0 {
+                return err as lfs_stag_t;
+            }
+            ntag = (lfs_frombe32(ntag_buf) ^ tag) & 0x7fff_ffff;
+
+            if lfs_tag_id(gmask) != 0
+                && u32::from(lfs_tag_type1(tag)) == crate::lfs_type::lfs_type::LFS_TYPE_SPLICE
+                && lfs_tag_id(tag) <= lfs_tag_id((gtag as i32 - gdiff) as u32)
+            {
+                if tag
+                    == (lfs_mktag(crate::lfs_type::lfs_type::LFS_TYPE_CREATE, 0, 0)
+                        | (lfs_mktag(0, 0x3ff, 0) & (gtag as i32 - gdiff) as u32))
+                {
+                    return crate::error::LFS_ERR_NOENT;
+                }
+                gdiff = gdiff
+                    .wrapping_add(lfs_mktag(0, crate::tag::lfs_tag_splice(tag) as u32, 0) as i32);
+            }
+
+            if (gmask & tag) == (gmask & ((gtag as i32 - gdiff) as u32)) {
+                if lfs_tag_isdelete(tag) {
+                    return crate::error::LFS_ERR_NOENT;
+                }
+                let diff = lfs_min(lfs_tag_size(tag), gsize);
+                let err = lfs_bd_read(
+                    lfs,
+                    core::ptr::null_mut(),
+                    &mut (*lfs).rcache,
+                    diff,
+                    dir_ref.pair[0],
+                    off + 4 + goff,
+                    gbuffer as *mut u8,
+                    diff,
+                );
+                if err != 0 {
+                    return err as lfs_stag_t;
+                }
+                if !gbuffer.is_null() && diff < gsize {
+                    core::ptr::write_bytes(
+                        (gbuffer as *mut u8).add(diff as usize),
+                        0,
+                        (gsize - diff) as usize,
+                    );
+                }
+                return (tag as i32).wrapping_add(gdiff);
+            }
+        }
+        crate::error::LFS_ERR_NOENT
+    }
 }
 
 /// Per lfs.c lfs_dir_get (lines 786-791)
@@ -99,13 +183,21 @@ pub fn lfs_dir_getslice(
 /// }
 /// ```
 pub fn lfs_dir_get(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const LfsMdir,
-    _gmask: lfs_tag_t,
-    _gtag: lfs_tag_t,
-    _buffer: *mut core::ffi::c_void,
+    lfs: *mut crate::fs::Lfs,
+    dir: *const LfsMdir,
+    gmask: lfs_tag_t,
+    gtag: lfs_tag_t,
+    buffer: *mut core::ffi::c_void,
 ) -> lfs_stag_t {
-    todo!("lfs_dir_get")
+    lfs_dir_getslice(
+        lfs,
+        dir,
+        gmask,
+        gtag,
+        0,
+        buffer,
+        crate::tag::lfs_tag_size(gtag),
+    )
 }
 
 /// Per lfs.c lfs_dir_getread (lines 793-850)
@@ -459,21 +551,107 @@ pub fn lfs_dir_traverse_filter(
 ///
 /// ```
 pub fn lfs_dir_traverse(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const LfsMdir,
-    _off: lfs_off_t,
-    _ptag: lfs_tag_t,
-    _attrs: *const core::ffi::c_void,
-    _attrcount: i32,
-    _tmask: lfs_tag_t,
-    _ttag: lfs_tag_t,
-    _begin: u16,
-    _end: u16,
-    _diff: i16,
-    _cb: Option<
+    lfs: *mut crate::fs::Lfs,
+    dir: *const LfsMdir,
+    off: lfs_off_t,
+    ptag: lfs_tag_t,
+    attrs: *const core::ffi::c_void,
+    attrcount: i32,
+    tmask: lfs_tag_t,
+    ttag: lfs_tag_t,
+    begin: u16,
+    end: u16,
+    diff: i16,
+    cb: Option<
         unsafe extern "C" fn(*mut core::ffi::c_void, lfs_tag_t, *const core::ffi::c_void) -> i32,
     >,
-    _data: *mut core::ffi::c_void,
+    data: *mut core::ffi::c_void,
 ) -> i32 {
-    todo!("lfs_dir_traverse")
+    use crate::bd::bd::lfs_bd_read;
+    use crate::tag::{lfs_mktag, lfs_tag_dsize, lfs_tag_id, lfs_tag_type3};
+    use crate::types::lfs_tag_t;
+    use crate::util::lfs_frombe32;
+
+    let cb = match cb {
+        Some(c) => c,
+        None => return 0,
+    };
+
+    unsafe {
+        let mut off = off;
+        let mut ptag = ptag;
+        let mut attrs = attrs;
+        let mut attrcount = attrcount;
+        let dir_ref = &*dir;
+        let mask = lfs_mktag(0x7ff, 0, 0);
+
+        let attrs_slice = if attrcount > 0 && !attrs.is_null() {
+            core::slice::from_raw_parts(attrs as *const crate::tag::lfs_mattr, attrcount as usize)
+        } else {
+            &[]
+        };
+        let mut attr_i: usize = 0;
+
+        loop {
+            let (tag, buffer): (lfs_tag_t, *const core::ffi::c_void) =
+                if off + lfs_tag_dsize(ptag) < dir_ref.off {
+                    let mut tag: lfs_tag_t = 0;
+                    let err = lfs_bd_read(
+                        lfs,
+                        core::ptr::null_mut(),
+                        &mut (*lfs).rcache,
+                        core::mem::size_of::<lfs_tag_t>() as u32,
+                        dir_ref.pair[0],
+                        off,
+                        &mut tag as *mut _ as *mut u8,
+                        core::mem::size_of::<lfs_tag_t>() as u32,
+                    );
+                    if err != 0 {
+                        return err;
+                    }
+                    off += lfs_tag_dsize(ptag);
+                    let tag_val = (lfs_frombe32(tag) ^ ptag) | 0x8000_0000;
+                    let disk = crate::tag::lfs_diskoff {
+                        block: dir_ref.pair[0],
+                        off: off + 4,
+                    };
+                    ptag = tag_val;
+                    (tag_val, &disk as *const _ as *const _)
+                } else if attr_i < attrs_slice.len() {
+                    let attr = &attrs_slice[attr_i];
+                    attr_i += 1;
+                    (attr.tag, attr.buffer)
+                } else {
+                    return 0;
+                };
+
+            if (mask & tmask & tag) != (mask & tmask & ttag) {
+                continue;
+            }
+
+            if crate::tag::lfs_tag_id(tmask) != 0
+                && !(crate::tag::lfs_tag_id(tag) >= begin && crate::tag::lfs_tag_id(tag) < end)
+            {
+                continue;
+            }
+
+            let type3 = lfs_tag_type3(tag);
+            if type3 == crate::lfs_type::lfs_type::LFS_FROM_NOOP as u16 {
+                // noop
+            } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_MOVE as u16 {
+                todo!("lfs_dir_traverse LFS_FROM_MOVE")
+            } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_USERATTRS as u16 {
+                todo!("lfs_dir_traverse LFS_FROM_USERATTRS")
+            } else {
+                let out_tag = tag.wrapping_add(lfs_mktag(0, diff as u32, 0));
+                let res = cb(data, out_tag, buffer);
+                if res < 0 {
+                    return res;
+                }
+                if res != 0 {
+                    return res;
+                }
+            }
+        }
+    }
 }

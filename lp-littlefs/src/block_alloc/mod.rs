@@ -1,3 +1,3 @@
 //! Block allocation. Per lfs.c lfs_alloc_*.
 
-mod alloc;
+pub(crate) mod alloc;

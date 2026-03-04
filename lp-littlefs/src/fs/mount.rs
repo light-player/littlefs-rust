@@ -1,32 +1,38 @@
 //! Mount/unmount. Per lfs.c lfs_mount_, lfs_unmount_.
 
+/// Per lfs.c lfs_tortoise_t and lfs_tortoise_detectcycles (lines 4464-4480)
+#[repr(C)]
+pub struct LfsTortoise {
+    pub pair: [crate::types::lfs_block_t; 2],
+    pub i: crate::types::lfs_size_t,
+    pub period: crate::types::lfs_size_t,
+}
+
 /// Per lfs.c lfs_tortoise_detectcycles (lines 4464-4480)
-///
-/// C:
-/// ```c
-/// static int lfs_tortoise_detectcycles(
-///     const lfs_mdir_t *dir, struct lfs_tortoise_t *tortoise) {
-///     // detect cycles with Brent's algorithm
-///     if (lfs_pair_issync(dir->tail, tortoise->pair)) {
-///         LFS_WARN("Cycle detected in tail list");
-///         return LFS_ERR_CORRUPT;
-///     }
-///     if (tortoise->i == tortoise->period) {
-///         tortoise->pair[0] = dir->tail[0];
-///         tortoise->pair[1] = dir->tail[1];
-///         tortoise->i = 0;
-///         tortoise->period *= 2;
-///     }
-///     tortoise->i += 1;
-///
-///     return LFS_ERR_OK;
-/// }
-/// ```
 pub fn lfs_tortoise_detectcycles(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const crate::dir::LfsMdir,
+    dir: *const crate::dir::LfsMdir,
+    tortoise: *mut LfsTortoise,
 ) -> i32 {
-    todo!("lfs_tortoise_detectcycles")
+    use crate::types::LFS_BLOCK_NULL;
+    use crate::util::lfs_pair_issync;
+
+    if tortoise.is_null() {
+        return 0;
+    }
+    unsafe {
+        let dir_ref = &*dir;
+        let tortoise_ref = &mut *tortoise;
+        if lfs_pair_issync(&dir_ref.tail, &tortoise_ref.pair) {
+            return crate::error::LFS_ERR_CORRUPT;
+        }
+        if tortoise_ref.i == tortoise_ref.period {
+            tortoise_ref.pair = dir_ref.tail;
+            tortoise_ref.i = 0;
+            tortoise_ref.period *= 2;
+        }
+        tortoise_ref.i += 1;
+    }
+    0
 }
 
 /// Per lfs.c lfs_mount_ (lines 4482-4645)

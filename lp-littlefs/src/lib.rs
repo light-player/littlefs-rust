@@ -22,6 +22,7 @@ mod lfs_gstate;
 mod lfs_info;
 mod lfs_superblock;
 mod lfs_type;
+#[macro_use]
 mod macros;
 mod tag;
 mod types;
@@ -31,22 +32,29 @@ use core::ffi::c_void;
 
 use crate::dir::LfsDir;
 use crate::file::LfsFile;
-use crate::fs::Lfs;
-use crate::lfs_config::LfsConfig;
-use crate::lfs_info::{LfsFileConfig, LfsFsinfo, LfsInfo};
+use crate::lfs_info::{LfsFileConfig, LfsInfo};
+
+pub use crate::error::LFS_ERR_CORRUPT;
+pub use crate::fs::Lfs;
+pub use crate::lfs_config::LfsConfig;
+pub use crate::lfs_info::LfsFsinfo;
 use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t, lfs_soff_t, lfs_ssize_t};
 
 /// Format a block device with littlefs.
 /// Per lfs.h lfs_format. Calls lfs_format_ (lfs.c:4391).
 #[inline(never)]
 pub fn lfs_format(lfs: *mut Lfs, config: *const LfsConfig) -> i32 {
-    todo!("lfs_format")
+    crate::lfs_trace!("lfs_format({:p}, {:p})", lfs, config);
+    let err = crate::fs::lfs_format_(lfs, config);
+    crate::lfs_trace!("lfs_format -> {}", err);
+    err
 }
 
 /// Mount a littlefs.
 /// Per lfs.h lfs_mount. Calls lfs_mount_ (lfs.c:4482).
 #[inline(never)]
 pub fn lfs_mount(lfs: *mut Lfs, config: *const LfsConfig) -> i32 {
+    crate::lfs_trace!("lfs_mount({:p}, {:p})", lfs, config);
     todo!("lfs_mount")
 }
 

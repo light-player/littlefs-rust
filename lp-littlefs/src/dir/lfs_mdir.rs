@@ -4,6 +4,7 @@ use crate::types::lfs_block_t;
 
 /// Per lfs.h typedef struct lfs_mdir
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct LfsMdir {
     pub pair: [lfs_block_t; 2],
     pub rev: u32,

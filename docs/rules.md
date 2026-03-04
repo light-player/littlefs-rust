@@ -2,6 +2,12 @@
 
 Hand-translation of LittleFS from C to Rust. These rules govern how to translate functions from the reference C source (`reference/lfs.c`, `lfs_util.c`, `lfs.h`, `lfs_util.h`).
 
+Refer to the C code in `reference/` for the original source, mostly `reference/lfs.c`.
+
+## 0. Before You Translate
+
+- **Translate callees first**: Before implementing a function, ensure every function it calls is already implemented (or stubbed). Implement leaf functions first, then work up the call graph. Avoids nested `todo!()` panics and lets you test each function in isolation.
+
 ## 1. Assertions
 
 - Translate every C `LFS_ASSERT(cond)` to `lfs_assert!(cond)` in Rust (uses `debug_assert!` under the hood)
@@ -24,7 +30,8 @@ Hand-translation of LittleFS from C to Rust. These rules govern how to translate
 
 ## 4. Signatures and Types
 
-- Match C function signatures using the Phase 2 struct/enum definitions
+- **Double-check signatures**: Compare the Rust signature to the C declaration (parameter types, return type, constness). Ensure Phase 2 structs and types are used consistently.
+- Prefer concrete pointer types over `void*`: Use `*mut Lfs`, `*const LfsMdir`, `*const lfs_mattr`, etc., instead of `*mut core::ffi::c_void` where the C type is known. For raw byte buffers, prefer `*const u8` / `*mut u8` over `*const c_void`. Do not change semantics; the goal is to avoid casts at every call site. Keep `repr(C)` struct fields matching C (e.g. `buffer: *const c_void` in `lfs_mattr`); function parameters may use more specific types.
 - Preserve pointer parameters (`*mut`, `*const`) where the C uses pointers
 - Keep the same error model: C returns negative `int` → Rust returns `i32` with `LFS_ERR_*` constants
 
@@ -49,3 +56,11 @@ Hand-translation of LittleFS from C to Rust. These rules govern how to translate
 
 - Preserve the C call graph: same functions call the same callees in the same order
 - Stub with `todo!("lfs_function_name")` until implemented; the first panic guides the next implementation step
+
+## 9. Implementation Details
+
+- **Null checks**: Where C checks `ptr != NULL` before use, preserve the check in Rust (e.g. `!attrs.is_null()` before `from_raw_parts`).
+- **Error propagation**: Mirror C control flow: check `err != 0`, return early on non-recoverable errors, handle special cases (e.g. `LFS_ERR_CORRUPT` vs `LFS_ERR_NOSPC`) exactly as in C.
+- **cfg access**: Where C assumes `lfs->cfg` is non-null after init, use `unwrap()` or `expect()` only when the C contract guarantees it; otherwise add explicit null checks.
+- **goto / control flow**: For C `goto`, preserve structure in Rust using nested blocks, `loop`/`continue`, or helper functions. Do not rewrite into different control-flow idioms if it could change behavior.
+- **C casts**: When C uses casts like `(const uint8_t*)buffer`, document the mapping in a comment (e.g. `// C: (const uint8_t*)buffer` → `buffer as *const u8`).

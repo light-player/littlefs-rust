@@ -27,12 +27,12 @@ pub const LFS_ATTR_MAX: usize = 1022;
 /// Version info. Per lfs.h LFS_VERSION.
 pub const LFS_VERSION: u32 = 0x0002_000b;
 pub const LFS_VERSION_MAJOR: u32 = 0xffff & (LFS_VERSION >> 16);
-pub const LFS_VERSION_MINOR: u32 = 0xffff & (LFS_VERSION >> 0);
+pub const LFS_VERSION_MINOR: u32 = 0xffff & LFS_VERSION;
 
 /// On-disk version. Per lfs.h LFS_DISK_VERSION.
 pub const LFS_DISK_VERSION: u32 = 0x0002_0001;
 pub const LFS_DISK_VERSION_MAJOR: u32 = 0xffff & (LFS_DISK_VERSION >> 16);
-pub const LFS_DISK_VERSION_MINOR: u32 = 0xffff & (LFS_DISK_VERSION >> 0);
+pub const LFS_DISK_VERSION_MINOR: u32 = 0xffff & LFS_DISK_VERSION;
 
 /// Per lfs.c LFS_BLOCK_NULL, LFS_BLOCK_INLINE
 pub const LFS_BLOCK_NULL: lfs_block_t = u32::MAX; // (lfs_block_t)-1

@@ -1,0 +1,192 @@
+//! Shared test helpers for lp-littlefs integration tests.
+//!
+//! Reduces duplication across test files. Provides RAM block device, config builder,
+//! and assert helpers. Upstream reference: tests/test_superblocks.toml
+
+#![allow(dead_code)]
+
+use lp_littlefs::LfsConfig;
+
+/// Initialize env_logger for tests that use logging. Idempotent.
+pub fn init_logger() {
+    let _ = env_logger::try_init();
+}
+
+/// Magic string "littlefs" at offset 8 in superblock blocks. Per lfs.h.
+pub const MAGIC: &[u8; 8] = b"littlefs";
+pub const MAGIC_OFFSET: u32 = 8;
+
+/// RAM block device storage. Erase = 0xff; prog = copy; read = copy.
+pub struct RamStorage {
+    pub data: Vec<u8>,
+    pub block_size: u32,
+    pub block_count: u32,
+}
+
+impl RamStorage {
+    pub fn new(block_size: u32, block_count: u32) -> Self {
+        let size = (block_size as usize)
+            .checked_mul(block_count as usize)
+            .expect("overflow");
+        Self {
+            data: vec![0u8; size],
+            block_size,
+            block_count,
+        }
+    }
+
+    pub fn block_offset(&self, block: u32) -> usize {
+        (block as usize)
+            .checked_mul(self.block_size as usize)
+            .expect("block overflow")
+    }
+
+    pub fn read(&mut self, block: u32, off: u32, buf: &mut [u8]) {
+        let base = self.block_offset(block);
+        let start = base + off as usize;
+        let end = start + buf.len();
+        buf.copy_from_slice(&self.data[start..end]);
+    }
+
+    pub fn prog(&mut self, block: u32, off: u32, buf: &[u8]) {
+        let base = self.block_offset(block);
+        let start = base + off as usize;
+        let end = start + buf.len();
+        self.data[start..end].copy_from_slice(buf);
+    }
+
+    pub fn erase(&mut self, block: u32) {
+        let base = self.block_offset(block);
+        let end = base + self.block_size as usize;
+        self.data[base..end].fill(0xff);
+    }
+}
+
+unsafe extern "C" fn ram_read(
+    cfg: *const LfsConfig,
+    block: u32,
+    off: u32,
+    buffer: *mut u8,
+    size: u32,
+) -> i32 {
+    let ctx = (*cfg).context as *mut RamStorage;
+    let ram = &mut *ctx;
+    let size = size as usize;
+    let buf = core::slice::from_raw_parts_mut(buffer, size);
+    ram.read(block, off, buf);
+    0
+}
+
+unsafe extern "C" fn ram_prog(
+    cfg: *const LfsConfig,
+    block: u32,
+    off: u32,
+    buffer: *const u8,
+    size: u32,
+) -> i32 {
+    let ctx = (*cfg).context as *mut RamStorage;
+    let ram = &mut *ctx;
+    let size = size as usize;
+    let buf = core::slice::from_raw_parts(buffer, size);
+    ram.prog(block, off, buf);
+    0
+}
+
+unsafe extern "C" fn ram_erase(cfg: *const LfsConfig, block: u32) -> i32 {
+    let ctx = (*cfg).context as *mut RamStorage;
+    let ram = &mut *ctx;
+    ram.erase(block);
+    0
+}
+
+unsafe extern "C" fn ram_sync(_cfg: *const LfsConfig) -> i32 {
+    0
+}
+
+/// Holds RAM storage, config, and buffers. Keeps pointers valid for lfs_* calls.
+pub struct TestEnv {
+    pub ram: RamStorage,
+    pub config: LfsConfig,
+    pub _read_buf: Vec<u8>,
+    pub _prog_buf: Vec<u8>,
+    pub _lookahead_buf: Vec<u8>,
+}
+
+/// Default block size. Matches upstream.
+const BLOCK_SIZE: u32 = 512;
+
+/// Build test environment with RAM BD. block_count defaults to 128 (upstream).
+pub fn default_config(block_count: u32) -> TestEnv {
+    let block_size = BLOCK_SIZE;
+    let ram = RamStorage::new(block_size, block_count);
+    let read_buf = vec![0u8; block_size as usize];
+    let prog_buf = vec![0u8; block_size as usize];
+    let lookahead_buf = vec![0u8; block_size as usize];
+
+    let config = LfsConfig {
+        context: core::ptr::null_mut(),
+        read: Some(ram_read),
+        prog: Some(ram_prog),
+        erase: Some(ram_erase),
+        sync: Some(ram_sync),
+        read_size: 16,
+        prog_size: 16,
+        block_size,
+        block_count,
+        block_cycles: -1,
+        cache_size: block_size,
+        lookahead_size: block_size,
+        compact_thresh: u32::MAX, // -1 in C
+        read_buffer: read_buf.as_ptr() as *mut core::ffi::c_void,
+        prog_buffer: prog_buf.as_ptr() as *mut core::ffi::c_void,
+        lookahead_buffer: lookahead_buf.as_ptr() as *mut core::ffi::c_void,
+        name_max: 255,
+        file_max: 2_147_483_647,
+        attr_max: 1022,
+        metadata_max: 0,
+        inline_max: 0,
+    };
+
+    // Build TestEnv, then set context/buffers. We must set context after returning
+    // to the caller, since env moves and the stored &mut env.ram would otherwise
+    // be a dangling pointer. Use TestEnv::init_context() after default_config().
+    let mut env = TestEnv {
+        ram,
+        config,
+        _read_buf: read_buf,
+        _prog_buf: prog_buf,
+        _lookahead_buf: lookahead_buf,
+    };
+    env.config.read_buffer = env._read_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.prog_buffer = env._prog_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.lookahead_buffer = env._lookahead_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env
+}
+
+/// Call after default_config() to set context to ram. Required because context
+/// must point to env.ram at its final address (after the env has been moved).
+pub fn init_context(env: &mut TestEnv) {
+    env.config.context = &mut env.ram as *mut RamStorage as *mut core::ffi::c_void;
+}
+
+/// Panic if result is not 0.
+pub fn assert_ok(result: i32) {
+    if result != 0 {
+        panic!("expected 0, got {}", result);
+    }
+}
+
+/// Panic if actual is not expected error code.
+pub fn assert_err(expected: i32, actual: i32) {
+    if actual != expected {
+        panic!("expected error {}, got {}", expected, actual);
+    }
+}
+
+/// Invoke config read callback for raw block access (e.g. test_superblocks_magic).
+pub fn read_block_raw(config: *const LfsConfig, block: u32, off: u32, buf: &mut [u8]) -> i32 {
+    unsafe {
+        let read = (*config).read.expect("read callback");
+        read(config, block, off, buf.as_mut_ptr(), buf.len() as u32)
+    }
+}

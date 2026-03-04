@@ -1,7 +1,10 @@
 //! Block device operations. Per lfs.c lfs_bd_read, lfs_bd_prog, lfs_bd_crc, etc.
 
 use crate::bd::LfsCache;
+use crate::error::LFS_ERR_CORRUPT;
+use crate::fs::Lfs;
 use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t};
+use crate::util::{lfs_aligndown, lfs_alignup, lfs_min};
 
 /// Per lfs.c lfs_cache_drop (lines 31-36)
 ///
@@ -15,7 +18,7 @@ use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t};
 /// }
 /// ```
 #[inline(always)]
-pub fn lfs_cache_drop(_lfs: *const core::ffi::c_void, rcache: *mut LfsCache) {
+pub fn lfs_cache_drop(_lfs: *const Lfs, rcache: *mut LfsCache) {
     unsafe {
         (*rcache).block = crate::types::LFS_BLOCK_NULL;
     }
@@ -32,8 +35,16 @@ pub fn lfs_cache_drop(_lfs: *const core::ffi::c_void, rcache: *mut LfsCache) {
 /// }
 /// ```
 #[inline(always)]
-pub fn lfs_cache_zero(_lfs: *const core::ffi::c_void, _pcache: *mut LfsCache) {
-    todo!("lfs_cache_zero")
+pub fn lfs_cache_zero(lfs: *const Lfs, pcache: *mut LfsCache) {
+    unsafe {
+        let cfg = (*lfs).cfg;
+        let cache_size = (*cfg).cache_size as usize;
+        let buf = (*pcache).buffer;
+        if !buf.is_null() {
+            core::ptr::write_bytes(buf, 0xff, cache_size);
+        }
+        (*pcache).block = crate::types::LFS_BLOCK_NULL;
+    }
 }
 
 /// Per lfs.c lfs_bd_read (lines 44-126)
@@ -125,16 +136,110 @@ pub fn lfs_cache_zero(_lfs: *const core::ffi::c_void, _pcache: *mut LfsCache) {
 /// }
 /// ```
 pub fn lfs_bd_read(
-    _lfs: *const core::ffi::c_void,
-    _pcache: *const LfsCache,
-    _rcache: *mut LfsCache,
-    _hint: lfs_size_t,
-    _block: lfs_block_t,
-    _off: lfs_off_t,
-    _buffer: *mut u8,
-    _size: lfs_size_t,
+    lfs: *mut Lfs,
+    pcache: *const LfsCache,
+    rcache: *mut LfsCache,
+    hint: lfs_size_t,
+    block: lfs_block_t,
+    off: lfs_off_t,
+    buffer: *mut u8,
+    size: lfs_size_t,
 ) -> i32 {
-    todo!("lfs_bd_read")
+    unsafe {
+        let lfs = &mut *lfs;
+        let cfg = &*lfs.cfg;
+        let read = match cfg.read {
+            Some(f) => f,
+            None => return LFS_ERR_CORRUPT,
+        };
+
+        if off + size > cfg.block_size || (lfs.block_count != 0 && block >= lfs.block_count) {
+            return LFS_ERR_CORRUPT;
+        }
+
+        let mut data = buffer;
+        let mut off = off;
+        let mut size = size;
+
+        while size > 0 {
+            let mut diff = size;
+
+            if !pcache.is_null() {
+                let pcache = &*pcache;
+                if block == pcache.block && off < pcache.off + pcache.size {
+                    if off >= pcache.off {
+                        diff = lfs_min(diff, pcache.size - (off - pcache.off));
+                        if !pcache.buffer.is_null() {
+                            core::ptr::copy_nonoverlapping(
+                                pcache.buffer.add((off - pcache.off) as usize),
+                                data,
+                                diff as usize,
+                            );
+                        }
+                        data = data.add(diff as usize);
+                        off += diff;
+                        size -= diff;
+                        continue;
+                    }
+                    diff = lfs_min(diff, pcache.off - off);
+                }
+            }
+
+            let rcache = &mut *rcache;
+            if block == rcache.block && off < rcache.off + rcache.size {
+                if off >= rcache.off {
+                    diff = lfs_min(diff, rcache.size - (off - rcache.off));
+                    if !rcache.buffer.is_null() {
+                        core::ptr::copy_nonoverlapping(
+                            rcache.buffer.add((off - rcache.off) as usize),
+                            data,
+                            diff as usize,
+                        );
+                    }
+                    data = data.add(diff as usize);
+                    off += diff;
+                    size -= diff;
+                    continue;
+                }
+                diff = lfs_min(diff, rcache.off - off);
+            }
+
+            if size >= hint && off.is_multiple_of(cfg.read_size) && size >= cfg.read_size {
+                diff = lfs_aligndown(diff, cfg.read_size);
+                let err = read(cfg as *const _, block, off, data, diff);
+                crate::lfs_assert!(err <= 0);
+                if err != 0 {
+                    return err;
+                }
+                data = data.add(diff as usize);
+                off += diff;
+                size -= diff;
+                continue;
+            }
+
+            crate::lfs_assert!(lfs.block_count == 0 || block < lfs.block_count);
+            rcache.block = block;
+            rcache.off = lfs_aligndown(off, cfg.read_size);
+            rcache.size = lfs_min(
+                lfs_min(lfs_alignup(off + hint, cfg.read_size), cfg.block_size)
+                    .saturating_sub(rcache.off),
+                cfg.cache_size,
+            );
+            let err = read(
+                cfg as *const _,
+                rcache.block,
+                rcache.off,
+                rcache.buffer,
+                rcache.size,
+            );
+            crate::lfs_assert!(err <= 0);
+            if err != 0 {
+                return err;
+            }
+        }
+
+        0
+    }
 }
 
 /// Per lfs.c lfs_bd_cmp (lines 128-154)
@@ -207,16 +312,41 @@ pub fn lfs_bd_cmp(
 /// }
 /// ```
 pub fn lfs_bd_crc(
-    _lfs: *const core::ffi::c_void,
-    _pcache: *const LfsCache,
-    _rcache: *mut LfsCache,
-    _hint: lfs_size_t,
-    _block: lfs_block_t,
-    _off: lfs_off_t,
-    _size: lfs_size_t,
-    _crc: *mut u32,
+    lfs: *mut Lfs,
+    pcache: *const LfsCache,
+    rcache: *mut LfsCache,
+    hint: lfs_size_t,
+    block: lfs_block_t,
+    off: lfs_off_t,
+    size: lfs_size_t,
+    crc: *mut u32,
 ) -> i32 {
-    todo!("lfs_bd_crc")
+    use crate::crc::lfs_crc;
+    use crate::util::lfs_min;
+
+    let mut i: lfs_off_t = 0;
+    while i < size {
+        let mut dat = [0u8; 8];
+        let diff = lfs_min(size - i, 8) as usize;
+        let err = lfs_bd_read(
+            lfs,
+            pcache,
+            rcache,
+            hint.saturating_sub(i),
+            block,
+            off + i,
+            dat.as_mut_ptr(),
+            diff as lfs_size_t,
+        );
+        if err != 0 {
+            return err;
+        }
+        unsafe {
+            *crc = lfs_crc(*crc, dat.as_ptr(), diff);
+        }
+        i += diff as lfs_off_t;
+    }
+    0
 }
 
 /// Per lfs.c lfs_bd_flush (lines 177-210)
@@ -259,12 +389,63 @@ pub fn lfs_bd_crc(
 /// #endif
 /// ```
 pub fn lfs_bd_flush(
-    _lfs: *const core::ffi::c_void,
-    _pcache: *mut LfsCache,
-    _rcache: *mut LfsCache,
-    _validate: bool,
+    lfs: *const Lfs,
+    pcache: *mut LfsCache,
+    rcache: *mut LfsCache,
+    validate: bool,
 ) -> i32 {
-    todo!("lfs_bd_flush")
+    use crate::types::LFS_BLOCK_INLINE;
+    use crate::util::lfs_alignup;
+
+    unsafe {
+        let lfs = &*lfs;
+        let pcache = &mut *pcache;
+        let cfg = &*lfs.cfg;
+
+        if pcache.block != crate::types::LFS_BLOCK_NULL && pcache.block != LFS_BLOCK_INLINE {
+            crate::lfs_assert!(pcache.block < lfs.block_count);
+            let diff = lfs_alignup(pcache.size, cfg.prog_size);
+            let prog = match cfg.prog {
+                Some(f) => f,
+                None => return LFS_ERR_CORRUPT,
+            };
+            let err = prog(
+                cfg as *const _,
+                pcache.block,
+                pcache.off,
+                pcache.buffer,
+                diff,
+            );
+            crate::lfs_assert!(err <= 0);
+            if err != 0 {
+                return err;
+            }
+
+            if validate {
+                lfs_cache_drop(lfs, rcache);
+                let res = lfs_bd_cmp(
+                    lfs as *const _ as *const core::ffi::c_void,
+                    core::ptr::null(),
+                    rcache,
+                    diff,
+                    pcache.block,
+                    pcache.off,
+                    pcache.buffer,
+                    diff,
+                );
+                if res < 0 {
+                    return res;
+                }
+                if res != 0 {
+                    return LFS_ERR_CORRUPT;
+                }
+            }
+
+            lfs_cache_zero(lfs, pcache);
+        }
+
+        0
+    }
 }
 
 /// Per lfs.c lfs_bd_sync (lines 213-226)
@@ -288,12 +469,28 @@ pub fn lfs_bd_flush(
 /// #endif
 /// ```
 pub fn lfs_bd_sync(
-    _lfs: *const core::ffi::c_void,
-    _pcache: *mut LfsCache,
-    _rcache: *mut LfsCache,
-    _validate: bool,
+    lfs: *const Lfs,
+    pcache: *mut LfsCache,
+    rcache: *mut LfsCache,
+    validate: bool,
 ) -> i32 {
-    todo!("lfs_bd_sync")
+    unsafe {
+        lfs_cache_drop(lfs, rcache);
+
+        let err = lfs_bd_flush(lfs, pcache, rcache, validate);
+        if err != 0 {
+            return err;
+        }
+
+        let cfg = &*(*lfs).cfg;
+        let sync = match cfg.sync {
+            Some(f) => f,
+            None => return LFS_ERR_CORRUPT,
+        };
+        let err = sync(cfg as *const _);
+        crate::lfs_assert!(err <= 0);
+        err
+    }
 }
 
 /// Per lfs.c lfs_bd_prog (lines 228-274)
@@ -349,16 +546,65 @@ pub fn lfs_bd_sync(
 /// #endif
 /// ```
 pub fn lfs_bd_prog(
-    _lfs: *const core::ffi::c_void,
-    _pcache: *mut LfsCache,
-    _rcache: *mut LfsCache,
-    _validate: bool,
-    _block: lfs_block_t,
-    _off: lfs_off_t,
-    _buffer: *const u8,
-    _size: lfs_size_t,
+    lfs: *const Lfs,
+    pcache: *mut LfsCache,
+    rcache: *mut LfsCache,
+    validate: bool,
+    block: lfs_block_t,
+    off: lfs_off_t,
+    buffer: *const u8,
+    size: lfs_size_t,
 ) -> i32 {
-    todo!("lfs_bd_prog")
+    use crate::types::LFS_BLOCK_INLINE;
+    use crate::util::{lfs_aligndown, lfs_max, lfs_min};
+
+    unsafe {
+        let lfs = &*lfs;
+        let cfg = &*lfs.cfg;
+        let pcache = &mut *pcache;
+
+        crate::lfs_assert!(block == LFS_BLOCK_INLINE || block < lfs.block_count);
+        crate::lfs_assert!(off + size <= cfg.block_size);
+
+        let mut data = buffer;
+        let mut off = off;
+        let mut size = size;
+
+        while size > 0 {
+            if block == pcache.block && off >= pcache.off && off < pcache.off + cfg.cache_size {
+                let diff = lfs_min(size, cfg.cache_size - (off - pcache.off));
+                if !pcache.buffer.is_null() && !data.is_null() {
+                    core::ptr::copy_nonoverlapping(
+                        data,
+                        pcache.buffer.add((off - pcache.off) as usize),
+                        diff as usize,
+                    );
+                }
+
+                data = data.add(diff as usize);
+                off += diff;
+                size -= diff;
+
+                pcache.size = lfs_max(pcache.size, off - pcache.off);
+                if pcache.size == cfg.cache_size {
+                    let err = lfs_bd_flush(lfs, pcache, rcache, validate);
+                    if err != 0 {
+                        return err;
+                    }
+                }
+
+                continue;
+            }
+
+            crate::lfs_assert!(pcache.block == crate::types::LFS_BLOCK_NULL);
+
+            pcache.block = block;
+            pcache.off = lfs_aligndown(off, cfg.prog_size);
+            pcache.size = 0;
+        }
+
+        0
+    }
 }
 
 /// Per lfs.c lfs_bd_erase (lines 277-282)
@@ -374,6 +620,16 @@ pub fn lfs_bd_prog(
 /// }
 /// #endif
 /// ```
-pub fn lfs_bd_erase(_lfs: *const core::ffi::c_void, _block: lfs_block_t) -> i32 {
-    todo!("lfs_bd_erase")
+pub fn lfs_bd_erase(lfs: *const Lfs, block: lfs_block_t) -> i32 {
+    unsafe {
+        let lfs = &*lfs;
+        crate::lfs_assert!(block < lfs.block_count);
+        let erase = match (*lfs.cfg).erase {
+            Some(f) => f,
+            None => return LFS_ERR_CORRUPT,
+        };
+        let err = erase(lfs.cfg, block);
+        crate::lfs_assert!(err <= 0);
+        err
+    }
 }

@@ -2,19 +2,20 @@
 
 mod attr;
 mod consistent;
-mod format;
+pub(crate) mod format;
 mod grow;
 mod init;
 mod lfs;
 mod lfs_lookahead;
 mod mkdir;
 mod mount;
-mod parent;
+pub(crate) mod parent;
 mod remove;
 mod rename;
 mod stat;
-mod superblock;
+pub(crate) mod superblock;
 mod traverse;
 
+pub use format::lfs_format_;
 pub use lfs::Lfs;
 pub use lfs_lookahead::LfsLookahead;
