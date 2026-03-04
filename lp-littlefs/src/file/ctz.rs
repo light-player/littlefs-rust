@@ -1,6 +1,35 @@
 //! CTZ operations. Per lfs.c lfs_ctz_index, lfs_ctz_find, lfs_ctz_extend, lfs_ctz_traverse.
 
-/// Per lfs.c lfs_ctz_index (lines 2873-2885)
+use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t};
+
+/// Per lfs.c lfs_ctz_fromle32 (lines 475-479)
+///
+/// C:
+/// ```c
+/// static void lfs_ctz_fromle32(struct lfs_ctz *ctz) {
+///     ctz->head = lfs_fromle32(ctz->head);
+///     ctz->size = lfs_fromle32(ctz->size);
+/// }
+/// ```
+pub fn lfs_ctz_fromle32(_ctz: *mut core::ffi::c_void) {
+    todo!("lfs_ctz_fromle32")
+}
+
+/// Per lfs.c lfs_ctz_tole32 (lines 481-486)
+///
+/// C:
+/// ```c
+/// static void lfs_ctz_tole32(struct lfs_ctz *ctz) {
+///     ctz->head = lfs_tole32(ctz->head);
+///     ctz->size = lfs_tole32(ctz->size);
+/// }
+/// #endif
+/// ```
+pub fn lfs_ctz_tole32(_ctz: *mut core::ffi::c_void) {
+    todo!("lfs_ctz_tole32")
+}
+
+/// Per lfs.c lfs_ctz_index (lines 2873-2884)
 ///
 /// C:
 /// ```c
@@ -8,12 +37,235 @@
 ///     lfs_off_t size = *off;
 ///     lfs_off_t b = lfs->cfg->block_size - 2*4;
 ///     lfs_off_t i = size / b;
-///     if (i == 0) return 0;
+///     if (i == 0) {
+///         return 0;
+///     }
+///
 ///     i = (size - 4*(lfs_popc(i-1)+2)) / b;
 ///     *off = size - b*i - 4*lfs_popc(i);
 ///     return i;
 /// }
 /// ```
-pub fn lfs_ctz_index(_lfs: *const core::ffi::c_void) -> i32 {
+pub fn lfs_ctz_index(_lfs: *const core::ffi::c_void, _off: *mut lfs_off_t) -> i32 {
     todo!("lfs_ctz_index")
+}
+
+/// Per lfs.c lfs_ctz_find (lines 2886-2919)
+///
+/// C:
+/// ```c
+/// static int lfs_ctz_find(lfs_t *lfs,
+///         const lfs_cache_t *pcache, lfs_cache_t *rcache,
+///         lfs_block_t head, lfs_size_t size,
+///         lfs_size_t pos, lfs_block_t *block, lfs_off_t *off) {
+///     if (size == 0) {
+///         *block = LFS_BLOCK_NULL;
+///         *off = 0;
+///         return 0;
+///     }
+///
+///     lfs_off_t current = lfs_ctz_index(lfs, &(lfs_off_t){size-1});
+///     lfs_off_t target = lfs_ctz_index(lfs, &pos);
+///
+///     while (current > target) {
+///         lfs_size_t skip = lfs_min(
+///                 lfs_npw2(current-target+1) - 1,
+///                 lfs_ctz(current));
+///
+///         int err = lfs_bd_read(lfs,
+///                 pcache, rcache, sizeof(head),
+///                 head, 4*skip, &head, sizeof(head));
+///         head = lfs_fromle32(head);
+///         if (err) {
+///             return err;
+///         }
+///
+///         current -= 1 << skip;
+///     }
+///
+///     *block = head;
+///     *off = pos;
+///     return 0;
+/// }
+/// ```
+pub fn lfs_ctz_find(
+    _lfs: *const core::ffi::c_void,
+    _ctz: *const core::ffi::c_void,
+    _block: *mut lfs_block_t,
+    _off: *mut lfs_off_t,
+) -> i32 {
+    todo!("lfs_ctz_find")
+}
+
+/// Per lfs.c lfs_ctz_traverse (lines 3020-3063)
+///
+/// C:
+/// ```c
+/// static int lfs_ctz_traverse(lfs_t *lfs,
+///         const lfs_cache_t *pcache, lfs_cache_t *rcache,
+///         lfs_block_t head, lfs_size_t size,
+///         int (*cb)(void*, lfs_block_t), void *data) {
+///     if (size == 0) {
+///         return 0;
+///     }
+///
+///     lfs_off_t index = lfs_ctz_index(lfs, &(lfs_off_t){size-1});
+///
+///     while (true) {
+///         int err = cb(data, head);
+///         if (err) {
+///             return err;
+///         }
+///
+///         if (index == 0) {
+///             return 0;
+///         }
+///
+///         lfs_block_t heads[2];
+///         int count = 2 - (index & 1);
+///         err = lfs_bd_read(lfs,
+///                 pcache, rcache, count*sizeof(head),
+///                 head, 0, &heads, count*sizeof(head));
+///         heads[0] = lfs_fromle32(heads[0]);
+///         heads[1] = lfs_fromle32(heads[1]);
+///         if (err) {
+///             return err;
+///         }
+///
+///         for (int i = 0; i < count-1; i++) {
+///             err = cb(data, heads[i]);
+///             if (err) {
+///                 return err;
+///             }
+///         }
+///
+///         head = heads[count-1];
+///         index -= count;
+///     }
+/// }
+/// ```
+pub fn lfs_ctz_traverse(
+    _lfs: *const core::ffi::c_void,
+    _pcache: *mut core::ffi::c_void,
+    _rcache: *mut core::ffi::c_void,
+    _block: lfs_block_t,
+    _size: lfs_size_t,
+    _cb: Option<unsafe extern "C" fn(*mut core::ffi::c_void, lfs_block_t) -> i32>,
+    _data: *mut core::ffi::c_void,
+) -> i32 {
+    todo!("lfs_ctz_traverse")
+}
+
+/// Per lfs.c lfs_ctz_extend (lines 2921-3018)
+///
+/// C:
+/// ```c
+/// static int lfs_ctz_extend(lfs_t *lfs,
+///         lfs_cache_t *pcache, lfs_cache_t *rcache,
+///         lfs_block_t head, lfs_size_t size,
+///         lfs_block_t *block, lfs_off_t *off) {
+///     while (true) {
+///         // go ahead and grab a block
+///         lfs_block_t nblock;
+///         int err = lfs_alloc(lfs, &nblock);
+///         if (err) {
+///             return err;
+///         }
+///
+///         {
+///             err = lfs_bd_erase(lfs, nblock);
+///             if (err) {
+///                 if (err == LFS_ERR_CORRUPT) {
+///                     goto relocate;
+///                 }
+///                 return err;
+///             }
+///
+///             if (size == 0) {
+///                 *block = nblock;
+///                 *off = 0;
+///                 return 0;
+///             }
+///
+///             lfs_size_t noff = size - 1;
+///             lfs_off_t index = lfs_ctz_index(lfs, &noff);
+///             noff = noff + 1;
+///
+///             // just copy out the last block if it is incomplete
+///             if (noff != lfs->cfg->block_size) {
+///                 for (lfs_off_t i = 0; i < noff; i++) {
+///                     uint8_t data;
+///                     err = lfs_bd_read(lfs,
+///                             NULL, rcache, noff-i,
+///                             head, i, &data, 1);
+///                     if (err) {
+///                         return err;
+///                     }
+///
+///                     err = lfs_bd_prog(lfs,
+///                             pcache, rcache, true,
+///                             nblock, i, &data, 1);
+///                     if (err) {
+///                         if (err == LFS_ERR_CORRUPT) {
+///                             goto relocate;
+///                         }
+///                         return err;
+///                     }
+///                 }
+///
+///                 *block = nblock;
+///                 *off = noff;
+///                 return 0;
+///             }
+///
+///             // append block
+///             index += 1;
+///             lfs_size_t skips = lfs_ctz(index) + 1;
+///             lfs_block_t nhead = head;
+///             for (lfs_off_t i = 0; i < skips; i++) {
+///                 nhead = lfs_tole32(nhead);
+///                 err = lfs_bd_prog(lfs, pcache, rcache, true,
+///                         nblock, 4*i, &nhead, 4);
+///                 nhead = lfs_fromle32(nhead);
+///                 if (err) {
+///                     if (err == LFS_ERR_CORRUPT) {
+///                         goto relocate;
+///                     }
+///                     return err;
+///                 }
+///
+///                 if (i != skips-1) {
+///                     err = lfs_bd_read(lfs,
+///                             NULL, rcache, sizeof(nhead),
+///                             nhead, 4*i, &nhead, sizeof(nhead));
+///                     nhead = lfs_fromle32(nhead);
+///                     if (err) {
+///                         return err;
+///                     }
+///                 }
+///             }
+///
+///             *block = nblock;
+///             *off = 4*skips;
+///             return 0;
+///         }
+///
+/// relocate:
+///         LFS_DEBUG("Bad block at 0x%"PRIx32, nblock);
+///
+///         // just clear cache and try a new block
+///         lfs_cache_drop(lfs, pcache);
+///     }
+/// }
+/// #endif
+/// ```
+pub fn lfs_ctz_extend(
+    _lfs: *const core::ffi::c_void,
+    _pcache: *mut core::ffi::c_void,
+    _rcache: *mut core::ffi::c_void,
+    _block: lfs_block_t,
+    _off: lfs_off_t,
+    _size: lfs_size_t,
+) -> i32 {
+    todo!("lfs_ctz_extend")
 }

@@ -1,6 +1,6 @@
-# Phase 3: Function Inventory and Module Map
+# C-to-Rust Function Inventory
 
-Complete mapping of `reference/lfs.c` and `reference/lfs_util.c` to target .rs files. Each entry includes C line range, target file, and feature flags. Basis for Phase 4 stub generation.
+Complete mapping of `reference/lfs.c` and `reference/lfs_util.c` to target .rs files. Each entry includes C line range, target file, and feature flags. Used for stub generation and implementation tracking.
 
 ## How to produce / verify
 
@@ -14,7 +14,7 @@ Complete mapping of `reference/lfs.c` and `reference/lfs_util.c` to target .rs f
 | C define | Rust feature | When to use |
 |----------|--------------|-------------|
 | `LFS_READONLY` | `readonly` | Omit write ops; format, mount read-only, dir read, file read only |
-| `LFS_NO_MALLOC` | (none initially) | Use `lfs_file_opencfg` only; `lfs_file_open` returns LFS_ERR_NOMEM |
+| `LFS_NO_MALLOC` | `no_malloc` | Use `lfs_file_opencfg` only; `lfs_file_open` returns LFS_ERR_NOMEM |
 | `LFS_MULTIVERSION` | `multiversion` | `disk_version` in config, `lfs_fs_disk_version*` |
 | `LFS_SHRINKNONRELOCATING` | `shrink` | `lfs_shrink_checkblock`, shrink path in `lfs_fs_grow_` |
 | `LFS_MIGRATE` | (defer) | v1→v2 migration; skip for initial port |

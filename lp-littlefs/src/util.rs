@@ -95,10 +95,48 @@ pub fn lfs_tobe32(a: u32) -> u32 {
 
 // --- lfs.c path operations ---
 
-/// Per lfs.c lfs_path_namelen - strcspn(path, "/")
+/// Per lfs.c lfs_path_namelen (lines 289-291)
+///
+/// C:
+/// ```c
+/// static inline lfs_size_t lfs_path_namelen(const char *path) {
+///     return strcspn(path, "/");
+/// }
+/// ```
 #[inline(always)]
 pub fn lfs_path_namelen(path: &[u8]) -> u32 {
     path.iter().position(|&b| b == b'/').unwrap_or(path.len()) as lfs_size_t
+}
+
+/// Per lfs.c lfs_path_islast (lines 293-296)
+///
+/// C:
+/// ```c
+/// static inline bool lfs_path_islast(const char *path) {
+///     lfs_size_t namelen = lfs_path_namelen(path);
+///     return path[namelen + strspn(path + namelen, "/")] == '\0';
+/// }
+/// ```
+#[inline(always)]
+pub fn lfs_path_islast(path: &[u8]) -> bool {
+    let namelen = lfs_path_namelen(path) as usize;
+    let rest = path.get(namelen..).unwrap_or(&[]);
+    let skip = rest.iter().take_while(|&&b| b == b'/').count();
+    path.get(namelen + skip).map_or(true, |&b| b == 0)
+}
+
+/// Per lfs.c lfs_path_isdir (lines 298-300)
+///
+/// C:
+/// ```c
+/// static inline bool lfs_path_isdir(const char *path) {
+///     return path[lfs_path_namelen(path)] != '\0';
+/// }
+/// ```
+#[inline(always)]
+pub fn lfs_path_isdir(path: &[u8]) -> bool {
+    let namelen = lfs_path_namelen(path) as usize;
+    path.get(namelen).map_or(false, |&b| b != 0)
 }
 
 /// Per lfs.c lfs_pair_swap

@@ -14,7 +14,19 @@ pub struct LfsSuperblock {
     pub attr_max: lfs_size_t,
 }
 
-/// Per lfs.c lfs_superblock_fromle32
+/// Per lfs.c lfs_superblock_fromle32 (lines 487-494)
+///
+/// C:
+/// ```c
+/// static inline void lfs_superblock_fromle32(lfs_superblock_t *superblock) {
+///     superblock->version     = lfs_fromle32(superblock->version);
+///     superblock->block_size  = lfs_fromle32(superblock->block_size);
+///     superblock->block_count = lfs_fromle32(superblock->block_count);
+///     superblock->name_max    = lfs_fromle32(superblock->name_max);
+///     superblock->file_max    = lfs_fromle32(superblock->file_max);
+///     superblock->attr_max    = lfs_fromle32(superblock->attr_max);
+/// }
+/// ```
 #[inline(always)]
 pub fn lfs_superblock_fromle32(sb: &mut LfsSuperblock) {
     sb.version = lfs_fromle32(sb.version);
@@ -25,7 +37,19 @@ pub fn lfs_superblock_fromle32(sb: &mut LfsSuperblock) {
     sb.attr_max = lfs_fromle32(sb.attr_max);
 }
 
-/// Per lfs.c lfs_superblock_tole32
+/// Per lfs.c lfs_superblock_tole32 (lines 497-505)
+///
+/// C:
+/// ```c
+/// static inline void lfs_superblock_tole32(lfs_superblock_t *superblock) {
+///     superblock->version     = lfs_tole32(superblock->version);
+///     superblock->block_size  = lfs_tole32(superblock->block_size);
+///     superblock->block_count = lfs_tole32(superblock->block_count);
+///     superblock->name_max    = lfs_tole32(superblock->name_max);
+///     superblock->file_max    = lfs_tole32(superblock->file_max);
+///     superblock->attr_max    = lfs_tole32(superblock->attr_max);
+/// }
+/// ```
 #[inline(always)]
 pub fn lfs_superblock_tole32(sb: &mut LfsSuperblock) {
     sb.version = lfs_tole32(sb.version);
