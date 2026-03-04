@@ -926,7 +926,48 @@ pub fn lfs_dir_traverse(
                             phase = TraversePhase::GetNextTag;
                         }
                     } else if type3 == crate::lfs_type::lfs_type::LFS_FROM_USERATTRS as u16 {
-                        todo!("lfs_dir_traverse LFS_FROM_USERATTRS")
+                        // C: lfs.c:620-632 — iterate over user attrs, dispatch each to cb
+                        let attr_count = crate::tag::lfs_tag_size(tag) as usize;
+                        let attrs_ptr = buffer as *const crate::lfs_info::LfsAttr;
+                        let mut i = 0;
+                        while i < attr_count {
+                            let a = unsafe { &*attrs_ptr.add(i) };
+                            let userattr_tag = lfs_mktag(
+                                crate::lfs_type::lfs_type::LFS_TYPE_USERATTR
+                                    .wrapping_add(u32::from(a.type_)),
+                                crate::tag::lfs_tag_id(tag) as u32 + diff as u32,
+                                a.size,
+                            );
+                            res = dispatch_tag(
+                                cb,
+                                data,
+                                userattr_tag,
+                                a.buffer as *const core::ffi::c_void,
+                                diff,
+                            );
+                            if res < 0 {
+                                return res;
+                            }
+                            if res != 0 {
+                                break;
+                            }
+                            i += 1;
+                        }
+                        if res == 0 {
+                            phase = TraversePhase::GetNextTag;
+                        } else if sp > 0 {
+                            crate::lfs_trace!(
+                                "traverse LFS_FROM_USERATTRS: res=1 storing redundant tag=0x{:08x}",
+                                tag
+                            );
+                            unsafe {
+                                (*stack[sp - 1].as_mut_ptr()).redundant_tag = tag;
+                                (*stack[sp - 1].as_mut_ptr()).redundant_buffer = buffer;
+                            }
+                            phase = TraversePhase::PopAndProcess;
+                        } else {
+                            return res;
+                        }
                     } else {
                         res = dispatch_tag(cb, data, tag, buffer, diff);
                         if res < 0 {

@@ -288,6 +288,15 @@ pub fn dir_entry_names(
     Ok(names)
 }
 
+/// Open flags for lfs_file_open. Per lfs.h LFS_O_*.
+pub const LFS_O_RDONLY: i32 = 1;
+pub const LFS_O_WRONLY: i32 = 2;
+pub const LFS_O_RDWR: i32 = 3;
+pub const LFS_O_CREAT: i32 = 0x0100;
+pub const LFS_O_EXCL: i32 = 0x0200;
+pub const LFS_O_TRUNC: i32 = 0x0400;
+pub const LFS_O_APPEND: i32 = 0x0800;
+
 /// Format, mount, create "hello" file with "Hello World!\0", unmount.
 /// Returns env. Caller mounts again before reading.
 pub fn fs_with_hello(env: &mut TestEnv) -> Result<(), i32> {

@@ -155,7 +155,7 @@ pub fn lfs_file_close(lfs: *mut Lfs, file: *mut LfsFile) -> i32 {
 /// Synchronize a file on storage. Per lfs.h lfs_file_sync (lfs.c:6263-6267).
 #[inline(never)]
 pub fn lfs_file_sync(lfs: *mut Lfs, file: *mut LfsFile) -> i32 {
-    todo!("lfs_file_sync")
+    crate::file::ops::lfs_file_sync_(lfs, file)
 }
 
 /// Read data from file. Per lfs.h lfs_file_read (lfs.c:6210-6224).
@@ -194,7 +194,7 @@ pub fn lfs_file_seek(
 /// Truncate the size of the file. Per lfs.h lfs_file_truncate (lfs.c:6471-6475).
 #[inline(never)]
 pub fn lfs_file_truncate(lfs: *mut Lfs, file: *mut LfsFile, size: lfs_off_t) -> i32 {
-    todo!("lfs_file_truncate")
+    crate::file::ops::lfs_file_truncate_(lfs, file, size)
 }
 
 /// Return the position of the file. Per lfs.h lfs_file_tell.
