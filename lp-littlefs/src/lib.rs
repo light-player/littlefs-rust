@@ -55,14 +55,14 @@ pub fn lfs_format(lfs: *mut Lfs, config: *const LfsConfig) -> i32 {
 #[inline(never)]
 pub fn lfs_mount(lfs: *mut Lfs, config: *const LfsConfig) -> i32 {
     crate::lfs_trace!("lfs_mount({:p}, {:p})", lfs, config);
-    todo!("lfs_mount")
+    crate::fs::lfs_mount_(lfs, config)
 }
 
 /// Unmount a littlefs.
 /// Per lfs.h lfs_unmount. Calls lfs_unmount_ (lfs.c:4647).
 #[inline(never)]
 pub fn lfs_unmount(lfs: *mut Lfs) -> i32 {
-    todo!("lfs_unmount")
+    crate::fs::lfs_unmount_(lfs)
 }
 
 /// Remove a file or directory. Per lfs.h lfs_remove (lfs.c:6193-6195).
@@ -245,7 +245,7 @@ pub fn lfs_dir_rewind(lfs: *mut Lfs, dir: *mut LfsDir) -> i32 {
 /// Find on-disk info about the filesystem. Per lfs.h lfs_fs_stat (lfs.c:6449-6453).
 #[inline(never)]
 pub fn lfs_fs_stat(lfs: *mut Lfs, fsinfo: *mut LfsFsinfo) -> i32 {
-    todo!("lfs_fs_stat")
+    crate::fs::lfs_fs_stat_(lfs, fsinfo)
 }
 
 /// Find the current size of the filesystem. Per lfs.h lfs_fs_size (lfs.c:6449-6453).

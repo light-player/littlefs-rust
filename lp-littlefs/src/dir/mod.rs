@@ -2,14 +2,14 @@
 
 pub(crate) mod commit;
 pub(crate) mod fetch;
-mod find;
+pub(crate) mod find;
 mod lfs_commit;
 mod lfs_dir;
 mod lfs_fcrc;
 mod lfs_mdir;
 mod lfs_mlist;
 mod open;
-mod traverse;
+pub(crate) mod traverse;
 
 pub use lfs_commit::LfsCommit;
 pub use lfs_dir::LfsDir;

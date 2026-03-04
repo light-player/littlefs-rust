@@ -19,3 +19,5 @@ mod traverse;
 pub use format::lfs_format_;
 pub use lfs::Lfs;
 pub use lfs_lookahead::LfsLookahead;
+pub use mount::{lfs_mount_, lfs_unmount_};
+pub use stat::lfs_fs_stat_;

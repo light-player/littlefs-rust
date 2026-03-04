@@ -1,5 +1,23 @@
 //! Directory find. Per lfs.c lfs_dir_find, lfs_dir_find_match.
 
+use crate::bd::bd::lfs_bd_cmp;
+use crate::tag::lfs_diskoff;
+use crate::tag::lfs_tag_size;
+use crate::types::lfs_tag_t;
+use crate::util::lfs_min;
+
+const LFS_CMP_EQ: i32 = 0;
+const LFS_CMP_LT: i32 = -1;
+const LFS_CMP_GT: i32 = 1;
+
+/// Per lfs.c struct lfs_dir_find_match (lines 1447-1475)
+#[repr(C)]
+pub struct LfsDirFindMatch {
+    pub lfs: *mut crate::fs::Lfs,
+    pub name: *const u8,
+    pub size: crate::types::lfs_size_t,
+}
+
 /// Per lfs.c lfs_dir_find_match (and struct lfs_dir_find_match) (lines 1447-1475)
 ///
 /// C:
@@ -35,12 +53,42 @@
 /// }
 ///
 /// ```
-pub fn lfs_dir_find_match(
-    _data: *mut core::ffi::c_void,
-    _tag: crate::types::lfs_tag_t,
-    _buffer: *const core::ffi::c_void,
+pub unsafe extern "C" fn lfs_dir_find_match(
+    data: *mut core::ffi::c_void,
+    tag: lfs_tag_t,
+    buffer: *const core::ffi::c_void,
 ) -> i32 {
-    todo!("lfs_dir_find_match")
+    if data.is_null() || buffer.is_null() {
+        return LFS_CMP_LT;
+    }
+    unsafe {
+        let name = &*(data as *const LfsDirFindMatch);
+        let disk = &*(buffer as *const lfs_diskoff);
+        let lfs = &mut *name.lfs;
+
+        let diff = lfs_min(name.size, lfs_tag_size(tag));
+        let res = lfs_bd_cmp(
+            name.lfs,
+            core::ptr::null(),
+            &mut lfs.rcache,
+            diff,
+            disk.block,
+            disk.off,
+            name.name,
+            diff,
+        );
+        if res != LFS_CMP_EQ {
+            return res;
+        }
+        if name.size != lfs_tag_size(tag) {
+            return if name.size < lfs_tag_size(tag) {
+                LFS_CMP_LT
+            } else {
+                LFS_CMP_GT
+            };
+        }
+        LFS_CMP_EQ
+    }
 }
 
 /// Per lfs.c lfs_dir_find (lines 1483-1590)

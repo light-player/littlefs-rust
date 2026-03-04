@@ -28,8 +28,12 @@ pub fn lfs_alloc_ckpoint(lfs: *mut Lfs) {
 ///     lfs_alloc_ckpoint(lfs);
 /// }
 /// ```
-pub fn lfs_alloc_drop(_lfs: *mut Lfs) {
-    todo!("lfs_alloc_drop")
+pub fn lfs_alloc_drop(lfs: *mut Lfs) {
+    unsafe {
+        (*lfs).lookahead.size = 0;
+        (*lfs).lookahead.next = 0;
+        lfs_alloc_ckpoint(lfs);
+    }
 }
 
 /// Per lfs.c lfs_alloc_lookahead (lines 627-637)

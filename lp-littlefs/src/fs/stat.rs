@@ -72,8 +72,62 @@ pub fn lfs_stat_(
 ///     return 0;
 /// }
 /// ```
-pub fn lfs_fs_stat_(_lfs: *mut super::lfs::Lfs, _fsinfo: *mut crate::lfs_info::LfsFsinfo) -> i32 {
-    todo!("lfs_fs_stat_")
+pub fn lfs_fs_stat_(lfs: *mut super::lfs::Lfs, fsinfo: *mut crate::lfs_info::LfsFsinfo) -> i32 {
+    use crate::dir::fetch::lfs_dir_fetch;
+    use crate::dir::traverse::lfs_dir_get;
+    use crate::lfs_gstate::lfs_gstate_needssuperblock;
+    use crate::lfs_superblock::{lfs_superblock_fromle32, LfsSuperblock};
+    use crate::lfs_type::lfs_type::LFS_TYPE_INLINESTRUCT;
+    use crate::tag::lfs_mktag;
+    use crate::types::LFS_DISK_VERSION;
+
+    unsafe {
+        let lfs_ref = &*lfs;
+        let fsinfo = &mut *fsinfo;
+
+        if !lfs_gstate_needssuperblock(&lfs_ref.gstate) {
+            fsinfo.disk_version = LFS_DISK_VERSION;
+        } else {
+            let mut dir = crate::dir::LfsMdir {
+                pair: [0, 0],
+                rev: 0,
+                off: 0,
+                etag: 0,
+                count: 0,
+                erased: false,
+                split: false,
+                tail: [0, 0],
+            };
+            let err = lfs_dir_fetch(lfs, &mut dir, &lfs_ref.root);
+            if err != 0 {
+                return err;
+            }
+            let mut superblock = core::mem::zeroed::<LfsSuperblock>();
+            let tag = lfs_dir_get(
+                lfs,
+                &dir as *const _,
+                lfs_mktag(0x7ff, 0x3ff, 0),
+                lfs_mktag(
+                    LFS_TYPE_INLINESTRUCT,
+                    0,
+                    core::mem::size_of::<LfsSuperblock>() as u32,
+                ),
+                &mut superblock as *mut _ as *mut core::ffi::c_void,
+            );
+            if tag < 0 {
+                return tag;
+            }
+            lfs_superblock_fromle32(&mut superblock);
+            fsinfo.disk_version = superblock.version;
+        }
+
+        fsinfo.block_size = (*lfs_ref.cfg).block_size;
+        fsinfo.block_count = lfs_ref.block_count;
+        fsinfo.name_max = lfs_ref.name_max;
+        fsinfo.file_max = lfs_ref.file_max;
+        fsinfo.attr_max = lfs_ref.attr_max;
+    }
+    0
 }
 
 /// Per lfs.c lfs_fs_size_count (lines 5172-5177)

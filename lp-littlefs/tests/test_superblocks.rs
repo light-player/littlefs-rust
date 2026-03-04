@@ -43,9 +43,9 @@ fn test_superblocks_mount() {
 }
 
 // --- test_superblocks_magic ---
-// Upstream: format, then raw read to verify "littlefs" at MAGIC_OFFSET in both blocks
+// Upstream: format, then raw read to verify "littlefs" at MAGIC_OFFSET in both blocks.
 #[test]
-#[ignore = "requires format+mount"]
+#[ignore = "raw block read does not find magic; needs format/cache investigation"]
 fn test_superblocks_magic() {
     let mut env = default_config(128);
     init_context(&mut env);
@@ -75,7 +75,6 @@ fn test_superblocks_magic() {
 // --- test_superblocks_invalid_mount ---
 // Upstream: mount on blank device => LFS_ERR_CORRUPT
 #[test]
-#[ignore = "requires mount"]
 fn test_superblocks_invalid_mount() {
     let mut env = default_config(128);
     init_context(&mut env);
@@ -90,7 +89,6 @@ fn test_superblocks_invalid_mount() {
 // --- test_superblocks_stat ---
 // Upstream: fs_stat after format/mount returns correct values
 #[test]
-#[ignore = "requires format+mount"]
 fn test_superblocks_stat() {
     let mut env = default_config(128);
     init_context(&mut env);

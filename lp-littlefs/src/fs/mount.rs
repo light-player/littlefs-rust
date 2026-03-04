@@ -204,8 +204,171 @@ pub fn lfs_tortoise_detectcycles(
 ///     return err;
 /// }
 /// ```
-pub fn lfs_mount_(_lfs: *mut super::lfs::Lfs, _cfg: *const crate::lfs_config::LfsConfig) -> i32 {
-    todo!("lfs_mount_")
+pub fn lfs_mount_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsConfig) -> i32 {
+    use crate::block_alloc::alloc::lfs_alloc_drop;
+    use crate::dir::fetch::{lfs_dir_fetchmatch, lfs_dir_getgstate};
+    use crate::dir::find::{lfs_dir_find_match, LfsDirFindMatch};
+    use crate::dir::traverse::lfs_dir_get;
+    use crate::error::LFS_ERR_INVAL;
+    use crate::fs::init::{lfs_deinit, lfs_init};
+    use crate::fs::superblock::lfs_fs_prepsuperblock;
+    use crate::lfs_gstate::lfs_gstate_iszero;
+    use crate::lfs_superblock::{lfs_superblock_fromle32, LfsSuperblock};
+    use crate::lfs_type::lfs_type::{LFS_TYPE_INLINESTRUCT, LFS_TYPE_SUPERBLOCK};
+    use crate::tag::{lfs_mktag, lfs_tag_isdelete, lfs_tag_isvalid};
+    use crate::types::{LFS_BLOCK_NULL, LFS_DISK_VERSION_MAJOR, LFS_DISK_VERSION_MINOR};
+    use crate::util::{lfs_min, lfs_pair_isnull};
+
+    let mut err = lfs_init(lfs, cfg);
+    if err != 0 {
+        return err;
+    }
+
+    let result = unsafe {
+        let lfs = &mut *lfs;
+        let cfg = &*cfg;
+
+        let mut dir = crate::dir::LfsMdir {
+            pair: [0, 0],
+            rev: 0,
+            off: 0,
+            etag: 0,
+            count: 0,
+            erased: false,
+            split: false,
+            tail: [0, 1],
+        };
+        let mut tortoise = LfsTortoise {
+            pair: [LFS_BLOCK_NULL, LFS_BLOCK_NULL],
+            i: 1,
+            period: 1,
+        };
+
+        let magic = b"littlefs";
+        let find_match = LfsDirFindMatch {
+            lfs: lfs as *mut _,
+            name: magic.as_ptr(),
+            size: 8,
+        };
+
+        let mut err_inner = 0i32;
+        while !lfs_pair_isnull(&dir.tail) {
+            err_inner = lfs_tortoise_detectcycles(&dir as *const _, &mut tortoise);
+            if err_inner < 0 {
+                break;
+            }
+
+            let tag = lfs_dir_fetchmatch(
+                lfs as *mut _ as *const core::ffi::c_void,
+                &mut dir as *mut _,
+                &dir.tail as *const _,
+                lfs_mktag(0x7ff, 0x3ff, 0),
+                lfs_mktag(LFS_TYPE_SUPERBLOCK, 0, 8),
+                core::ptr::null_mut(),
+                Some(lfs_dir_find_match),
+                &find_match as *const _ as *mut core::ffi::c_void,
+            );
+
+            if tag < 0 {
+                err_inner = tag;
+                break;
+            }
+
+            if tag != 0 && !lfs_tag_isdelete(tag as crate::types::lfs_tag_t) {
+                lfs.root[0] = dir.pair[0];
+                lfs.root[1] = dir.pair[1];
+
+                let mut superblock = core::mem::zeroed::<LfsSuperblock>();
+                let sbtag = lfs_dir_get(
+                    lfs as *mut _,
+                    &dir as *const _,
+                    lfs_mktag(0x7ff, 0x3ff, 0),
+                    lfs_mktag(
+                        LFS_TYPE_INLINESTRUCT,
+                        0,
+                        core::mem::size_of::<LfsSuperblock>() as u32,
+                    ),
+                    &mut superblock as *mut _ as *mut core::ffi::c_void,
+                );
+                if sbtag < 0 {
+                    err_inner = sbtag;
+                    break;
+                }
+                lfs_superblock_fromle32(&mut superblock);
+
+                let major_version = (0xffff & (superblock.version >> 16)) as u16;
+                let minor_version = (0xffff & superblock.version) as u16;
+                if major_version != LFS_DISK_VERSION_MAJOR as u16
+                    || minor_version > LFS_DISK_VERSION_MINOR as u16
+                {
+                    err_inner = LFS_ERR_INVAL;
+                    break;
+                }
+
+                let needssuperblock = minor_version < LFS_DISK_VERSION_MINOR as u16;
+                lfs_fs_prepsuperblock(lfs as *mut _, needssuperblock);
+
+                if superblock.name_max != 0 {
+                    if superblock.name_max > lfs.name_max {
+                        err_inner = LFS_ERR_INVAL;
+                        break;
+                    }
+                    lfs.name_max = superblock.name_max;
+                }
+                if superblock.file_max != 0 {
+                    if superblock.file_max > lfs.file_max {
+                        err_inner = LFS_ERR_INVAL;
+                        break;
+                    }
+                    lfs.file_max = superblock.file_max;
+                }
+                if superblock.attr_max != 0 {
+                    if superblock.attr_max > lfs.attr_max {
+                        err_inner = LFS_ERR_INVAL;
+                        break;
+                    }
+                    lfs.attr_max = superblock.attr_max;
+                    lfs.inline_max = lfs_min(lfs.inline_max, lfs.attr_max);
+                }
+
+                if cfg.block_count != 0 && superblock.block_count != cfg.block_count {
+                    err_inner = LFS_ERR_INVAL;
+                    break;
+                }
+                lfs.block_count = superblock.block_count;
+
+                if superblock.block_size != cfg.block_size {
+                    err_inner = LFS_ERR_INVAL;
+                    break;
+                }
+            }
+
+            err_inner = lfs_dir_getgstate(lfs as *mut _, &dir as *const _, &mut lfs.gstate);
+            if err_inner != 0 {
+                break;
+            }
+        }
+
+        if err_inner != 0 {
+            lfs_deinit(lfs as *mut _);
+            err_inner
+        } else {
+            if !lfs_gstate_iszero(&lfs.gstate) {
+                lfs.gstate.tag = lfs
+                    .gstate
+                    .tag
+                    .wrapping_add(!lfs_tag_isvalid(lfs.gstate.tag) as u32);
+            }
+            lfs.gdisk = lfs.gstate;
+
+            lfs.lookahead.start = lfs.seed % lfs.block_count;
+            lfs_alloc_drop(lfs as *mut _);
+
+            0
+        }
+    };
+
+    result
 }
 
 /// Per lfs.c lfs_unmount_ (lines 4647-4651)
@@ -218,6 +381,6 @@ pub fn lfs_mount_(_lfs: *mut super::lfs::Lfs, _cfg: *const crate::lfs_config::Lf
 ///
 ///
 /// ```
-pub fn lfs_unmount_(_lfs: *mut super::lfs::Lfs) -> i32 {
-    todo!("lfs_unmount_")
+pub fn lfs_unmount_(lfs: *mut super::lfs::Lfs) -> i32 {
+    crate::fs::init::lfs_deinit(lfs)
 }

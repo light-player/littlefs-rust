@@ -11,8 +11,13 @@ use crate::types::lfs_block_t;
 ///             | (uint32_t)needssuperblock << 9;
 /// }
 /// ```
-pub fn lfs_fs_prepsuperblock(_lfs: *mut super::lfs::Lfs, _needssuperblock: bool) {
-    todo!("lfs_fs_prepsuperblock")
+pub fn lfs_fs_prepsuperblock(lfs: *mut super::lfs::Lfs, needssuperblock: bool) {
+    use crate::tag::lfs_mktag;
+    unsafe {
+        let lfs = &mut *lfs;
+        lfs.gstate.tag =
+            (lfs.gstate.tag & !lfs_mktag(0, 0, 0x200)) | ((needssuperblock as u32) << 9);
+    }
 }
 
 /// Per lfs.c lfs_fs_preporphans (lines 4894-4904)

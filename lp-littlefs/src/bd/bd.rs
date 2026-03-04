@@ -274,16 +274,49 @@ pub fn lfs_bd_read(
 /// }
 /// ```
 pub fn lfs_bd_cmp(
-    _lfs: *const core::ffi::c_void,
-    _pcache: *const LfsCache,
-    _rcache: *mut LfsCache,
-    _hint: lfs_size_t,
-    _block: lfs_block_t,
-    _off: lfs_off_t,
-    _buffer: *const u8,
-    _size: lfs_size_t,
+    lfs: *mut Lfs,
+    pcache: *const LfsCache,
+    rcache: *mut LfsCache,
+    hint: lfs_size_t,
+    block: lfs_block_t,
+    off: lfs_off_t,
+    buffer: *const u8,
+    size: lfs_size_t,
 ) -> i32 {
-    todo!("lfs_bd_cmp")
+    const LFS_CMP_EQ: i32 = 0;
+    const LFS_CMP_LT: i32 = -1;
+    const LFS_CMP_GT: i32 = 1;
+
+    let mut i: lfs_off_t = 0;
+    while i < size {
+        let mut dat = [0u8; 8];
+        let diff = lfs_min(size - i, 8) as usize;
+        let err = lfs_bd_read(
+            lfs,
+            pcache,
+            rcache,
+            hint.saturating_sub(i),
+            block,
+            off + i,
+            dat.as_mut_ptr(),
+            diff as lfs_size_t,
+        );
+        if err != 0 {
+            return err;
+        }
+        let res = unsafe {
+            let disk = &dat[..diff];
+            let expected = core::slice::from_raw_parts(buffer.add(i as usize), diff);
+            disk.cmp(expected)
+        };
+        match res {
+            core::cmp::Ordering::Equal => {}
+            core::cmp::Ordering::Less => return LFS_CMP_LT,
+            core::cmp::Ordering::Greater => return LFS_CMP_GT,
+        }
+        i += diff as lfs_off_t;
+    }
+    LFS_CMP_EQ
 }
 
 /// Per lfs.c lfs_bd_crc (lines 155-175)
@@ -398,6 +431,7 @@ pub fn lfs_bd_flush(
     use crate::util::lfs_alignup;
 
     unsafe {
+        let lfs_ptr = lfs;
         let lfs = &*lfs;
         let pcache = &mut *pcache;
         let cfg = &*lfs.cfg;
@@ -424,7 +458,7 @@ pub fn lfs_bd_flush(
             if validate {
                 lfs_cache_drop(lfs, rcache);
                 let res = lfs_bd_cmp(
-                    lfs as *const _ as *const core::ffi::c_void,
+                    lfs_ptr as *mut Lfs,
                     core::ptr::null(),
                     rcache,
                     diff,

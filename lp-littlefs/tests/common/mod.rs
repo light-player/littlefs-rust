@@ -12,9 +12,10 @@ pub fn init_logger() {
     let _ = env_logger::try_init();
 }
 
-/// Magic string "littlefs" at offset 8 in superblock blocks. Per lfs.h.
+/// Magic string "littlefs" in superblock blocks. Per lfs.h.
+/// Layout: [rev 4][CREATE tag 4][SUPERBLOCK tag 4]["littlefs" 8]
 pub const MAGIC: &[u8; 8] = b"littlefs";
-pub const MAGIC_OFFSET: u32 = 8;
+pub const MAGIC_OFFSET: u32 = 12;
 
 /// RAM block device storage. Erase = 0xff; prog = copy; read = copy.
 pub struct RamStorage {

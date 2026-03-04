@@ -895,6 +895,8 @@ pub fn lfs_dir_compact(
         let dir_ref = &mut *dir;
         let superblock_pair = [0u32, 1u32];
 
+        dir_ref.rev = dir_ref.rev.wrapping_add(1);
+
         if tired && lfs_pair_cmp(&dir_ref.pair, &superblock_pair) != 0 {
             relocated = true;
             lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
