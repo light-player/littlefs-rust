@@ -64,3 +64,20 @@ Refer to the C code in `reference/` for the original source, mostly `reference/l
 - **cfg access**: Where C assumes `lfs->cfg` is non-null after init, use `unwrap()` or `expect()` only when the C contract guarantees it; otherwise add explicit null checks.
 - **goto / control flow**: For C `goto`, preserve structure in Rust using nested blocks, `loop`/`continue`, or helper functions. Do not rewrite into different control-flow idioms if it could change behavior.
 - **C casts**: When C uses casts like `(const uint8_t*)buffer`, document the mapping in a comment (e.g. `// C: (const uint8_t*)buffer` → `buffer as *const u8`).
+
+## 10. Copying Tests from Reference
+
+Tests are defined in upstream TOML files (`tests/test_*.toml`) which contain C snippets run by the littlefs test framework. Port them to Rust integration tests, preserving alignment with the reference.
+
+- **Source**: `https://github.com/littlefs-project/littlefs/blob/master/tests/*.toml`. Commit in `docs/reference.md`.
+
+- **Names**: Keep the same test names as upstream. `[cases.test_bd_one_block]` → `test_bd_one_block`. Module mapping: `test_dirs.toml` → `tests/test_dirs.rs`, etc.
+
+- **Permutations**: Use `rstest` with `#[rstest]` and `#[case(...)]`. Map TOML defines to concrete cases:
+  - `defines.READ = ['READ_SIZE', 'BLOCK_SIZE']` (and similar) → `#[case(read_size, prog_size)]` with concrete pairs (e.g. `(16, 16)`, `(512, 512)`).
+  - `defines.N = 'range(3, 100, 3)'` → start with a subset (e.g. `#[case(5)]#[case(8)]#[case(10)]`); expand once stable.
+  - Add a comment above each parameterized test: `// Upstream: defines.X = [...], defines.Y = [...]. Subset: ...`.
+
+- **Refer to C files**: Each test module header: `//! Upstream: tests/test_dirs.toml` plus GitHub URL. Per-test comment: `// Upstream: [cases.test_dirs_many_rename]` (or the C API calls exercised).
+
+- **Strategy**: Start with narrow parameter ranges; broaden after implementation is stable. See `lp-littlefs-old/docs/2026-03-03-parameterized-test-bugs.md` for failures when ranges are expanded too early.
