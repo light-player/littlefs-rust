@@ -42,6 +42,17 @@ Fix warnings before committing. Do not ignore them.
 - Gate std-dependent code behind features
 - Follow existing code style
 
+## C-to-Rust Translation
+
+When translating functions from the reference C code (`reference/lfs.c`, `lfs_util.c`) to Rust:
+
+- Preserve all `LFS_ASSERT` → translate to `lfs_assert!` (or `debug_assert!` where appropriate)
+- Match C logic and control flow as closely as possible; do not refactor or simplify during translation
+- Include original C source as comments above/below each function with line references (e.g. `//! C: lfs.c:1234-1280`)
+- Use `unsafe` for pointer dereferences and raw buffer access; keep the same error model (negative int → `LFS_ERR_*`)
+- Document any intentional divergence from C; do not silently change behavior
+- See [docs/rules.md](docs/rules.md) for the full translation rules
+
 ## Language
 
 - Keep language professional and restrained
