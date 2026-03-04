@@ -38,7 +38,9 @@ use core::ffi::c_void;
 use crate::lfs_info::LfsFileConfig;
 
 pub use crate::dir::LfsDir;
-pub use crate::error::LFS_ERR_CORRUPT;
+pub use crate::error::{
+    LFS_ERR_CORRUPT, LFS_ERR_NOATTR, LFS_ERR_NOENT, LFS_ERR_NOMEM, LFS_ERR_NOSPC,
+};
 pub use crate::file::LfsFile;
 pub use crate::fs::Lfs;
 pub use crate::lfs_config::LfsConfig;

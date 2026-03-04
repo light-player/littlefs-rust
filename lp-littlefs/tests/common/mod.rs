@@ -116,6 +116,13 @@ pub struct TestEnv {
 /// Default block size. Matches upstream.
 const BLOCK_SIZE: u32 = 512;
 
+/// Build test environment with custom cache_size. Used for spill tests (e.g. cache 512).
+pub fn config_with_cache(cache_size: u32, block_count: u32) -> TestEnv {
+    let mut env = default_config(block_count);
+    env.config.cache_size = cache_size;
+    env
+}
+
 /// Build test environment with RAM BD. block_count defaults to 128 (upstream).
 pub fn default_config(block_count: u32) -> TestEnv {
     let block_size = BLOCK_SIZE;

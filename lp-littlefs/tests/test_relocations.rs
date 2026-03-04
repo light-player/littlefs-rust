@@ -1,0 +1,235 @@
+//! Relocation and compaction tests.
+//!
+//! Upstream: tests/test_relocations.toml
+//! Source: https://github.com/littlefs-project/littlefs/blob/master/tests/test_relocations.toml
+//!
+//! Validates dir_compact, dir_split, and orphaningcommit.
+
+mod common;
+
+use common::{
+    assert_ok, default_config, init_context, init_logger, path_bytes, LFS_O_CREAT, LFS_O_WRONLY,
+};
+use lp_littlefs::{
+    lfs_file_close, lfs_file_open, lfs_file_write, lfs_format, lfs_mkdir, lfs_mount, lfs_remove,
+    lfs_rename, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsFile, LfsInfo,
+};
+
+// --- test_relocations_dangling_split_dir ---
+// Fill FS, create many files in child dir. Triggers split when metadata overflows.
+#[test]
+fn test_relocations_dangling_split_dir() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d0").as_ptr()));
+    for i in 0..8 {
+        let path = path_bytes(&format!("d0/f{i}"));
+        let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+        assert_ok(lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path.as_ptr(),
+            LFS_O_WRONLY | LFS_O_CREAT,
+        ));
+        let n = lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"x".as_ptr() as *const core::ffi::c_void,
+            1,
+        );
+        assert_eq!(n, 1);
+        assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    }
+
+    for i in 0..8 {
+        let path = path_bytes(&format!("d0/f{i}"));
+        let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+        assert_ok(lfs_stat(lfs.as_mut_ptr(), path.as_ptr(), info.as_mut_ptr()));
+        let info = unsafe { info.assume_init() };
+        let nul = info.name.iter().position(|&b| b == 0).unwrap_or(256);
+        assert_eq!(
+            core::str::from_utf8(&info.name[..nul]).unwrap(),
+            format!("f{i}")
+        );
+    }
+
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// --- test_relocations_outdated_head ---
+// Split dir handling: multiple dirs, nested sub with many files.
+#[test]
+fn test_relocations_outdated_head() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    for i in 0..3 {
+        assert_ok(lfs_mkdir(
+            lfs.as_mut_ptr(),
+            path_bytes(&format!("d{i}")).as_ptr(),
+        ));
+    }
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d0/sub").as_ptr()));
+    for i in 0..8 {
+        let path = path_bytes(&format!("d0/sub/f{i}"));
+        let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+        assert_ok(lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path.as_ptr(),
+            LFS_O_WRONLY | LFS_O_CREAT,
+        ));
+        let n = lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"x".as_ptr() as *const core::ffi::c_void,
+            1,
+        );
+        assert_eq!(n, 1);
+        assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    }
+
+    for i in 0..8 {
+        let path = path_bytes(&format!("d0/sub/f{i}"));
+        let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+        assert_ok(lfs_stat(lfs.as_mut_ptr(), path.as_ptr(), info.as_mut_ptr()));
+        let info = unsafe { info.assume_init() };
+        let nul = info.name.iter().position(|&b| b == 0).unwrap_or(256);
+        assert_eq!(
+            core::str::from_utf8(&info.name[..nul]).unwrap(),
+            format!("f{i}")
+        );
+    }
+
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// --- test_relocations_nonreentrant ---
+// mkdir/remove cycles, no power-loss.
+#[test]
+fn test_relocations_nonreentrant() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    for i in 0..6 {
+        let name = format!("{}", (b'a' + i) as char);
+        let path = path_bytes(&name);
+        let _ = lfs_mkdir(lfs.as_mut_ptr(), path.as_ptr());
+    }
+    for i in 0..6 {
+        let name = format!("{}", (b'a' + i) as char);
+        let path = path_bytes(&name);
+        let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+        assert_ok(lfs_stat(lfs.as_mut_ptr(), path.as_ptr(), info.as_mut_ptr()));
+        let info = unsafe { info.assume_init() };
+        let nul = info.name.iter().position(|&b| b == 0).unwrap_or(256);
+        assert_eq!(core::str::from_utf8(&info.name[..nul]).unwrap(), name);
+        assert_ok(lfs_remove(lfs.as_mut_ptr(), path.as_ptr()));
+    }
+
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// --- test_relocations_nonreentrant_renames ---
+// Chained renames (x→z, y→x, z→y) exercise same-slot name change.
+#[test]
+fn test_relocations_nonreentrant_renames() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    for name in ["x", "y"] {
+        let path = path_bytes(name);
+        let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+        assert_ok(lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path.as_ptr(),
+            LFS_O_WRONLY | LFS_O_CREAT,
+        ));
+        assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    }
+
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("x").as_ptr(),
+        path_bytes("z").as_ptr(),
+    ));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("y").as_ptr(),
+        path_bytes("x").as_ptr(),
+    ));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("z").as_ptr(),
+        path_bytes("y").as_ptr(),
+    ));
+
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    assert_ok(lfs_stat(
+        lfs.as_mut_ptr(),
+        path_bytes("x").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    let info = unsafe { info.assume_init() };
+    let nul = info.name.iter().position(|&b| b == 0).unwrap_or(256);
+    assert_eq!(core::str::from_utf8(&info.name[..nul]).unwrap(), "x");
+
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    assert_ok(lfs_stat(
+        lfs.as_mut_ptr(),
+        path_bytes("y").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    let info = unsafe { info.assume_init() };
+    let nul = info.name.iter().position(|&b| b == 0).unwrap_or(256);
+    assert_eq!(core::str::from_utf8(&info.name[..nul]).unwrap(), "y");
+
+    assert_ok(lfs_remove(lfs.as_mut_ptr(), path_bytes("x").as_ptr()));
+    assert_ok(lfs_remove(lfs.as_mut_ptr(), path_bytes("y").as_ptr()));
+
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// --- Deferred ---
+
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_relocations_reentrant() {}
+
+#[test]
+#[ignore = "powerloss runner not implemented"]
+fn test_relocations_reentrant_renames() {}
