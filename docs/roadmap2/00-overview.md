@@ -42,6 +42,8 @@ Phased roadmap for the new lp-littlefs implementation (`lp-littlefs/`). Test-dri
 | [07-remaining-tests](07-phase-remaining-tests.md) | Paths, move, entries, attrs, relocations, alloc | test_paths, test_move, test_entries, test_attrs, test_relocations, test_alloc |
 | [08-robustness](08-phase-robustness.md) | Exhaustion, evil, bad blocks | test_exhaustion, test_evil, test_badblocks, test_interspersed |
 
+Phase 07 has subphases: [07a](07a-phase-paths-move.md), [07b](07b-phase-entries.md), [07c](07c-phase-relocations.md), [07d](07d-phase-alloc.md), [07e](07e-phase-attrs.md).
+
 ---
 
 ## Deferred (Out of Scope for Roadmap 2)
