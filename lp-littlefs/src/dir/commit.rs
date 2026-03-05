@@ -964,7 +964,7 @@ pub fn lfs_dir_compact(
     end: u16,
 ) -> i32 {
     use crate::bd::bd::{lfs_bd_erase, lfs_cache_drop};
-    use crate::block_alloc::alloc::lfs_alloc;
+    use crate::block_alloc::alloc::{lfs_alloc, lfs_alloc_lookahead};
     use crate::dir::traverse::lfs_dir_traverse;
     use crate::error::{LFS_ERR_CORRUPT, LFS_ERR_NOSPC};
     use crate::lfs_gstate::{lfs_gstate_iszero, lfs_gstate_tole32, lfs_gstate_xor};
@@ -1027,6 +1027,7 @@ pub fn lfs_dir_compact(
                         relocate_count,
                         dir_ref.pair
                     );
+                    lfs_alloc_lookahead(lfs, dir_ref.pair[1]);
                     lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
                     if lfs_pair_cmp(&dir_ref.pair, &superblock_pair) == 0 {
                         crate::lfs_trace!("lfs_dir_compact NOSPC: root+CORRUPT bd_erase");
@@ -1058,6 +1059,7 @@ pub fn lfs_dir_compact(
                         relocate_count,
                         dir_ref.pair
                     );
+                    lfs_alloc_lookahead(lfs, dir_ref.pair[1]);
                     lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
                     if lfs_pair_cmp(&dir_ref.pair, &superblock_pair) == 0 {
                         crate::lfs_trace!("lfs_dir_compact NOSPC: root+CORRUPT commitprog");
@@ -1102,6 +1104,7 @@ pub fn lfs_dir_compact(
                         relocate_count,
                         dir_ref.pair
                     );
+                    lfs_alloc_lookahead(lfs, dir_ref.pair[1]);
                     lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
                     if lfs_pair_cmp(&dir_ref.pair, &superblock_pair) == 0 {
                         crate::lfs_trace!("lfs_dir_compact NOSPC: root+err traverse");
@@ -1145,6 +1148,7 @@ pub fn lfs_dir_compact(
                             relocate_count,
                             dir_ref.pair
                         );
+                        lfs_alloc_lookahead(lfs, dir_ref.pair[1]);
                         lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
                         if lfs_pair_cmp(&dir_ref.pair, &superblock_pair) == 0 {
                             crate::lfs_trace!("lfs_dir_compact NOSPC: root+CORRUPT tail");
@@ -1202,6 +1206,7 @@ pub fn lfs_dir_compact(
                             relocate_count,
                             dir_ref.pair
                         );
+                        lfs_alloc_lookahead(lfs, dir_ref.pair[1]);
                         lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
                         if lfs_pair_cmp(&dir_ref.pair, &superblock_pair) == 0 {
                             crate::lfs_trace!("lfs_dir_compact NOSPC: root+CORRUPT movestate");
@@ -1232,6 +1237,7 @@ pub fn lfs_dir_compact(
                         relocate_count,
                         dir_ref.pair
                     );
+                    lfs_alloc_lookahead(lfs, dir_ref.pair[1]);
                     lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
                     if lfs_pair_cmp(&dir_ref.pair, &superblock_pair) == 0 {
                         crate::lfs_trace!("lfs_dir_compact NOSPC: root+CORRUPT commitcrc");

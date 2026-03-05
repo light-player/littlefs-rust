@@ -420,7 +420,7 @@ pub fn lfs_ctz_extend(
     off: *mut lfs_off_t,
 ) -> i32 {
     use crate::bd::bd::{lfs_bd_erase, lfs_bd_prog, lfs_bd_read, lfs_cache_drop};
-    use crate::block_alloc::alloc::lfs_alloc;
+    use crate::block_alloc::alloc::{lfs_alloc, lfs_alloc_lookahead};
     use crate::error::LFS_ERR_CORRUPT;
     use crate::util::{lfs_ctz, lfs_fromle32, lfs_tole32};
 
@@ -438,6 +438,7 @@ pub fn lfs_ctz_extend(
             let err = lfs_bd_erase(lfs as *const crate::fs::Lfs, nblock);
             if err != 0 {
                 if err == LFS_ERR_CORRUPT {
+                    lfs_alloc_lookahead(lfs, nblock);
                     lfs_cache_drop(lfs, pcache);
                     continue 'relocate;
                 }
@@ -482,6 +483,7 @@ pub fn lfs_ctz_extend(
                     );
                     if err != 0 {
                         if err == LFS_ERR_CORRUPT {
+                            lfs_alloc_lookahead(lfs, nblock);
                             lfs_cache_drop(lfs, pcache);
                             continue 'relocate;
                         }
@@ -510,6 +512,7 @@ pub fn lfs_ctz_extend(
                 );
                 if err != 0 {
                     if err == LFS_ERR_CORRUPT {
+                        lfs_alloc_lookahead(lfs, nblock);
                         lfs_cache_drop(lfs, pcache);
                         continue 'relocate;
                     }
