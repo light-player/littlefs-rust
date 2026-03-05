@@ -49,7 +49,18 @@ pub fn lfs_mlist_remove(lfs: *mut crate::fs::Lfs, mlist: *mut LfsMlist) {
     }
     unsafe {
         let mut p = &mut (*lfs).mlist;
+        #[cfg(feature = "loop_limits")]
+        const MAX_MLIST_REMOVE_ITER: u32 = 256;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
         while !(*p).is_null() {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_MLIST_REMOVE_ITER {
+                    panic!("loop_limits: MAX_MLIST_REMOVE_ITER ({}) exceeded", MAX_MLIST_REMOVE_ITER);
+                }
+                iter += 1;
+            }
             if core::ptr::eq(*p, mlist) {
                 *p = (*mlist).next;
                 break;

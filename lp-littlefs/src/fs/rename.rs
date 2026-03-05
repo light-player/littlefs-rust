@@ -214,7 +214,18 @@ fn slice_until_nul(ptr: *const u8) -> &'static [u8] {
     }
     unsafe {
         let mut len = 0;
+        #[cfg(feature = "loop_limits")]
+        const MAX_SLICE_NUL_ITER: u32 = 4096;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
         while *ptr.add(len) != 0 {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_SLICE_NUL_ITER {
+                    panic!("loop_limits: MAX_SLICE_NUL_ITER ({}) exceeded", MAX_SLICE_NUL_ITER);
+                }
+                iter += 1;
+            }
             len += 1;
         }
         core::slice::from_raw_parts(ptr, len)

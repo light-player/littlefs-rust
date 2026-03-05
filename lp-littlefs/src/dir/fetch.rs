@@ -395,7 +395,10 @@ pub fn lfs_dir_fetchmatch(
                 #[cfg(feature = "loop_limits")]
                 {
                     if tag_iter >= MAX_FETCH_TAG_ITER {
-                        return LFS_ERR_CORRUPT as lfs_stag_t;
+                        panic!(
+                            "loop_limits: MAX_FETCH_TAG_ITER ({}) exceeded",
+                            MAX_FETCH_TAG_ITER
+                        );
                     }
                     if tag_iter > 0 && tag_iter % 32 == 0 {
                         crate::lfs_trace!(

@@ -213,7 +213,18 @@ pub fn lfs_dir_read_(lfs: *mut crate::fs::Lfs, dir: *mut LfsDir, info: *mut LfsI
             return 1;
         }
 
+        #[cfg(feature = "loop_limits")]
+        const MAX_DIR_READ_ITER: u32 = 2048;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
         loop {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_DIR_READ_ITER {
+                    panic!("loop_limits: MAX_DIR_READ_ITER ({}) exceeded", MAX_DIR_READ_ITER);
+                }
+                iter += 1;
+            }
             if dir_ref.id == dir_ref.m.count {
                 if !dir_ref.m.split {
                     return 0;

@@ -218,7 +218,18 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
             return LFS_ERR_NOSPC;
         }
 
+        #[cfg(feature = "loop_limits")]
+        const MAX_ALLOC_ITER: u32 = 1024;
+        #[cfg(feature = "loop_limits")]
+        let mut alloc_iter: u32 = 0;
         loop {
+            #[cfg(feature = "loop_limits")]
+            {
+                if alloc_iter >= MAX_ALLOC_ITER {
+                    panic!("loop_limits: MAX_ALLOC_ITER ({}) exceeded in lfs_alloc", MAX_ALLOC_ITER);
+                }
+                alloc_iter += 1;
+            }
             // scan our lookahead buffer for free blocks
             while lfs.lookahead.next < lfs.lookahead.size {
                 if (*buf.add((lfs.lookahead.next / 8) as usize)) & (1u8 << (lfs.lookahead.next % 8))
@@ -229,7 +240,18 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
 
                     // eagerly find next free block to maximize how many blocks
                     // lfs_alloc_ckpoint makes available for scanning
+                    #[cfg(feature = "loop_limits")]
+                    const MAX_ALLOC_SCAN_BIT_ITER: u32 = 4096;
+                    #[cfg(feature = "loop_limits")]
+                    let mut bit_iter: u32 = 0;
                     loop {
+                        #[cfg(feature = "loop_limits")]
+                        {
+                            if bit_iter >= MAX_ALLOC_SCAN_BIT_ITER {
+                                panic!("loop_limits: MAX_ALLOC_SCAN_BIT_ITER ({}) exceeded", MAX_ALLOC_SCAN_BIT_ITER);
+                            }
+                            bit_iter += 1;
+                        }
                         lfs.lookahead.next += 1;
                         lfs.lookahead.ckpoint = lfs.lookahead.ckpoint.wrapping_sub(1);
 

@@ -106,7 +106,18 @@ pub fn lfs_dir_getslice(
             }
         }
 
+        #[cfg(feature = "loop_limits")]
+        const MAX_GETSLICE_TAG_ITER: u32 = 2048;
+        #[cfg(feature = "loop_limits")]
+        let mut tag_iter: u32 = 0;
         while off >= 4 + lfs_tag_dsize(ntag) {
+            #[cfg(feature = "loop_limits")]
+            {
+                if tag_iter >= MAX_GETSLICE_TAG_ITER {
+                    panic!("loop_limits: MAX_GETSLICE_TAG_ITER ({}) exceeded", MAX_GETSLICE_TAG_ITER);
+                }
+                tag_iter += 1;
+            }
             off -= lfs_tag_dsize(ntag);
             let tag = ntag;
             let mut ntag_buf: lfs_tag_t = 0;
@@ -747,7 +758,18 @@ pub fn lfs_dir_traverse(
 
     let mut phase = TraversePhase::GetNextTag;
 
+    #[cfg(feature = "loop_limits")]
+    const MAX_TRAVERSE_PHASE_ITER: u32 = 65536;
+    #[cfg(feature = "loop_limits")]
+    let mut phase_iter: u32 = 0;
     loop {
+        #[cfg(feature = "loop_limits")]
+        {
+            if phase_iter >= MAX_TRAVERSE_PHASE_ITER {
+                panic!("loop_limits: MAX_TRAVERSE_PHASE_ITER ({}) exceeded in lfs_dir_traverse", MAX_TRAVERSE_PHASE_ITER);
+            }
+            phase_iter += 1;
+        }
         match phase {
             TraversePhase::GetNextTag => {
                 crate::lfs_trace!("traverse GetNextTag: sp={} phase=GetNextTag", sp);

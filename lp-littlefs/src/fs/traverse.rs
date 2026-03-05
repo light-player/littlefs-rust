@@ -160,7 +160,10 @@ pub fn lfs_fs_traverse_(
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_TRAVERSE_TAIL {
-                    return LFS_ERR_CORRUPT;
+                    panic!(
+                        "loop_limits: MAX_TRAVERSE_TAIL ({}) exceeded",
+                        MAX_TRAVERSE_TAIL
+                    );
                 }
                 if iter > 0 && iter % 20 == 0 {
                     crate::lfs_trace!("fs_traverse: iter={} tail={:?}", iter, dir.tail);
@@ -246,7 +249,7 @@ pub fn lfs_fs_traverse_(
             #[cfg(feature = "loop_limits")]
             {
                 if mlist_iter >= MAX_MLIST {
-                    return LFS_ERR_CORRUPT;
+                    panic!("loop_limits: MAX_MLIST ({}) exceeded", MAX_MLIST);
                 }
                 mlist_iter += 1;
             }

@@ -53,8 +53,19 @@ pub fn lfs_fs_pred(
             period: 1,
         };
         let mut have_fetched = false;
+        #[cfg(feature = "loop_limits")]
+        const MAX_PARENT_ITER: u32 = 2048;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
 
         while !lfs_pair_isnull(&(*pdir).tail) {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_PARENT_ITER {
+                    panic!("loop_limits: MAX_PARENT_ITER ({}) exceeded in lfs_fs_parent", MAX_PARENT_ITER);
+                }
+                iter += 1;
+            }
             let err = lfs_tortoise_detectcycles(pdir, &mut tortoise);
             if err < 0 {
                 return crate::error::LFS_ERR_CORRUPT;
@@ -205,8 +216,19 @@ pub fn lfs_fs_parent(
             i: 1,
             period: 1,
         };
+        #[cfg(feature = "loop_limits")]
+        const MAX_PARENT_ITER: u32 = 2048;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
 
         while !lfs_pair_isnull(&(*parent).tail) {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_PARENT_ITER {
+                    panic!("loop_limits: MAX_PARENT_ITER ({}) exceeded in lfs_fs_parent (parent)", MAX_PARENT_ITER);
+                }
+                iter += 1;
+            }
             let err = lfs_tortoise_detectcycles(parent, &mut tortoise);
             if err < 0 {
                 return err;

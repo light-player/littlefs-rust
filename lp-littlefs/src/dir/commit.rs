@@ -999,7 +999,18 @@ pub fn lfs_dir_compact(
             tired = false;
         }
 
+        #[cfg(feature = "loop_limits")]
+        const MAX_COMPACT_ITER: u32 = 1024;
+        #[cfg(feature = "loop_limits")]
+        let mut compact_iter: u32 = 0;
         loop {
+            #[cfg(feature = "loop_limits")]
+            {
+                if compact_iter >= MAX_COMPACT_ITER {
+                    panic!("loop_limits: MAX_COMPACT_ITER ({}) exceeded in lfs_dir_compact", MAX_COMPACT_ITER);
+                }
+                compact_iter += 1;
+            }
             let metadata_max = (*lfs).cfg.as_ref().map_or(0, |c| c.metadata_max);
             let block_size = (*lfs).cfg.as_ref().unwrap().block_size;
             let end_off = if metadata_max != 0 {
@@ -1864,7 +1875,18 @@ fn relocatingcommit_fixmlist(
     unsafe {
         let oldpair = [(*pair)[0], (*pair)[1]];
         let mut d = (*lfs).mlist;
+        #[cfg(feature = "loop_limits")]
+        const MAX_MLIST_COMMIT_ITER: u32 = 128;
+        #[cfg(feature = "loop_limits")]
+        let mut mlist_iter: u32 = 0;
         while !d.is_null() {
+            #[cfg(feature = "loop_limits")]
+            {
+                if mlist_iter >= MAX_MLIST_COMMIT_ITER {
+                    panic!("loop_limits: MAX_MLIST_COMMIT_ITER ({}) exceeded", MAX_MLIST_COMMIT_ITER);
+                }
+                mlist_iter += 1;
+            }
             let d_ref = &mut *d;
             if lfs_pair_cmp(&d_ref.m.pair, &oldpair) == 0 {
                 d_ref.m = *dir;
@@ -1895,7 +1917,18 @@ fn relocatingcommit_fixmlist(
                         }
                     }
                 }
+                #[cfg(feature = "loop_limits")]
+                const MAX_COMMIT_DIR_ADVANCE: u32 = 2048;
+                #[cfg(feature = "loop_limits")]
+                let mut advance_iter: u32 = 0;
                 while d_ref.id >= d_ref.m.count && d_ref.m.split {
+                    #[cfg(feature = "loop_limits")]
+                    {
+                        if advance_iter >= MAX_COMMIT_DIR_ADVANCE {
+                            panic!("loop_limits: MAX_COMMIT_DIR_ADVANCE ({}) exceeded", MAX_COMMIT_DIR_ADVANCE);
+                        }
+                        advance_iter += 1;
+                    }
                     if lfs_pair_cmp(&d_ref.m.tail, &(*lfs).root) != 0 {
                         d_ref.id -= d_ref.m.count;
                     }
@@ -2192,7 +2225,18 @@ pub fn lfs_dir_orphaningcommit(
         let mut state = state;
         let mut lpair = lpair;
         let mut parent_hasparent = false;
+        #[cfg(feature = "loop_limits")]
+        const MAX_RELOCATE_ITER: u32 = 512;
+        #[cfg(feature = "loop_limits")]
+        let mut relocate_iter: u32 = 0;
         while state == crate::error::LFS_OK_RELOCATED {
+            #[cfg(feature = "loop_limits")]
+            {
+                if relocate_iter >= MAX_RELOCATE_ITER {
+                    panic!("loop_limits: MAX_RELOCATE_ITER ({}) exceeded", MAX_RELOCATE_ITER);
+                }
+                relocate_iter += 1;
+            }
             state = 0;
             if lfs_pair_cmp(&lpair, &(*lfs).root) == 0 {
                 (*lfs).root[0] = ldir.pair[0];

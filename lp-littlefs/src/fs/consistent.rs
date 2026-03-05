@@ -159,8 +159,19 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
                 split: false,
                 tail: [0, 1],
             };
+            #[cfg(feature = "loop_limits")]
+            const MAX_GC_COMPACT_ITER: u32 = 2048;
+            #[cfg(feature = "loop_limits")]
+            let mut iter: u32 = 0;
 
             while !lfs_pair_isnull(&mdir.tail) {
+                #[cfg(feature = "loop_limits")]
+                {
+                    if iter >= MAX_GC_COMPACT_ITER {
+                        panic!("loop_limits: MAX_GC_COMPACT_ITER ({}) exceeded", MAX_GC_COMPACT_ITER);
+                    }
+                    iter += 1;
+                }
                 let err = lfs_dir_fetch(lfs, &mut mdir, &mdir.tail);
                 if err != 0 {
                     return err;

@@ -199,7 +199,18 @@ pub fn lfs_strspn(p: *const u8, c: u8) -> u32 {
     let mut n: u32 = 0;
     unsafe {
         let mut q = p;
+        #[cfg(feature = "loop_limits")]
+        const MAX_STRSPN_ITER: u32 = 4096;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
         while *q == c {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_STRSPN_ITER {
+                    panic!("loop_limits: MAX_STRSPN_ITER ({}) exceeded", MAX_STRSPN_ITER);
+                }
+                iter += 1;
+            }
             n += 1;
             q = q.add(1);
         }
@@ -216,7 +227,18 @@ pub fn lfs_strcspn(p: *const u8, c: u8) -> u32 {
     let mut n: u32 = 0;
     unsafe {
         let mut q = p;
+        #[cfg(feature = "loop_limits")]
+        const MAX_STRCSPN_ITER: u32 = 4096;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
         while *q != c && *q != 0 {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_STRCSPN_ITER {
+                    panic!("loop_limits: MAX_STRCSPN_ITER ({}) exceeded", MAX_STRCSPN_ITER);
+                }
+                iter += 1;
+            }
             n += 1;
             q = q.add(1);
         }

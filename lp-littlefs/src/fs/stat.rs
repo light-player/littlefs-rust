@@ -47,7 +47,18 @@ pub fn lfs_stat_(
 
         // C: lfs.c:3872-3875 - only allow trailing slashes on dirs (strchr(path, '/') != NULL)
         let mut p = path_ptr;
+        #[cfg(feature = "loop_limits")]
+        const MAX_STAT_PATH_ITER: u32 = 1024;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
         while *p != 0 {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_STAT_PATH_ITER {
+                    panic!("loop_limits: MAX_STAT_PATH_ITER ({}) exceeded", MAX_STAT_PATH_ITER);
+                }
+                iter += 1;
+            }
             if *p == b'/' {
                 if u32::from(lfs_tag_type3(tag as u32)) != LFS_TYPE_DIR {
                     return crate::error::LFS_ERR_NOTDIR;

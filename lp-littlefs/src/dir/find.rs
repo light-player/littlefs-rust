@@ -4,7 +4,7 @@ use crate::bd::bd::lfs_bd_cmp;
 use crate::dir::fetch::lfs_dir_fetchmatch;
 use crate::dir::traverse::lfs_dir_get;
 use crate::dir::LfsMdir;
-use crate::error::{LFS_ERR_CORRUPT, LFS_ERR_INVAL, LFS_ERR_NOENT, LFS_ERR_NOTDIR};
+use crate::error::{LFS_ERR_INVAL, LFS_ERR_NOENT, LFS_ERR_NOTDIR};
 use crate::fs::Lfs;
 use crate::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_NAME, LFS_TYPE_STRUCT};
 use crate::tag::{lfs_diskoff, lfs_mktag, lfs_tag_id, lfs_tag_size, lfs_tag_type3};
@@ -259,7 +259,18 @@ pub fn lfs_dir_find(
             // C: lfs.c:1527-1541 - skip if matched by '..' in path
             let mut suffix = name.add(namelen as usize);
             let mut depth: i32 = 1;
+            #[cfg(feature = "loop_limits")]
+            const MAX_PATH_DEPTH_ITER: u32 = 512;
+            #[cfg(feature = "loop_limits")]
+            let mut path_iter: u32 = 0;
             loop {
+                #[cfg(feature = "loop_limits")]
+                {
+                    if path_iter >= MAX_PATH_DEPTH_ITER {
+                        panic!("loop_limits: MAX_PATH_DEPTH_ITER ({}) exceeded in path .. parsing", MAX_PATH_DEPTH_ITER);
+                    }
+                    path_iter += 1;
+                }
                 let suffix_skip = lfs_strspn(suffix, b'/');
                 suffix = suffix.add(suffix_skip as usize);
                 let sufflen = lfs_strcspn(suffix, b'/');
@@ -318,13 +329,10 @@ pub fn lfs_dir_find(
                 {
                     find_iter += 1;
                     if find_iter > MAX_FIND_ITER {
-                        crate::lfs_trace!(
-                            "dir_find: iter cap {} exceeded name_len={} tail={:?}",
-                            MAX_FIND_ITER,
-                            namelen,
-                            dir_ref.tail
+                        panic!(
+                            "loop_limits: MAX_FIND_ITER ({}) exceeded name_len={} tail={:?}",
+                            MAX_FIND_ITER, namelen, dir_ref.tail
                         );
-                        return LFS_ERR_CORRUPT as crate::types::lfs_stag_t;
                     }
                 }
                 let mut match_data = LfsDirFindMatch {

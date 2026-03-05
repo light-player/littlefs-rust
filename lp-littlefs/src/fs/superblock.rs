@@ -373,11 +373,18 @@ pub fn lfs_fs_deorphan(lfs: *mut super::lfs::Lfs, powerloss: bool) -> i32 {
                 #[cfg(feature = "loop_limits")]
                 {
                     if iter >= MAX_DEORPHAN_ITER {
-                        crate::lfs_trace!("deorphan: iter cap {} exceeded", MAX_DEORPHAN_ITER);
-                        return crate::error::LFS_ERR_CORRUPT;
+                        panic!(
+                            "loop_limits: MAX_DEORPHAN_ITER ({}) exceeded",
+                            MAX_DEORPHAN_ITER
+                        );
                     }
                     if iter > 0 && iter % 20 == 0 {
-                        crate::lfs_trace!("deorphan: pass={} iter={} tail={:?}", pass, iter, pdir.tail);
+                        crate::lfs_trace!(
+                            "deorphan: pass={} iter={} tail={:?}",
+                            pass,
+                            iter,
+                            pdir.tail
+                        );
                     }
                     iter += 1;
                 }

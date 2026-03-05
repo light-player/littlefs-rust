@@ -259,8 +259,10 @@ pub fn lfs_mount_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsC
             #[cfg(feature = "loop_limits")]
             {
                 if mount_iter >= 64 {
-                    crate::lfs_trace!("mount: iter cap 64 exceeded tail={:?}", dir.tail);
-                    break;
+                    panic!(
+                        "loop_limits: mount iter cap 64 exceeded tail={:?}",
+                        dir.tail
+                    );
                 }
                 mount_iter += 1;
             }
@@ -357,7 +359,11 @@ pub fn lfs_mount_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsC
 
             crate::lfs_trace!("mount: before getgstate");
             err_inner = lfs_dir_getgstate(lfs as *mut _, &dir as *const _, &mut lfs.gstate);
-            crate::lfs_trace!("mount: after getgstate err={} tail={:?}", err_inner, dir.tail);
+            crate::lfs_trace!(
+                "mount: after getgstate err={} tail={:?}",
+                err_inner,
+                dir.tail
+            );
             if err_inner != 0 {
                 break;
             }

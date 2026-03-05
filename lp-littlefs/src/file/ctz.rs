@@ -169,7 +169,10 @@ pub fn lfs_ctz_find(
             {
                 iter += 1;
                 if iter > MAX_CTZ_FIND_ITER {
-                    return LFS_ERR_CORRUPT;
+                    panic!(
+                        "loop_limits: MAX_CTZ_FIND_ITER ({}) exceeded",
+                        MAX_CTZ_FIND_ITER
+                    );
                 }
             }
             let skip = lfs_min(
@@ -280,7 +283,10 @@ pub fn lfs_ctz_traverse(
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= block_count {
-                    return crate::error::LFS_ERR_CORRUPT;
+                    panic!(
+                        "loop_limits: lfs_ctz_traverse iter ({}) >= block_count ({})",
+                        iter, block_count
+                    );
                 }
                 iter += 1;
             }
