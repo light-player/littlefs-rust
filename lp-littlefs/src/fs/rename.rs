@@ -238,7 +238,7 @@ fn slice_until_nul(ptr: *const u8) -> &'static [u8] {
 pub fn lfs_rename_(lfs: *mut super::lfs::Lfs, oldpath: *const u8, newpath: *const u8) -> i32 {
     let err = lfs_fs_forceconsistency(lfs);
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
 
     unsafe {
@@ -292,11 +292,11 @@ pub fn lfs_rename_(lfs: *mut super::lfs::Lfs, oldpath: *const u8, newpath: *cons
             if lfs_path_isdir(newpath_slice)
                 && u32::from(lfs_tag_type3(oldtag as u32)) != LFS_TYPE_DIR
             {
-                return LFS_ERR_NOTDIR;
+                return crate::lfs_err!(LFS_ERR_NOTDIR);
             }
             let nlen = lfs_path_namelen(newpath_slice);
             if nlen > (*lfs).name_max {
-                return LFS_ERR_NAMETOOLONG;
+                return crate::lfs_err!(LFS_ERR_NAMETOOLONG);
             }
             if samepair && newid <= newoldid {
                 newoldid += 1;
@@ -327,14 +327,14 @@ pub fn lfs_rename_(lfs: *mut super::lfs::Lfs, oldpath: *const u8, newpath: *cons
 
             let err = lfs_dir_fetch(lfs, &mut prevdir.m, &prevpair);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             if prevdir.m.count > 0 || prevdir.m.split {
-                return LFS_ERR_NOTEMPTY;
+                return crate::lfs_err!(LFS_ERR_NOTEMPTY);
             }
             let err = lfs_fs_preporphans(lfs, 1);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             prevdir.type_ = 0;
             prevdir.id = 0;
@@ -375,7 +375,7 @@ pub fn lfs_rename_(lfs: *mut super::lfs::Lfs, oldpath: *const u8, newpath: *cons
         let err = lfs_dir_commit(lfs, &mut newcwd, attrs.as_ptr() as *const _, 5);
         (*lfs).mlist = prevdir.next;
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         if !samepair && lfs_gstate_hasmove(&(*lfs).gstate) {
@@ -387,7 +387,7 @@ pub fn lfs_rename_(lfs: *mut super::lfs::Lfs, oldpath: *const u8, newpath: *cons
             let err = lfs_dir_commit(lfs, &mut oldcwd, attrs2.as_ptr() as *const _, 1);
             (*lfs).mlist = prevdir.next;
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
 
@@ -397,11 +397,11 @@ pub fn lfs_rename_(lfs: *mut super::lfs::Lfs, oldpath: *const u8, newpath: *cons
 
             let err = lfs_fs_preporphans(lfs, -1);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             let err = lfs_fs_pred(lfs, &prevdir.m.pair, &mut newcwd);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             lfs_dir_drop(lfs, &mut newcwd, &prevdir.m)
         } else {

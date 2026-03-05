@@ -55,3 +55,57 @@ macro_rules! lfs_trace {
 macro_rules! lfs_trace {
     ($($_:tt)*) => {};
 }
+
+/// Produce an error value for return. When `log` feature is enabled, logs at trace level
+/// (file, line, error code) before producing the value. Use as `return lfs_err!(LFS_ERR_NOSPC)`
+/// or with context: `return lfs_err!(LFS_ERR_NOSPC, "off={} end={}", off, end)`.
+#[cfg(feature = "log")]
+#[macro_export]
+macro_rules! lfs_err {
+    ($e:expr) => {{
+        $crate::lfs_trace!("lfs_err {} at {}:{}", $e, file!(), line!());
+        $e
+    }};
+    ($e:expr, $fmt:expr, $($arg:tt)*) => {{
+        $crate::lfs_trace!(concat!("lfs_err {} at ", file!(), ":", line!(), " ", $fmt), $e, $($arg)*);
+        $e
+    }};
+}
+
+#[cfg(not(feature = "log"))]
+#[macro_export]
+macro_rules! lfs_err {
+    ($e:expr) => {
+        $e
+    };
+    ($e:expr, $($arg:tt)+) => {
+        $e
+    };
+}
+
+/// Propagate an error value on return. When `log` feature is enabled, logs at trace level
+/// (file, line, error code) so call chain is visible. Use as `return lfs_pass_err!(err)` or
+/// with context: `return lfs_pass_err!(err, "after lfs_dir_commit")`.
+#[cfg(feature = "log")]
+#[macro_export]
+macro_rules! lfs_pass_err {
+    ($e:expr) => {{
+        $crate::lfs_trace!("lfs_pass_err {} at {}:{}", $e, file!(), line!());
+        $e
+    }};
+    ($e:expr, $fmt:expr, $($arg:tt)*) => {{
+        $crate::lfs_trace!(concat!("lfs_pass_err {} at ", file!(), ":", line!(), " ", $fmt), $e, $($arg)*);
+        $e
+    }};
+}
+
+#[cfg(not(feature = "log"))]
+#[macro_export]
+macro_rules! lfs_pass_err {
+    ($e:expr) => {
+        $e
+    };
+    ($e:expr, $($arg:tt)+) => {
+        $e
+    };
+}

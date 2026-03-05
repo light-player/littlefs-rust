@@ -336,7 +336,7 @@ pub fn lfs_dir_fetchmatch(
 
         // block_count check (C: lines 1117-1120)
         if lfs.block_count != 0 && (pair[0] >= lfs.block_count || pair[1] >= lfs.block_count) {
-            return LFS_ERR_CORRUPT as lfs_stag_t;
+            return crate::lfs_err!(LFS_ERR_CORRUPT as lfs_stag_t);
         }
 
         // find the block with the most recent revision (C: lines 1123-1138)

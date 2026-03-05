@@ -217,14 +217,14 @@ pub fn lfs_dir_find(
     id: *mut u16,
 ) -> crate::types::lfs_stag_t {
     if lfs.is_null() || dir.is_null() || path.is_null() {
-        return LFS_ERR_INVAL as crate::types::lfs_stag_t;
+        return crate::lfs_err!(LFS_ERR_INVAL as crate::types::lfs_stag_t);
     }
     unsafe {
         let lfs_ref = &mut *lfs;
         let dir_ref = &mut *dir;
         let mut name = *path;
         if name.is_null() {
-            return LFS_ERR_INVAL as crate::types::lfs_stag_t;
+            return crate::lfs_err!(LFS_ERR_INVAL as crate::types::lfs_stag_t);
         }
 
         // C: lfs.c:1488-1491
@@ -234,7 +234,7 @@ pub fn lfs_dir_find(
 
         // C: lfs.c:1494-1495
         if *name == 0 {
-            return LFS_ERR_INVAL as crate::types::lfs_stag_t;
+            return crate::lfs_err!(LFS_ERR_INVAL as crate::types::lfs_stag_t);
         }
 
         'nextname: loop {
@@ -253,7 +253,7 @@ pub fn lfs_dir_find(
 
             // C: lfs.c:1522-1524 - error on '..' at top level
             if namelen == 2 && *name == b'.' && *name.add(1) == b'.' {
-                return LFS_ERR_INVAL as crate::types::lfs_stag_t;
+                return crate::lfs_err!(LFS_ERR_INVAL as crate::types::lfs_stag_t);
             }
 
             // C: lfs.c:1527-1541 - skip if matched by '..' in path
@@ -304,7 +304,7 @@ pub fn lfs_dir_find(
 
             // C: lfs.c:1652-1654
             if u32::from(lfs_tag_type3(tag as u32)) != LFS_TYPE_DIR {
-                return LFS_ERR_NOTDIR as crate::types::lfs_stag_t;
+                return crate::lfs_err!(LFS_ERR_NOTDIR as crate::types::lfs_stag_t);
             }
 
             // C: lfs.c:1557-1564
@@ -360,7 +360,7 @@ pub fn lfs_dir_find(
                     break;
                 }
                 if !dir_ref.split {
-                    return LFS_ERR_NOENT as crate::types::lfs_stag_t;
+                    return crate::lfs_err!(LFS_ERR_NOENT as crate::types::lfs_stag_t);
                 }
             }
 

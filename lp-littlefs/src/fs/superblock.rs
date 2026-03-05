@@ -88,7 +88,7 @@ pub fn lfs_fs_desuperblock(lfs: *mut super::lfs::Lfs) -> i32 {
         let mut root = core::mem::zeroed();
         let err = lfs_dir_fetch(lfs, &mut root, &(*lfs).root);
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         // write a new superblock
@@ -112,7 +112,7 @@ pub fn lfs_fs_desuperblock(lfs: *mut super::lfs::Lfs) -> i32 {
         }];
         let err = lfs_dir_commit(lfs, &mut root, attrs.as_ptr() as *const _, 1);
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         lfs_fs_prepsuperblock(lfs, false);
@@ -179,7 +179,7 @@ pub fn lfs_fs_demove(lfs: *mut super::lfs::Lfs) -> i32 {
         let mut movedir = core::mem::zeroed();
         let err = lfs_dir_fetch(lfs, &mut movedir, &(*lfs).gdisk.pair);
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         let moveid = lfs_tag_id((*lfs).gdisk.tag);
@@ -390,7 +390,7 @@ pub fn lfs_fs_deorphan(lfs: *mut super::lfs::Lfs, powerloss: bool) -> i32 {
                 }
                 let err = lfs_dir_fetch(lfs, &mut dir, &pdir.tail);
                 if err != 0 {
-                    return err;
+                    return crate::lfs_pass_err!(err);
                 }
 
                 if !pdir.split {
@@ -458,7 +458,7 @@ pub fn lfs_fs_deorphan(lfs: *mut super::lfs::Lfs, powerloss: bool) -> i32 {
                         let err =
                             crate::dir::fetch::lfs_dir_getgstate(lfs, &dir, &mut (*lfs).gdelta);
                         if err != 0 {
-                            return err;
+                            return crate::lfs_pass_err!(err);
                         }
 
                         let mut dir_tail = dir.tail;
@@ -500,12 +500,12 @@ pub fn lfs_fs_forceconsistency(lfs: *mut super::lfs::Lfs) -> i32 {
     let err = lfs_fs_desuperblock(lfs);
     crate::lfs_trace!("forceconsistency: after desuperblock err={}", err);
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
     let err = lfs_fs_demove(lfs);
     crate::lfs_trace!("forceconsistency: after demove err={}", err);
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
     crate::lfs_trace!("forceconsistency: before deorphan");
     let result = lfs_fs_deorphan(lfs, true);

@@ -221,7 +221,7 @@ pub fn lfs_mount_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsC
 
     let mut err = lfs_init(lfs, cfg);
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
 
     unsafe {

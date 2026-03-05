@@ -103,7 +103,7 @@ use crate::util::lfs_pair_fromle32;
 pub fn lfs_remove_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
     let err = lfs_fs_forceconsistency(lfs);
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
 
     unsafe {
@@ -147,16 +147,16 @@ pub fn lfs_remove_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
 
             let err = lfs_dir_fetch(lfs, &mut dir.m, &pair);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             if dir.m.count > 0 || dir.m.split {
-                return LFS_ERR_NOTEMPTY;
+                return crate::lfs_err!(LFS_ERR_NOTEMPTY);
             }
 
             let err = lfs_fs_preporphans(lfs, 1);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             dir.type_ = 0;
@@ -171,7 +171,7 @@ pub fn lfs_remove_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
         let err = lfs_dir_commit(lfs, &mut cwd, attrs.as_ptr() as *const _, 1);
         (*lfs).mlist = dir.next;
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         if lfs_gstate_hasorphans(&(*lfs).gstate) {
@@ -179,12 +179,12 @@ pub fn lfs_remove_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
 
             let err = lfs_fs_preporphans(lfs, -1);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             let err = lfs_fs_pred(lfs, &dir.m.pair, &mut cwd);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             lfs_dir_drop(lfs, &mut cwd, &dir.m)

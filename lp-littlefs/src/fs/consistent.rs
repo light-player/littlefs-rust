@@ -45,7 +45,7 @@ pub fn lfs_fs_mkconsistent_(lfs: *mut super::lfs::Lfs) -> i32 {
 
     let err = super::superblock::lfs_fs_forceconsistency(lfs);
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
 
     unsafe {
@@ -60,12 +60,12 @@ pub fn lfs_fs_mkconsistent_(lfs: *mut super::lfs::Lfs) -> i32 {
             let mut root = core::mem::zeroed::<LfsMdir>();
             let err = lfs_dir_fetch(lfs, &mut root, &(*lfs).root);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             let err = lfs_dir_commit(lfs, &mut root, core::ptr::null(), 0);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
     }
@@ -137,7 +137,7 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
     let err = super::superblock::lfs_fs_forceconsistency(lfs);
     crate::lfs_trace!("lfs_fs_gc: after forceconsistency err={}", err);
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
 
     unsafe {
@@ -177,7 +177,7 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
                 }
                 let err = lfs_dir_fetch(lfs, &mut mdir, &mdir.tail);
                 if err != 0 {
-                    return err;
+                    return crate::lfs_pass_err!(err);
                 }
 
                 let should_compact = !mdir.erased
@@ -192,7 +192,7 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
                     mdir_ref.erased = false;
                     let err = lfs_dir_commit(lfs, mdir_ref, core::ptr::null(), 0);
                     if err != 0 {
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                 }
             }
@@ -206,7 +206,7 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
             let err = lfs_alloc_scan(lfs);
             crate::lfs_trace!("lfs_fs_gc: alloc_scan done err={}", err);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
     }

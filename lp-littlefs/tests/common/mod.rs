@@ -145,7 +145,7 @@ unsafe extern "C" fn badblock_read(
     let ctx = (*cfg).context as *mut BadBlockRamStorage;
     let badblock = &mut *ctx;
     if badblock.bad_blocks.borrow().contains(&block) {
-        return LFS_ERR_CORRUPT;
+        return lp_littlefs::lfs_err!(LFS_ERR_CORRUPT);
     }
     let size = size as usize;
     let buf = core::slice::from_raw_parts_mut(buffer, size);
@@ -163,7 +163,7 @@ unsafe extern "C" fn badblock_prog(
     let ctx = (*cfg).context as *mut BadBlockRamStorage;
     let badblock = &mut *ctx;
     if badblock.bad_blocks.borrow().contains(&block) {
-        return LFS_ERR_CORRUPT;
+        return lp_littlefs::lfs_err!(LFS_ERR_CORRUPT);
     }
     let size = size as usize;
     let buf = core::slice::from_raw_parts(buffer, size);
@@ -175,7 +175,7 @@ unsafe extern "C" fn badblock_erase(cfg: *const LfsConfig, block: u32) -> i32 {
     let ctx = (*cfg).context as *mut BadBlockRamStorage;
     let badblock = &mut *ctx;
     if badblock.bad_blocks.borrow().contains(&block) {
-        return LFS_ERR_CORRUPT;
+        return lp_littlefs::lfs_err!(LFS_ERR_CORRUPT);
     }
     badblock.ram.erase(block);
     0

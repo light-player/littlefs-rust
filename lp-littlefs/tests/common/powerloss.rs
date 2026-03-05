@@ -41,7 +41,7 @@ impl PowerLossCtx {
         self.write_count.set(count);
         let fail_at = self.fail_after_writes.get();
         if fail_at > 0 && count >= fail_at {
-            return LFS_ERR_IO;
+            return lp_littlefs::lfs_err!(LFS_ERR_IO);
         }
         0
     }
@@ -73,7 +73,7 @@ unsafe extern "C" fn powerloss_prog(
     let ctx = &mut *ctx;
     let err = ctx.check_and_count();
     if err != 0 {
-        return err;
+        return lp_littlefs::lfs_pass_err!(err);
     }
     let size = size as usize;
     let buf = core::slice::from_raw_parts(buffer, size);
@@ -86,7 +86,7 @@ unsafe extern "C" fn powerloss_erase(cfg: *const LfsConfig, block: u32) -> i32 {
     let ctx = &mut *ctx;
     let err = ctx.check_and_count();
     if err != 0 {
-        return err;
+        return lp_littlefs::lfs_pass_err!(err);
     }
     ctx.ram.erase(block);
     0

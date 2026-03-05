@@ -144,7 +144,7 @@ pub fn lfs_alloc_scan(lfs: *mut Lfs) -> i32 {
         if err != 0 {
             crate::lfs_trace!("alloc_scan: traverse err={}", err);
             lfs_alloc_drop(lfs);
-            return err;
+            return crate::lfs_pass_err!(err);
         }
         crate::lfs_trace!("alloc_scan: done");
         0
@@ -215,7 +215,7 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
         let lfs = &mut *lfs;
         let buf = lfs.lookahead.buffer;
         if buf.is_null() {
-            return LFS_ERR_NOSPC;
+            return crate::lfs_err!(LFS_ERR_NOSPC);
         }
 
         #[cfg(feature = "loop_limits")]
@@ -286,7 +286,7 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
                     "No more free space 0x{:08x} (ckpoint==0)",
                     (lfs.lookahead.start + lfs.lookahead.next) % lfs.block_count
                 );
-                return LFS_ERR_NOSPC;
+                return crate::lfs_err!(LFS_ERR_NOSPC);
             }
 
             // No blocks in our lookahead buffer, we need to scan the filesystem for
@@ -299,7 +299,7 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
                     lfs.lookahead.start,
                     lfs.lookahead.next
                 );
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
     }

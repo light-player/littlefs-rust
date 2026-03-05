@@ -147,7 +147,7 @@ pub fn lfs_fs_stat_(lfs: *mut super::lfs::Lfs, fsinfo: *mut crate::lfs_info::Lfs
             };
             let err = lfs_dir_fetch(lfs, &mut dir, &lfs_ref.root);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             let mut superblock = core::mem::zeroed::<LfsSuperblock>();
             let tag = lfs_dir_get(
@@ -220,7 +220,7 @@ pub fn lfs_fs_size_(lfs: *mut super::lfs::Lfs) -> lfs_ssize_t {
         false,
     );
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
     size as lfs_ssize_t
 }

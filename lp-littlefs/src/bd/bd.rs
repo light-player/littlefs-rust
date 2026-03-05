@@ -154,7 +154,7 @@ pub fn lfs_bd_read(
         };
 
         if off + size > cfg.block_size || (lfs.block_count != 0 && block >= lfs.block_count) {
-            return LFS_ERR_CORRUPT;
+            return crate::lfs_err!(LFS_ERR_CORRUPT);
         }
 
         let mut data = buffer;
@@ -211,7 +211,7 @@ pub fn lfs_bd_read(
                 crate::lfs_assert!(err <= 0);
                 if err != 0 {
                     crate::lfs_trace!("bd_read block={} -> CORRUPT", block);
-                    return err;
+                    return crate::lfs_pass_err!(err);
                 }
                 data = data.add(diff as usize);
                 off += diff;
@@ -246,7 +246,7 @@ pub fn lfs_bd_read(
                 // Don't leave rcache claiming to have this block when the buffer wasn't filled.
                 // A retry (e.g. after bad-block clear) would otherwise serve stale data.
                 rcache.block = crate::types::LFS_BLOCK_NULL;
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
 
@@ -315,7 +315,7 @@ pub fn lfs_bd_cmp(
             diff as lfs_size_t,
         );
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
         let res = unsafe {
             let disk = &dat[..diff];
@@ -385,7 +385,7 @@ pub fn lfs_bd_crc(
             diff as lfs_size_t,
         );
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
         unsafe {
             *crc = lfs_crc(*crc, dat.as_ptr(), diff);
@@ -472,7 +472,7 @@ pub fn lfs_bd_flush(
             crate::lfs_assert!(err <= 0);
             if err != 0 {
                 crate::lfs_trace!("bd_prog block={} -> CORRUPT", pcache.block);
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             if validate {
@@ -491,7 +491,7 @@ pub fn lfs_bd_flush(
                     return res;
                 }
                 if res != 0 {
-                    return LFS_ERR_CORRUPT;
+                    return crate::lfs_err!(LFS_ERR_CORRUPT);
                 }
             }
 
@@ -533,7 +533,7 @@ pub fn lfs_bd_sync(
 
         let err = lfs_bd_flush(lfs, pcache, rcache, validate);
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         let cfg = &*(*lfs).cfg;
@@ -661,7 +661,7 @@ pub fn lfs_bd_prog(
                 if pcache.size == cfg.cache_size {
                     let err = lfs_bd_flush(lfs, pcache, rcache, validate);
                     if err != 0 {
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                 }
 

@@ -262,7 +262,7 @@ pub fn lfs_dir_getread(
         let lfs_ref = &*lfs;
         let cfg = lfs_ref.cfg.as_ref().expect("cfg");
         if off + size > cfg.block_size {
-            return LFS_ERR_CORRUPT;
+            return crate::lfs_err!(LFS_ERR_CORRUPT);
         }
 
         let mut off = off;
@@ -804,7 +804,7 @@ pub fn lfs_dir_traverse(
                             core::mem::size_of::<lfs_tag_t>() as u32,
                         );
                         if err != 0 {
-                            return err;
+                            return crate::lfs_pass_err!(err);
                         }
                         let tag_val = (lfs_frombe32(tag_raw) ^ ptag) | 0x8000_0000;
                         disk = crate::tag::lfs_diskoff {

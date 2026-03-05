@@ -172,13 +172,13 @@ pub fn lfs_fs_traverse_(
             }
             let err = lfs_tortoise_detectcycles(&dir, &mut tortoise);
             if err < 0 {
-                return LFS_ERR_CORRUPT;
+                return crate::lfs_err!(LFS_ERR_CORRUPT);
             }
 
             for i in 0..2 {
                 let err = cb(data, dir.tail[i]);
                 if err != 0 {
-                    return err;
+                    return crate::lfs_pass_err!(err);
                 }
             }
 
@@ -186,7 +186,7 @@ pub fn lfs_fs_traverse_(
             crate::lfs_trace!("fs_traverse: fetch tail={:?} count={}", dir.tail, dir.count);
             let err = lfs_dir_fetch(lfs, &mut dir, &dir.tail);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             for id in 0..dir.count {
@@ -217,7 +217,7 @@ pub fn lfs_fs_traverse_(
                         data,
                     );
                     if err != 0 {
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                 } else if includeorphans
                     && u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_DIRSTRUCT
@@ -226,7 +226,7 @@ pub fn lfs_fs_traverse_(
                     for i in 0..2 {
                         let err = cb(data, raw[i]);
                         if err != 0 {
-                            return err;
+                            return crate::lfs_pass_err!(err);
                         }
                     }
                 }
@@ -269,7 +269,7 @@ pub fn lfs_fs_traverse_(
                         data,
                     );
                     if err != 0 {
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                 }
                 if (f_ref.flags as i32 & LFS_F_WRITING) != 0
@@ -285,7 +285,7 @@ pub fn lfs_fs_traverse_(
                         data,
                     );
                     if err != 0 {
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                 }
             }

@@ -80,7 +80,7 @@ pub fn lfs_fs_pred(
                     // The root has no predecessor.
                     let err = lfs_dir_fetch(lfs, pdir, &(*pdir).tail);
                     if err != 0 {
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                     if lfs_pair_isnull(&(*pdir).tail) {
                         return crate::error::LFS_ERR_NOENT;
@@ -91,7 +91,7 @@ pub fn lfs_fs_pred(
 
             let err = lfs_dir_fetch(lfs, pdir, &(*pdir).tail);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             have_fetched = true;
         }
@@ -154,7 +154,7 @@ pub unsafe extern "C" fn lfs_fs_parent_match(
         8,
     );
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
     lfs_pair_fromle32(&mut child);
     if lfs_pair_cmp(&child, &find.pair) == 0 {
@@ -237,7 +237,7 @@ pub fn lfs_fs_parent(
             }
             let err = lfs_tortoise_detectcycles(parent, &mut tortoise);
             if err < 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             let find_match = LfsFsParentMatch {

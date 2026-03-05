@@ -116,7 +116,7 @@ use crate::util::{lfs_pair_fromle32, lfs_pair_tole32, lfs_path_islast, lfs_path_
 pub fn lfs_mkdir_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
     let err = lfs_fs_forceconsistency(lfs);
     if err != 0 {
-        return err;
+        return crate::lfs_pass_err!(err);
     }
 
     unsafe {
@@ -142,14 +142,14 @@ pub fn lfs_mkdir_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
         let path_slice = slice_until_nul(path_ptr);
         let nlen = lfs_path_namelen(path_slice);
         if nlen > (*lfs).name_max {
-            return LFS_ERR_NAMETOOLONG;
+            return crate::lfs_err!(LFS_ERR_NAMETOOLONG);
         }
 
         lfs_alloc_ckpoint(lfs);
         let mut dir = core::mem::zeroed();
         let err = lfs_dir_alloc(lfs, &mut dir);
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         let mut pred = cwd.m;
@@ -170,7 +170,7 @@ pub fn lfs_mkdir_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
             }
             let err = lfs_dir_fetch(lfs, &mut pred, &pred.tail);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
 
@@ -182,13 +182,13 @@ pub fn lfs_mkdir_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
         let err = lfs_dir_commit(lfs, &mut dir, attrs1.as_ptr() as *const _, 1);
         lfs_pair_fromle32(&mut pred.tail);
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         if cwd.m.split {
             let err = lfs_fs_preporphans(lfs, 1);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             cwd.type_ = 0;
@@ -204,12 +204,12 @@ pub fn lfs_mkdir_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
             lfs_pair_fromle32(&mut dir.pair);
             (*lfs).mlist = cwd.next;
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             let err = lfs_fs_preporphans(lfs, -1);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
 

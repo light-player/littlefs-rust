@@ -192,7 +192,7 @@ pub fn lfs_ctz_find(
                 4,
             );
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             head_val = lfs_fromle32(head_buf);
 
@@ -292,7 +292,7 @@ pub fn lfs_ctz_traverse(
             }
             let err = cb(data, current_head);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             if index == 0 {
@@ -313,7 +313,7 @@ pub fn lfs_ctz_traverse(
                 read_size,
             );
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             heads[0] = lfs_fromle32(heads[0]);
             heads[1] = lfs_fromle32(heads[1]);
@@ -322,7 +322,7 @@ pub fn lfs_ctz_traverse(
             for i in 0..count - 1 {
                 let err = cb(data, heads[i]);
                 if err != 0 {
-                    return err;
+                    return crate::lfs_pass_err!(err);
                 }
             }
 
@@ -461,7 +461,7 @@ pub fn lfs_ctz_extend(
             let mut nblock: lfs_block_t = 0;
             let err = lfs_alloc(lfs, &mut nblock);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             let err = lfs_bd_erase(lfs as *const crate::fs::Lfs, nblock);
@@ -471,7 +471,7 @@ pub fn lfs_ctz_extend(
                     lfs_cache_drop(lfs, pcache);
                     continue 'relocate;
                 }
-                return err;
+                return crate::lfs_pass_err!(err);
             }
 
             if size == 0 {
@@ -498,7 +498,7 @@ pub fn lfs_ctz_extend(
                         1,
                     );
                     if err != 0 {
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                     let err = lfs_bd_prog(
                         lfs as *const crate::fs::Lfs,
@@ -516,7 +516,7 @@ pub fn lfs_ctz_extend(
                             lfs_cache_drop(lfs, pcache);
                             continue 'relocate;
                         }
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                 }
                 *block = nblock;
@@ -545,7 +545,7 @@ pub fn lfs_ctz_extend(
                         lfs_cache_drop(lfs, pcache);
                         continue 'relocate;
                     }
-                    return err;
+                    return crate::lfs_pass_err!(err);
                 }
                 nhead = lfs_fromle32(nhead_le);
 
@@ -562,7 +562,7 @@ pub fn lfs_ctz_extend(
                         4,
                     );
                     if err != 0 {
-                        return err;
+                        return crate::lfs_pass_err!(err);
                     }
                     nhead = lfs_fromle32(nhead_buf);
                 }

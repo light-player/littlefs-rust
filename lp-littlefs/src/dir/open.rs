@@ -101,7 +101,7 @@ pub fn lfs_dir_open_(lfs: *mut crate::fs::Lfs, dir: *mut LfsDir, path: *const u8
 
         let err = lfs_dir_fetch(lfs, &mut dir_ref.m, &pair);
         if err != 0 {
-            return err;
+            return crate::lfs_pass_err!(err);
         }
 
         dir_ref.head[0] = dir_ref.m.pair[0];
@@ -234,14 +234,14 @@ pub fn lfs_dir_read_(lfs: *mut crate::fs::Lfs, dir: *mut LfsDir, info: *mut LfsI
                 }
                 let err = lfs_dir_fetch(lfs, &mut dir_ref.m, &dir_ref.m.tail);
                 if err != 0 {
-                    return err;
+                    return crate::lfs_pass_err!(err);
                 }
                 dir_ref.id = 0;
             }
 
             let err = lfs_dir_getinfo(lfs, &dir_ref.m, dir_ref.id, info);
             if err != 0 && err != crate::error::LFS_ERR_NOENT {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
             dir_ref.id += 1;
             if err != crate::error::LFS_ERR_NOENT {

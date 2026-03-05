@@ -59,7 +59,7 @@ pub fn lfs_getattr_(
     size: lfs_size_t,
 ) -> lfs_ssize_t {
     if lfs.is_null() || path.is_null() {
-        return LFS_ERR_INVAL;
+        return crate::lfs_err!(LFS_ERR_INVAL);
     }
     unsafe {
         let mut cwd = LfsMdir {
@@ -84,7 +84,7 @@ pub fn lfs_getattr_(
             id = 0;
             let err = lfs_dir_fetch(lfs, &mut cwd, &(*lfs).root);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
 
@@ -96,7 +96,7 @@ pub fn lfs_getattr_(
         tag = lfs_dir_get(lfs, &cwd, lfs_mktag(0x7ff, 0x3ff, 0), gtag, buffer);
         if tag < 0 {
             if tag == LFS_ERR_NOENT {
-                return LFS_ERR_NOATTR;
+                return crate::lfs_err!(LFS_ERR_NOATTR);
             }
             return tag;
         }
@@ -142,7 +142,7 @@ pub fn lfs_commitattr(
     size: lfs_size_t,
 ) -> i32 {
     if lfs.is_null() || path.is_null() {
-        return LFS_ERR_INVAL;
+        return crate::lfs_err!(LFS_ERR_INVAL);
     }
     unsafe {
         let mut cwd = LfsMdir {
@@ -167,7 +167,7 @@ pub fn lfs_commitattr(
             id = 0;
             let err = lfs_dir_fetch(lfs, &mut cwd, &(*lfs).root);
             if err != 0 {
-                return err;
+                return crate::lfs_pass_err!(err);
             }
         }
 
@@ -203,11 +203,11 @@ pub fn lfs_setattr_(
     size: lfs_size_t,
 ) -> i32 {
     if lfs.is_null() {
-        return LFS_ERR_INVAL;
+        return crate::lfs_err!(LFS_ERR_INVAL);
     }
     unsafe {
         if size > (*lfs).attr_max {
-            return LFS_ERR_NOSPC;
+            return crate::lfs_err!(LFS_ERR_NOSPC);
         }
         lfs_commitattr(lfs, path, r#type, buffer, size)
     }
