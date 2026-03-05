@@ -214,7 +214,54 @@ pub fn lfs_fs_traverse_(
             }
         }
 
-        // iterate over any open files (Phase 4+; for now mlist is empty for alloc)
+        // iterate over any open files
+        use crate::dir::LfsMlist;
+        use crate::file::ctz::lfs_ctz_traverse;
+        use crate::file::LfsFile;
+        use crate::lfs_type::lfs_open_flags::{LFS_F_DIRTY, LFS_F_INLINE, LFS_F_WRITING};
+        use crate::lfs_type::lfs_type::LFS_TYPE_REG;
+
+        let mut m = (*lfs).mlist;
+        while !m.is_null() {
+            let f = m as *mut LfsFile;
+            let f_ref = &*f;
+            if f_ref.type_ as u32 == LFS_TYPE_REG {
+                if (f_ref.flags as i32 & LFS_F_DIRTY) != 0
+                    && (f_ref.flags as i32 & LFS_F_INLINE) == 0
+                {
+                    let err = lfs_ctz_traverse(
+                        lfs,
+                        &(*f).cache,
+                        &mut (*lfs).rcache,
+                        f_ref.ctz.head,
+                        f_ref.ctz.size,
+                        Some(cb),
+                        data,
+                    );
+                    if err != 0 {
+                        return err;
+                    }
+                }
+                if (f_ref.flags as i32 & LFS_F_WRITING) != 0
+                    && (f_ref.flags as i32 & LFS_F_INLINE) == 0
+                {
+                    let err = lfs_ctz_traverse(
+                        lfs,
+                        &(*f).cache,
+                        &mut (*lfs).rcache,
+                        f_ref.block,
+                        f_ref.pos,
+                        Some(cb),
+                        data,
+                    );
+                    if err != 0 {
+                        return err;
+                    }
+                }
+            }
+            m = (*m).next;
+        }
+
         0
     }
 }
