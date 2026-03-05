@@ -357,8 +357,19 @@ pub fn lfs_fs_deorphan(lfs: *mut super::lfs::Lfs, powerloss: bool) -> i32 {
             };
             let mut dir = core::mem::zeroed::<LfsMdir>();
             let mut moreorphans = false;
+            #[cfg(feature = "loop_limits")]
+            let mut iter: u32 = 0;
+            #[cfg(feature = "loop_limits")]
+            const MAX_DEORPHAN_ITER: u32 = 512;
 
             while !crate::util::lfs_pair_isnull(&pdir.tail) {
+                #[cfg(feature = "loop_limits")]
+                {
+                    if iter >= MAX_DEORPHAN_ITER {
+                        return crate::error::LFS_ERR_CORRUPT;
+                    }
+                    iter += 1;
+                }
                 let err = lfs_dir_fetch(lfs, &mut dir, &pdir.tail);
                 if err != 0 {
                     return err;

@@ -384,7 +384,19 @@ pub fn lfs_dir_fetchmatch(
             let mut crc = lfs_crc(0xffff_ffff, &rev_le as *const _ as *const u8, 4);
             dir.rev = lfs_fromle32(dir.rev);
 
+            #[cfg(feature = "loop_limits")]
+            let mut tag_iter: u32 = 0;
+            #[cfg(feature = "loop_limits")]
+            const MAX_FETCH_TAG_ITER: u32 = 256;
             loop {
+                #[cfg(feature = "loop_limits")]
+                {
+                    if tag_iter >= MAX_FETCH_TAG_ITER {
+                        return LFS_ERR_CORRUPT as lfs_stag_t;
+                    }
+                    tag_iter += 1;
+                }
+
                 off += lfs_tag_dsize(ptag);
 
                 let mut tag_buf = [0u8; 4];

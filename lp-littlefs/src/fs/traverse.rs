@@ -151,7 +151,18 @@ pub fn lfs_fs_traverse_(
             period: 1,
         };
 
+        #[cfg(feature = "loop_limits")]
+        const MAX_TRAVERSE_TAIL: u32 = 512;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
         while !lfs_pair_isnull(&dir.tail) {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= MAX_TRAVERSE_TAIL {
+                    return LFS_ERR_CORRUPT;
+                }
+                iter += 1;
+            }
             let err = lfs_tortoise_detectcycles(&dir, &mut tortoise);
             if err < 0 {
                 return LFS_ERR_CORRUPT;
@@ -222,7 +233,18 @@ pub fn lfs_fs_traverse_(
         use crate::lfs_type::lfs_type::LFS_TYPE_REG;
 
         let mut m = (*lfs).mlist;
+        #[cfg(feature = "loop_limits")]
+        const MAX_MLIST: u32 = 64;
+        #[cfg(feature = "loop_limits")]
+        let mut mlist_iter: u32 = 0;
         while !m.is_null() {
+            #[cfg(feature = "loop_limits")]
+            {
+                if mlist_iter >= MAX_MLIST {
+                    return LFS_ERR_CORRUPT;
+                }
+                mlist_iter += 1;
+            }
             let f = m as *mut LfsFile;
             let f_ref = &*f;
             if f_ref.type_ as u32 == LFS_TYPE_REG {

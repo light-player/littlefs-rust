@@ -4,7 +4,7 @@ use crate::bd::bd::lfs_bd_cmp;
 use crate::dir::fetch::lfs_dir_fetchmatch;
 use crate::dir::traverse::lfs_dir_get;
 use crate::dir::LfsMdir;
-use crate::error::{LFS_ERR_INVAL, LFS_ERR_NOENT, LFS_ERR_NOTDIR};
+use crate::error::{LFS_ERR_CORRUPT, LFS_ERR_INVAL, LFS_ERR_NOENT, LFS_ERR_NOTDIR};
 use crate::fs::Lfs;
 use crate::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_NAME, LFS_TYPE_STRUCT};
 use crate::tag::{lfs_diskoff, lfs_mktag, lfs_tag_id, lfs_tag_size, lfs_tag_type3};
@@ -309,7 +309,18 @@ pub fn lfs_dir_find(
             }
 
             // C: lfs.c:1567-1584 - find entry matching name
+            #[cfg(feature = "loop_limits")]
+            const MAX_FIND_ITER: u32 = 256;
+            #[cfg(feature = "loop_limits")]
+            let mut find_iter: u32 = 0;
             loop {
+                #[cfg(feature = "loop_limits")]
+                {
+                    find_iter += 1;
+                    if find_iter > MAX_FIND_ITER {
+                        return LFS_ERR_CORRUPT as crate::types::lfs_stag_t;
+                    }
+                }
                 let mut match_data = LfsDirFindMatch {
                     lfs,
                     name,

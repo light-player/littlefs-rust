@@ -18,8 +18,9 @@ env_logger = "0.10"
 rstest = "0.26"
 
 [features]
-default = ["alloc"]
+default = ["alloc", "loop_limits"]
 alloc = []
+loop_limits = []  # iteration caps to detect/avoid infinite loops (mount, traverse, fetch, etc.)
 # Enable for debugging: RUST_LOG=lp_littlefs=trace cargo test --features log ...
 std = []
 log = ["dep:log"]

@@ -252,7 +252,16 @@ pub fn lfs_mount_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsC
         };
 
         let mut err_inner = 0i32;
+        #[cfg(feature = "loop_limits")]
+        let mut mount_iter: u32 = 0;
         while !lfs_pair_isnull(&dir.tail) {
+            #[cfg(feature = "loop_limits")]
+            {
+                if mount_iter >= 64 {
+                    break;
+                }
+                mount_iter += 1;
+            }
             err_inner = lfs_tortoise_detectcycles(&dir as *const _, &mut tortoise);
             if err_inner < 0 {
                 break;

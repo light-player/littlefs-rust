@@ -1,5 +1,6 @@
 //! CTZ operations. Per lfs.c lfs_ctz_index, lfs_ctz_find, lfs_ctz_extend, lfs_ctz_traverse.
 
+use crate::error::LFS_ERR_CORRUPT;
 use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t};
 
 #[repr(C)]
@@ -158,8 +159,19 @@ pub fn lfs_ctz_find(
         let target = lfs_ctz_index(lfs as *const crate::fs::Lfs, &mut target_off);
 
         let mut head_val = head;
+        #[cfg(feature = "loop_limits")]
+        const MAX_CTZ_FIND_ITER: u32 = 4096;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
 
         while current > target {
+            #[cfg(feature = "loop_limits")]
+            {
+                iter += 1;
+                if iter > MAX_CTZ_FIND_ITER {
+                    return LFS_ERR_CORRUPT;
+                }
+            }
             let skip = lfs_min(
                 lfs_npw2((current - target + 1) as u32) - 1,
                 lfs_ctz(current as u32),
@@ -259,8 +271,19 @@ pub fn lfs_ctz_traverse(
         let mut index = lfs_ctz_index(lfs, &mut index_off) as u32;
         let mut current_head = head;
         let lfs = lfs as *mut crate::fs::Lfs;
+        #[cfg(feature = "loop_limits")]
+        let block_count = (*lfs).block_count;
+        #[cfg(feature = "loop_limits")]
+        let mut iter: u32 = 0;
 
         loop {
+            #[cfg(feature = "loop_limits")]
+            {
+                if iter >= block_count {
+                    return crate::error::LFS_ERR_CORRUPT;
+                }
+                iter += 1;
+            }
             let err = cb(data, current_head);
             if err != 0 {
                 return err;
