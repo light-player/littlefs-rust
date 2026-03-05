@@ -165,7 +165,7 @@ pub fn lfs_fs_traverse_(
                         MAX_TRAVERSE_TAIL
                     );
                 }
-                if iter > 0 && iter % 20 == 0 {
+                if iter > 0 && iter.is_multiple_of(20) {
                     crate::lfs_trace!("fs_traverse: iter={} tail={:?}", iter, dir.tail);
                 }
                 iter += 1;

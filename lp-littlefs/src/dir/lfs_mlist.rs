@@ -57,7 +57,10 @@ pub fn lfs_mlist_remove(lfs: *mut crate::fs::Lfs, mlist: *mut LfsMlist) {
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_MLIST_REMOVE_ITER {
-                    panic!("loop_limits: MAX_MLIST_REMOVE_ITER ({}) exceeded", MAX_MLIST_REMOVE_ITER);
+                    panic!(
+                        "loop_limits: MAX_MLIST_REMOVE_ITER ({}) exceeded",
+                        MAX_MLIST_REMOVE_ITER
+                    );
                 }
                 iter += 1;
             }

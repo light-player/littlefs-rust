@@ -161,7 +161,10 @@ pub fn lfs_mkdir_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_MKDIR_PRED_ITER {
-                    panic!("loop_limits: MAX_MKDIR_PRED_ITER ({}) exceeded", MAX_MKDIR_PRED_ITER);
+                    panic!(
+                        "loop_limits: MAX_MKDIR_PRED_ITER ({}) exceeded",
+                        MAX_MKDIR_PRED_ITER
+                    );
                 }
                 iter += 1;
             }

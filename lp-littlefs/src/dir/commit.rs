@@ -1007,7 +1007,10 @@ pub fn lfs_dir_compact(
             #[cfg(feature = "loop_limits")]
             {
                 if compact_iter >= MAX_COMPACT_ITER {
-                    panic!("loop_limits: MAX_COMPACT_ITER ({}) exceeded in lfs_dir_compact", MAX_COMPACT_ITER);
+                    panic!(
+                        "loop_limits: MAX_COMPACT_ITER ({}) exceeded in lfs_dir_compact",
+                        MAX_COMPACT_ITER
+                    );
                 }
                 compact_iter += 1;
             }
@@ -1883,7 +1886,10 @@ fn relocatingcommit_fixmlist(
             #[cfg(feature = "loop_limits")]
             {
                 if mlist_iter >= MAX_MLIST_COMMIT_ITER {
-                    panic!("loop_limits: MAX_MLIST_COMMIT_ITER ({}) exceeded", MAX_MLIST_COMMIT_ITER);
+                    panic!(
+                        "loop_limits: MAX_MLIST_COMMIT_ITER ({}) exceeded",
+                        MAX_MLIST_COMMIT_ITER
+                    );
                 }
                 mlist_iter += 1;
             }
@@ -1925,7 +1931,10 @@ fn relocatingcommit_fixmlist(
                     #[cfg(feature = "loop_limits")]
                     {
                         if advance_iter >= MAX_COMMIT_DIR_ADVANCE {
-                            panic!("loop_limits: MAX_COMMIT_DIR_ADVANCE ({}) exceeded", MAX_COMMIT_DIR_ADVANCE);
+                            panic!(
+                                "loop_limits: MAX_COMMIT_DIR_ADVANCE ({}) exceeded",
+                                MAX_COMMIT_DIR_ADVANCE
+                            );
                         }
                         advance_iter += 1;
                     }
@@ -2233,7 +2242,10 @@ pub fn lfs_dir_orphaningcommit(
             #[cfg(feature = "loop_limits")]
             {
                 if relocate_iter >= MAX_RELOCATE_ITER {
-                    panic!("loop_limits: MAX_RELOCATE_ITER ({}) exceeded", MAX_RELOCATE_ITER);
+                    panic!(
+                        "loop_limits: MAX_RELOCATE_ITER ({}) exceeded",
+                        MAX_RELOCATE_ITER
+                    );
                 }
                 relocate_iter += 1;
             }

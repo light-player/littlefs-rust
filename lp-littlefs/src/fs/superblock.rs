@@ -378,7 +378,7 @@ pub fn lfs_fs_deorphan(lfs: *mut super::lfs::Lfs, powerloss: bool) -> i32 {
                             MAX_DEORPHAN_ITER
                         );
                     }
-                    if iter > 0 && iter % 20 == 0 {
+                    if iter > 0 && iter.is_multiple_of(20) {
                         crate::lfs_trace!(
                             "deorphan: pass={} iter={} tail={:?}",
                             pass,

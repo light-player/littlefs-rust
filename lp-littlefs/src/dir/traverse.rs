@@ -114,7 +114,10 @@ pub fn lfs_dir_getslice(
             #[cfg(feature = "loop_limits")]
             {
                 if tag_iter >= MAX_GETSLICE_TAG_ITER {
-                    panic!("loop_limits: MAX_GETSLICE_TAG_ITER ({}) exceeded", MAX_GETSLICE_TAG_ITER);
+                    panic!(
+                        "loop_limits: MAX_GETSLICE_TAG_ITER ({}) exceeded",
+                        MAX_GETSLICE_TAG_ITER
+                    );
                 }
                 tag_iter += 1;
             }
@@ -766,7 +769,10 @@ pub fn lfs_dir_traverse(
         #[cfg(feature = "loop_limits")]
         {
             if phase_iter >= MAX_TRAVERSE_PHASE_ITER {
-                panic!("loop_limits: MAX_TRAVERSE_PHASE_ITER ({}) exceeded in lfs_dir_traverse", MAX_TRAVERSE_PHASE_ITER);
+                panic!(
+                    "loop_limits: MAX_TRAVERSE_PHASE_ITER ({}) exceeded in lfs_dir_traverse",
+                    MAX_TRAVERSE_PHASE_ITER
+                );
             }
             phase_iter += 1;
         }

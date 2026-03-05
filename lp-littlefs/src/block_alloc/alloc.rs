@@ -226,7 +226,10 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
             #[cfg(feature = "loop_limits")]
             {
                 if alloc_iter >= MAX_ALLOC_ITER {
-                    panic!("loop_limits: MAX_ALLOC_ITER ({}) exceeded in lfs_alloc", MAX_ALLOC_ITER);
+                    panic!(
+                        "loop_limits: MAX_ALLOC_ITER ({}) exceeded in lfs_alloc",
+                        MAX_ALLOC_ITER
+                    );
                 }
                 alloc_iter += 1;
             }
@@ -248,7 +251,10 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
                         #[cfg(feature = "loop_limits")]
                         {
                             if bit_iter >= MAX_ALLOC_SCAN_BIT_ITER {
-                                panic!("loop_limits: MAX_ALLOC_SCAN_BIT_ITER ({}) exceeded", MAX_ALLOC_SCAN_BIT_ITER);
+                                panic!(
+                                    "loop_limits: MAX_ALLOC_SCAN_BIT_ITER ({}) exceeded",
+                                    MAX_ALLOC_SCAN_BIT_ITER
+                                );
                             }
                             bit_iter += 1;
                         }

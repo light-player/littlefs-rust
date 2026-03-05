@@ -55,7 +55,10 @@ pub fn lfs_stat_(
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_STAT_PATH_ITER {
-                    panic!("loop_limits: MAX_STAT_PATH_ITER ({}) exceeded", MAX_STAT_PATH_ITER);
+                    panic!(
+                        "loop_limits: MAX_STAT_PATH_ITER ({}) exceeded",
+                        MAX_STAT_PATH_ITER
+                    );
                 }
                 iter += 1;
             }

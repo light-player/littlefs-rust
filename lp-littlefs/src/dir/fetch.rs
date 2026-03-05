@@ -400,7 +400,7 @@ pub fn lfs_dir_fetchmatch(
                             MAX_FETCH_TAG_ITER
                         );
                     }
-                    if tag_iter > 0 && tag_iter % 32 == 0 {
+                    if tag_iter > 0 && tag_iter.is_multiple_of(32) {
                         crate::lfs_trace!(
                             "fetchmatch: tag_iter={} off={} block_iter={} pair={:?}",
                             tag_iter,

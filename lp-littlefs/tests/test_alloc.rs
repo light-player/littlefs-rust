@@ -1117,7 +1117,7 @@ fn test_alloc_outdated_lookahead() {
     let block_size = env.config.block_size as usize;
     let block_count = env.config.block_count as usize;
     let size1 = ((block_count - 2) / 2) * (block_size - 8);
-    let size2 = ((block_count - 2 + 1) / 2) * (block_size - 8);
+    let size2 = (block_count - 2).div_ceil(2) * (block_size - 8);
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
     assert_ok(lfs_format(
@@ -1217,7 +1217,7 @@ fn test_alloc_outdated_lookahead_split_dir() {
     let block_size = env.config.block_size as usize;
     let block_count = env.config.block_count as usize;
     let size1_full = ((block_count - 2) / 2) * (block_size - 8);
-    let size2 = ((block_count - 2 + 1) / 2) * (block_size - 8);
+    let size2 = (block_count - 2).div_ceil(2) * (block_size - 8);
     let size1_hole = ((block_count - 2) / 2 - 1) * (block_size - 8);
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();

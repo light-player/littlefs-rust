@@ -168,7 +168,10 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
                 #[cfg(feature = "loop_limits")]
                 {
                     if iter >= MAX_GC_COMPACT_ITER {
-                        panic!("loop_limits: MAX_GC_COMPACT_ITER ({}) exceeded", MAX_GC_COMPACT_ITER);
+                        panic!(
+                            "loop_limits: MAX_GC_COMPACT_ITER ({}) exceeded",
+                            MAX_GC_COMPACT_ITER
+                        );
                     }
                     iter += 1;
                 }

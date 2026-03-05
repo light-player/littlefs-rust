@@ -207,7 +207,10 @@ pub fn lfs_strspn(p: *const u8, c: u8) -> u32 {
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_STRSPN_ITER {
-                    panic!("loop_limits: MAX_STRSPN_ITER ({}) exceeded", MAX_STRSPN_ITER);
+                    panic!(
+                        "loop_limits: MAX_STRSPN_ITER ({}) exceeded",
+                        MAX_STRSPN_ITER
+                    );
                 }
                 iter += 1;
             }
@@ -235,7 +238,10 @@ pub fn lfs_strcspn(p: *const u8, c: u8) -> u32 {
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_STRCSPN_ITER {
-                    panic!("loop_limits: MAX_STRCSPN_ITER ({}) exceeded", MAX_STRCSPN_ITER);
+                    panic!(
+                        "loop_limits: MAX_STRCSPN_ITER ({}) exceeded",
+                        MAX_STRCSPN_ITER
+                    );
                 }
                 iter += 1;
             }

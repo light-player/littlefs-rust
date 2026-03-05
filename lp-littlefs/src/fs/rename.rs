@@ -222,7 +222,10 @@ fn slice_until_nul(ptr: *const u8) -> &'static [u8] {
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_SLICE_NUL_ITER {
-                    panic!("loop_limits: MAX_SLICE_NUL_ITER ({}) exceeded", MAX_SLICE_NUL_ITER);
+                    panic!(
+                        "loop_limits: MAX_SLICE_NUL_ITER ({}) exceeded",
+                        MAX_SLICE_NUL_ITER
+                    );
                 }
                 iter += 1;
             }

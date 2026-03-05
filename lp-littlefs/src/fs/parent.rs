@@ -62,7 +62,10 @@ pub fn lfs_fs_pred(
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_PARENT_ITER {
-                    panic!("loop_limits: MAX_PARENT_ITER ({}) exceeded in lfs_fs_parent", MAX_PARENT_ITER);
+                    panic!(
+                        "loop_limits: MAX_PARENT_ITER ({}) exceeded in lfs_fs_parent",
+                        MAX_PARENT_ITER
+                    );
                 }
                 iter += 1;
             }
@@ -225,7 +228,10 @@ pub fn lfs_fs_parent(
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_PARENT_ITER {
-                    panic!("loop_limits: MAX_PARENT_ITER ({}) exceeded in lfs_fs_parent (parent)", MAX_PARENT_ITER);
+                    panic!(
+                        "loop_limits: MAX_PARENT_ITER ({}) exceeded in lfs_fs_parent (parent)",
+                        MAX_PARENT_ITER
+                    );
                 }
                 iter += 1;
             }

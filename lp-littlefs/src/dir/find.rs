@@ -267,7 +267,10 @@ pub fn lfs_dir_find(
                 #[cfg(feature = "loop_limits")]
                 {
                     if path_iter >= MAX_PATH_DEPTH_ITER {
-                        panic!("loop_limits: MAX_PATH_DEPTH_ITER ({}) exceeded in path .. parsing", MAX_PATH_DEPTH_ITER);
+                        panic!(
+                            "loop_limits: MAX_PATH_DEPTH_ITER ({}) exceeded in path .. parsing",
+                            MAX_PATH_DEPTH_ITER
+                        );
                     }
                     path_iter += 1;
                 }
