@@ -252,14 +252,7 @@ pub fn lfs_alloc(lfs: *mut Lfs, block: *mut lfs_block_t) -> i32 {
             // the filesystem as out of storage.
             if lfs.lookahead.ckpoint == 0 {
                 crate::lfs_trace!(
-                    "lfs_alloc NOSPC: ckpoint==0 start={} next={} size={} block_count={}",
-                    lfs.lookahead.start,
-                    lfs.lookahead.next,
-                    lfs.lookahead.size,
-                    lfs.block_count
-                );
-                crate::lfs_error!(
-                    "No more free space 0x{:08x}",
+                    "No more free space 0x{:08x} (ckpoint==0)",
                     (lfs.lookahead.start + lfs.lookahead.next) % lfs.block_count
                 );
                 return LFS_ERR_NOSPC;
