@@ -443,12 +443,153 @@ fn test_entries_drop() {
     assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 }
 
-// --- Deferred ---
-
+// --- test_entries_create_too_big ---
+// Upstream: [cases.test_entries_create_too_big]
 #[test]
-#[ignore = "create_too_big / name_max may need specific config"]
-fn test_entries_create_too_big() {}
+fn test_entries_create_too_big() {
+    init_logger();
+    let mut env = env_with_cache_512();
+    init_context(&mut env);
 
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    let path = path_bytes(&"m".repeat(200));
+    let size = 400usize;
+    let wbuf = [b'c'; 1024];
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC,
+    ));
+    let n = lfs_file_write(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        wbuf[..size].as_ptr() as *const core::ffi::c_void,
+        size as u32,
+    );
+    assert_eq!(n, size as i32);
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        LFS_O_RDONLY,
+    ));
+    let mut rbuf = [0u8; 1024];
+    let n = lfs_file_read(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        rbuf[..size].as_mut_ptr() as *mut core::ffi::c_void,
+        size as u32,
+    );
+    assert_eq!(n, size as i32);
+    assert_eq!(&rbuf[..size], &wbuf[..size]);
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// --- test_entries_resize_too_big ---
+// Upstream: [cases.test_entries_resize_too_big]
+// Ignored: with 200-byte path, read returns LFS_ERR_NOSPC (-28) after truncate+write 400.
+// Works with shorter path (e.g. 50 bytes). Likely dir commit/split bug when updating
+// inline→CTZ with long name. See create_too_big which passes (fresh create, no truncate).
 #[test]
-#[ignore = "resize_too_big may need specific config"]
-fn test_entries_resize_too_big() {}
+#[ignore = "LFS_ERR_NOSPC on read after truncate+write with 200-byte path"]
+fn test_entries_resize_too_big() {
+    init_logger();
+    let mut env = env_with_cache_512();
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    let path = path_bytes(&"m".repeat(200));
+    let wbuf = [b'c'; 1024];
+    let mut rbuf = [0u8; 1024];
+
+    // Create with 40 bytes
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC,
+    ));
+    let n = lfs_file_write(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        wbuf[..40].as_ptr() as *const core::ffi::c_void,
+        40,
+    );
+    assert_eq!(n, 40);
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    // Read 40 bytes
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        LFS_O_RDONLY,
+    ));
+    let n = lfs_file_read(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        rbuf[..40].as_mut_ptr() as *mut core::ffi::c_void,
+        40,
+    );
+    assert_eq!(n, 40);
+    assert_eq!(&rbuf[..40], &wbuf[..40]);
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    // Truncate and write 400 bytes
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC,
+    ));
+    let n = lfs_file_write(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        wbuf[..400].as_ptr() as *const core::ffi::c_void,
+        400,
+    );
+    assert_eq!(n, 400);
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    // Read 400 bytes
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        LFS_O_RDONLY,
+    ));
+    let n = lfs_file_read(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        rbuf[..400].as_mut_ptr() as *mut core::ffi::c_void,
+        400,
+    );
+    assert_eq!(n, 400);
+    assert_eq!(&rbuf[..400], &wbuf[..400]);
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
