@@ -415,18 +415,21 @@ pub fn lfs_file_opencfg_(
 /// Per lfs.c lfs_file_open_ (lines 3238-3244)
 ///
 /// C: Wrapper that calls opencfg with default config.
+/// Static defaults for lfs_file_open (no opencfg). C uses the same;
+/// a stack-local would make file.cfg a dangling pointer after return.
+static LFS_FILE_DEFAULTS: LfsFileConfig = LfsFileConfig {
+    buffer: core::ptr::null_mut(),
+    attrs: core::ptr::null_mut(),
+    attr_count: 0,
+};
+
 pub fn lfs_file_open_(
     lfs: *mut crate::fs::Lfs,
     file: *mut LfsFile,
     path: *const i8,
     flags: i32,
 ) -> i32 {
-    let defaults = LfsFileConfig {
-        buffer: core::ptr::null_mut(),
-        attrs: core::ptr::null_mut(),
-        attr_count: 0,
-    };
-    lfs_file_opencfg_(lfs, file, path, flags, &defaults)
+    lfs_file_opencfg_(lfs, file, path, flags, &LFS_FILE_DEFAULTS)
 }
 
 /// Per lfs.c lfs_file_close_ (lines 3246-3264)
@@ -538,7 +541,7 @@ pub fn lfs_file_close_(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
 /// ```
 pub fn lfs_file_relocate(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
     use crate::bd::bd::{lfs_bd_erase, lfs_bd_prog, lfs_bd_read, lfs_cache_drop, lfs_cache_zero};
-    use crate::block_alloc::alloc::lfs_alloc;
+    use crate::block_alloc::alloc::{lfs_alloc, lfs_alloc_lookahead};
     use crate::error::LFS_ERR_CORRUPT;
 
     'relocate: loop {
@@ -552,6 +555,7 @@ pub fn lfs_file_relocate(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
             let err = lfs_bd_erase(lfs as *const crate::fs::Lfs, nblock);
             if err != 0 {
                 if err == LFS_ERR_CORRUPT {
+                    lfs_alloc_lookahead(lfs, nblock);
                     lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
                     continue 'relocate;
                 }
@@ -605,6 +609,7 @@ pub fn lfs_file_relocate(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
                 );
                 if err != 0 {
                     if err == LFS_ERR_CORRUPT {
+                        lfs_alloc_lookahead(lfs, nblock);
                         lfs_cache_drop(lfs, &mut (*lfs).pcache as *mut _);
                         continue 'relocate;
                     }

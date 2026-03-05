@@ -37,3 +37,6 @@ pub struct LfsFileConfig {
     pub attrs: *mut LfsAttr,
     pub attr_count: lfs_size_t,
 }
+
+// Safe: default config (all nulls) is shareable. Callers must not mutate.
+unsafe impl Sync for LfsFileConfig {}
