@@ -1,10 +1,15 @@
 //! Directory find. Per lfs.c lfs_dir_find, lfs_dir_find_match.
 
 use crate::bd::bd::lfs_bd_cmp;
-use crate::tag::lfs_diskoff;
-use crate::tag::lfs_tag_size;
-use crate::types::lfs_tag_t;
-use crate::util::lfs_min;
+use crate::dir::fetch::lfs_dir_fetchmatch;
+use crate::dir::traverse::lfs_dir_get;
+use crate::dir::LfsMdir;
+use crate::error::{LFS_ERR_INVAL, LFS_ERR_NOENT, LFS_ERR_NOTDIR};
+use crate::fs::Lfs;
+use crate::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_NAME, LFS_TYPE_STRUCT};
+use crate::tag::{lfs_diskoff, lfs_mktag, lfs_tag_id, lfs_tag_size, lfs_tag_type3};
+use crate::types::{lfs_size_t, lfs_tag_t};
+use crate::util::{lfs_min, lfs_pair_fromle32, lfs_strcspn, lfs_strspn};
 
 // Per lfs.c enum: LFS_CMP_EQ=0, LFS_CMP_LT=1, LFS_CMP_GT=2 (positive = not error)
 const LFS_CMP_EQ: i32 = 0;
@@ -14,9 +19,9 @@ const LFS_CMP_GT: i32 = 2;
 /// Per lfs.c struct lfs_dir_find_match (lines 1447-1475)
 #[repr(C)]
 pub struct LfsDirFindMatch {
-    pub lfs: *mut crate::fs::Lfs,
+    pub lfs: *mut Lfs,
     pub name: *const u8,
-    pub size: crate::types::lfs_size_t,
+    pub size: lfs_size_t,
 }
 
 /// Per lfs.c lfs_dir_find_match (and struct lfs_dir_find_match) (lines 1447-1475)
@@ -206,18 +211,11 @@ pub unsafe extern "C" fn lfs_dir_find_match(
 /// }
 /// ```
 pub fn lfs_dir_find(
-    lfs: *mut crate::fs::Lfs,
-    dir: *mut crate::dir::LfsMdir,
+    lfs: *mut Lfs,
+    dir: *mut LfsMdir,
     path: *mut *const u8,
     id: *mut u16,
 ) -> crate::types::lfs_stag_t {
-    use crate::dir::fetch::lfs_dir_fetchmatch;
-    use crate::dir::traverse::lfs_dir_get;
-    use crate::error::{LFS_ERR_INVAL, LFS_ERR_NOENT, LFS_ERR_NOTDIR};
-    use crate::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_NAME, LFS_TYPE_STRUCT};
-    use crate::tag::{lfs_mktag, lfs_tag_id, lfs_tag_type3};
-    use crate::util::{lfs_pair_fromle32, lfs_strcspn, lfs_strspn};
-
     if lfs.is_null() || dir.is_null() || path.is_null() {
         return LFS_ERR_INVAL as crate::types::lfs_stag_t;
     }
@@ -239,7 +237,7 @@ pub fn lfs_dir_find(
             return LFS_ERR_INVAL as crate::types::lfs_stag_t;
         }
 
-        loop {
+        'nextname: loop {
             // C: nextname - lfs.c:1510-1512
             if u32::from(lfs_tag_type3(tag as u32)) == LFS_TYPE_DIR {
                 let skip = lfs_strspn(name, b'/');
@@ -274,7 +272,7 @@ pub fn lfs_dir_find(
                     depth -= 1;
                     if depth == 0 {
                         name = suffix.add(sufflen as usize);
-                        continue;
+                        continue 'nextname;
                     }
                 } else {
                     depth += 1;
