@@ -437,6 +437,9 @@ enum TraversePhase {
     ProcessTag {
         tag: lfs_tag_t,
         buffer: *const core::ffi::c_void,
+        /// When dispatching a tag from disk after exhaust-pop, frame.buffer pointed to
+        /// the outer `disk` (overwritten by subsequent reads). Use this copy instead.
+        disk_override: Option<crate::tag::lfs_diskoff>,
     },
     PopAndProcess,
 }
@@ -859,10 +862,18 @@ pub fn lfs_dir_traverse(
                     };
                     phase = TraversePhase::GetNextTag;
                 } else {
-                    phase = TraversePhase::ProcessTag { tag, buffer };
+                    phase = TraversePhase::ProcessTag {
+                        tag,
+                        buffer,
+                        disk_override: None,
+                    };
                 }
             }
-            TraversePhase::ProcessTag { tag, buffer } => {
+            TraversePhase::ProcessTag {
+                tag,
+                buffer,
+                disk_override,
+            } => {
                 crate::lfs_trace!(
                     "traverse ProcessTag: sp={} tag=0x{:08x} type3={} buffer={:p}",
                     sp,
@@ -969,7 +980,11 @@ pub fn lfs_dir_traverse(
                             return res;
                         }
                     } else {
-                        res = dispatch_tag(cb, data, tag, buffer, diff);
+                        let actual_buffer = match disk_override {
+                            Some(ref d) => d as *const _ as *const core::ffi::c_void,
+                            None => buffer,
+                        };
+                        res = dispatch_tag(cb, data, tag, actual_buffer, diff);
                         if res < 0 {
                             return res;
                         }
@@ -1018,11 +1033,21 @@ pub fn lfs_dir_traverse(
                 // "given back" because we restore attr_i; we'll get it on the next GetNextTag
                 // and emit it once. Using redundant_tag here would emit the attr now, but
                 // we also restore attr_i, so we'd emit it again on next iteration = duplicate.
-                let (proc_tag, proc_buffer) = (frame.tag, frame.buffer);
+                //
+                // When the tag was read from disk (0x80000000), frame.buffer pointed to the
+                // outer `disk` variable, which gets overwritten by subsequent reads. Use the
+                // copy saved in frame.disk so we pass the correct data to the callback.
+                let proc_tag = frame.tag;
+                let disk_override = if !crate::tag::lfs_tag_isvalid(frame.tag) {
+                    Some(frame.disk)
+                } else {
+                    None
+                };
                 sp -= 1;
                 phase = TraversePhase::ProcessTag {
                     tag: proc_tag,
-                    buffer: proc_buffer,
+                    buffer: frame.buffer,
+                    disk_override,
                 };
             }
         }
