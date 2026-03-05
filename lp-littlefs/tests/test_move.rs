@@ -9,6 +9,7 @@ mod common;
 
 use common::{
     assert_err, assert_ok, default_config, dir_entry_names, init_context, init_logger, path_bytes,
+    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
     LFS_O_CREAT, LFS_O_RDONLY, LFS_O_TRUNC, LFS_O_WRONLY,
 };
 use lp_littlefs::lfs_type::lfs_type::LFS_TYPE_DIR;
@@ -705,9 +706,67 @@ fn test_move_file_corrupt_source_dest() {}
 #[ignore = "block-level corruption simulation not implemented"]
 fn test_move_file_after_corrupt() {}
 
+// --- test_move_reentrant_file ---
+// Power-loss at rename points; verify FS consistent after each simulated power loss.
 #[test]
-#[ignore = "powerloss runner not implemented"]
-fn test_move_reentrant_file() {}
+fn test_move_reentrant_file() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("dir.1").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("dir.2").as_ptr()));
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path_bytes("dir.1/1.move_me").as_ptr(),
+        LFS_O_WRONLY | LFS_O_CREAT,
+    ));
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    let snapshot = env.snapshot();
+    let path_src = path_bytes("dir.1/1.move_me");
+    let path_dst = path_bytes("dir.2/1.move_me");
+
+    let result = run_powerloss_linear(
+        &mut env,
+        &snapshot,
+        128,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let err = lfs_rename(lfs_ptr, path_src.as_ptr(), path_dst.as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_unmount(lfs_ptr);
+            if err != 0 {
+                return Err(err);
+            }
+            Ok(())
+        },
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let _ = lfs_unmount(lfs_ptr);
+            Ok(())
+        },
+    );
+    result.expect("test_move_reentrant_file should complete");
+}
 
 #[test]
 #[ignore = "block-level corruption simulation not implemented"]
@@ -721,6 +780,63 @@ fn test_move_dir_corrupt_source_dest() {}
 #[ignore = "block-level corruption simulation not implemented"]
 fn test_move_dir_after_corrupt() {}
 
+// --- test_reentrant_dir ---
+// Power-loss at cross-dir dir rename points; verify FS consistent after each.
 #[test]
-#[ignore = "powerloss runner not implemented"]
-fn test_reentrant_dir() {}
+fn test_reentrant_dir() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("b").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("c").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a/hi").as_ptr()));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/hola").as_ptr(),
+    ));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    let snapshot = env.snapshot();
+    let path_src = path_bytes("a/hi");
+    let path_dst = path_bytes("c/hi");
+
+    let result = run_powerloss_linear(
+        &mut env,
+        &snapshot,
+        128,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let err = lfs_rename(lfs_ptr, path_src.as_ptr(), path_dst.as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_unmount(lfs_ptr);
+            if err != 0 {
+                return Err(err);
+            }
+            Ok(())
+        },
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let _ = lfs_unmount(lfs_ptr);
+            Ok(())
+        },
+    );
+    result.expect("test_reentrant_dir should complete");
+}

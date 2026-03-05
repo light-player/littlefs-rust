@@ -8,7 +8,9 @@
 mod common;
 
 use common::{
-    assert_ok, default_config, init_context, init_logger, path_bytes, LFS_O_CREAT, LFS_O_WRONLY,
+    assert_ok, default_config, init_context, init_logger, path_bytes,
+    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
+    LFS_O_CREAT, LFS_O_WRONLY,
 };
 use lp_littlefs::{
     lfs_file_close, lfs_file_open, lfs_file_write, lfs_format, lfs_mkdir, lfs_mount, lfs_remove,
@@ -224,12 +226,149 @@ fn test_relocations_nonreentrant_renames() {
     assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 }
 
-// --- Deferred ---
-
+// --- test_relocations_reentrant ---
+// mkdir/remove cycles with power-loss; verify FS consistent after each.
 #[test]
-#[ignore = "powerloss runner not implemented"]
-fn test_relocations_reentrant() {}
+fn test_relocations_reentrant() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
 
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    let snapshot = env.snapshot();
+
+    let result = run_powerloss_linear(
+        &mut env,
+        &snapshot,
+        128,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            for i in 0..6 {
+                let name = format!("{}", (b'a' + i) as char);
+                let path = path_bytes(&name);
+                let err = lfs_mkdir(lfs_ptr, path.as_ptr());
+                if err != 0 {
+                    let _ = lfs_unmount(lfs_ptr);
+                    return Err(err);
+                }
+            }
+            for i in 0..6 {
+                let name = format!("{}", (b'a' + i) as char);
+                let path = path_bytes(&name);
+                let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+                let err = lfs_stat(lfs_ptr, path.as_ptr(), info.as_mut_ptr());
+                if err != 0 {
+                    let _ = lfs_unmount(lfs_ptr);
+                    return Err(err);
+                }
+                let err = lfs_remove(lfs_ptr, path.as_ptr());
+                if err != 0 {
+                    let _ = lfs_unmount(lfs_ptr);
+                    return Err(err);
+                }
+            }
+            let err = lfs_unmount(lfs_ptr);
+            if err != 0 {
+                return Err(err);
+            }
+            Ok(())
+        },
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let _ = lfs_unmount(lfs_ptr);
+            Ok(())
+        },
+    );
+    result.expect("test_relocations_reentrant should complete");
+}
+
+// --- test_relocations_reentrant_renames ---
+// Chained renames with power-loss; verify FS consistent after each.
 #[test]
-#[ignore = "powerloss runner not implemented"]
-fn test_relocations_reentrant_renames() {}
+fn test_relocations_reentrant_renames() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    for name in ["x", "y"] {
+        let path = path_bytes(name);
+        let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+        assert_ok(lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path.as_ptr(),
+            LFS_O_WRONLY | LFS_O_CREAT,
+        ));
+        assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    }
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    let snapshot = env.snapshot();
+
+    let result = run_powerloss_linear(
+        &mut env,
+        &snapshot,
+        128,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let err = lfs_rename(lfs_ptr, path_bytes("x").as_ptr(), path_bytes("z").as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_rename(lfs_ptr, path_bytes("y").as_ptr(), path_bytes("x").as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_rename(lfs_ptr, path_bytes("z").as_ptr(), path_bytes("y").as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_remove(lfs_ptr, path_bytes("x").as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_remove(lfs_ptr, path_bytes("y").as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_unmount(lfs_ptr);
+            if err != 0 {
+                return Err(err);
+            }
+            Ok(())
+        },
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let _ = lfs_unmount(lfs_ptr);
+            Ok(())
+        },
+    );
+    result.expect("test_relocations_reentrant_renames should complete");
+}

@@ -6,12 +6,14 @@
 mod common;
 
 use common::{
-    assert_ok_at, default_config, init_context, init_logger, path_bytes, LFS_O_APPEND, LFS_O_CREAT,
-    LFS_O_RDONLY, LFS_O_WRONLY,
+    assert_ok_at, default_config, init_context, init_logger, path_bytes,
+    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
+    LFS_O_APPEND, LFS_O_CREAT, LFS_O_RDONLY, LFS_O_WRONLY,
 };
 use lp_littlefs::{
     lfs_dir_close, lfs_dir_open, lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_sync,
     lfs_file_write, lfs_format, lfs_mkdir, lfs_mount, lfs_unmount, Lfs, LfsConfig, LfsDir, LfsFile,
+    LFS_ERR_IO,
 };
 
 // --- test_powerloss_only_rev ---
@@ -214,6 +216,100 @@ fn test_powerloss_only_rev() {
     }
     assert_ok_at("file_close", lfs_file_close(lfs_ptr, file.as_mut_ptr()));
     assert_ok_at("unmount final", lfs_unmount(lfs_ptr));
+}
+
+// --- test_powerloss_trigger_first_write ---
+// Unit test: fail_after_writes=1 causes first prog/erase to return LFS_ERR_IO.
+#[test]
+fn test_powerloss_trigger_first_write() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+    env.set_fail_after_writes(1);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    let err = lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig);
+    assert_eq!(
+        err, LFS_ERR_IO,
+        "format should fail on first write with fail_after_writes=1"
+    );
+}
+
+// --- test_powerloss_runner_smoke ---
+// Smoke test: run_powerloss_linear with mkdir op; verify mount works after power loss.
+#[test]
+fn test_powerloss_runner_smoke() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok_at(
+        "format",
+        lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig),
+    );
+    let snapshot = env.snapshot();
+
+    let path_d = path_bytes("d");
+    let result = run_powerloss_linear(
+        &mut env,
+        &snapshot,
+        64,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let err = lfs_mkdir(lfs_ptr, path_d.as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_unmount(lfs_ptr);
+            if err != 0 {
+                return Err(err);
+            }
+            Ok(())
+        },
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let _ = lfs_unmount(lfs_ptr);
+            Ok(())
+        },
+    );
+    result.expect("run_powerloss_linear should complete");
+}
+
+// --- test_powerloss_snapshot_restore ---
+// Unit test: snapshot and restore preserve BD state.
+#[test]
+fn test_powerloss_snapshot_restore() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok_at(
+        "format",
+        lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig),
+    );
+    let snapshot = env.snapshot();
+
+    // Mutate ram
+    env.ctx.ram.data[0] = 0;
+    assert_ne!(env.ctx.ram.data[0], snapshot[0]);
+
+    env.restore(&snapshot);
+    assert_eq!(&env.ctx.ram.data[..], &snapshot[..]);
+
+    assert_ok_at(
+        "mount after restore",
+        lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig),
+    );
+    assert_ok_at("unmount", lfs_unmount(lfs.as_mut_ptr()));
 }
 
 // =============================================================================

@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 pub mod dump;
+pub mod powerloss;
 
 use core::cell::RefCell;
 use lp_littlefs::{LfsConfig, LFS_ERR_CORRUPT};
