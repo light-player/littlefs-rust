@@ -155,11 +155,15 @@ pub fn lfs_fs_traverse_(
         const MAX_TRAVERSE_TAIL: u32 = 512;
         #[cfg(feature = "loop_limits")]
         let mut iter: u32 = 0;
+        crate::lfs_trace!("fs_traverse: tail loop start");
         while !lfs_pair_isnull(&dir.tail) {
             #[cfg(feature = "loop_limits")]
             {
                 if iter >= MAX_TRAVERSE_TAIL {
                     return LFS_ERR_CORRUPT;
+                }
+                if iter > 0 && iter % 20 == 0 {
+                    crate::lfs_trace!("fs_traverse: iter={} tail={:?}", iter, dir.tail);
                 }
                 iter += 1;
             }
@@ -176,6 +180,7 @@ pub fn lfs_fs_traverse_(
             }
 
             // iterate through ids in directory
+            crate::lfs_trace!("fs_traverse: fetch tail={:?} count={}", dir.tail, dir.count);
             let err = lfs_dir_fetch(lfs, &mut dir, &dir.tail);
             if err != 0 {
                 return err;

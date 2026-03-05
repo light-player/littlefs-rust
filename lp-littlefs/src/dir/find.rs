@@ -318,6 +318,12 @@ pub fn lfs_dir_find(
                 {
                     find_iter += 1;
                     if find_iter > MAX_FIND_ITER {
+                        crate::lfs_trace!(
+                            "dir_find: iter cap {} exceeded name_len={} tail={:?}",
+                            MAX_FIND_ITER,
+                            namelen,
+                            dir_ref.tail
+                        );
                         return LFS_ERR_CORRUPT as crate::types::lfs_stag_t;
                     }
                 }

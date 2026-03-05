@@ -332,6 +332,7 @@ pub fn lfs_dir_fetchmatch(
         let cfg = &*lfs.cfg;
 
         let mut besttag: lfs_stag_t = -1;
+        crate::lfs_trace!("fetchmatch: start pair={:?}", pair);
 
         // block_count check (C: lines 1117-1120)
         if lfs.block_count != 0 && (pair[0] >= lfs.block_count || pair[1] >= lfs.block_count) {
@@ -342,6 +343,7 @@ pub fn lfs_dir_fetchmatch(
         let mut revs = [0u32; 2];
         let mut r = 0usize;
         for i in 0..2 {
+            crate::lfs_trace!("fetchmatch: reading rev for pair[{}]={}", i, pair[i]);
             let mut rev_buf = [0u8; 4];
             let err = lfs_bd_read(
                 lfs,
@@ -368,6 +370,7 @@ pub fn lfs_dir_fetchmatch(
         dir.off = 0;
 
         for _block_iter in 0..2 {
+            crate::lfs_trace!("fetchmatch: block_iter={}", _block_iter);
             let mut off: u32 = 0;
             let mut ptag: lfs_tag_t = 0xffff_ffff;
 
@@ -393,6 +396,15 @@ pub fn lfs_dir_fetchmatch(
                 {
                     if tag_iter >= MAX_FETCH_TAG_ITER {
                         return LFS_ERR_CORRUPT as lfs_stag_t;
+                    }
+                    if tag_iter > 0 && tag_iter % 32 == 0 {
+                        crate::lfs_trace!(
+                            "fetchmatch: tag_iter={} off={} block_iter={} pair={:?}",
+                            tag_iter,
+                            off,
+                            _block_iter,
+                            dir.pair
+                        );
                     }
                     tag_iter += 1;
                 }

@@ -206,9 +206,11 @@ pub fn lfs_bd_read(
 
             if size >= hint && off.is_multiple_of(cfg.read_size) && size >= cfg.read_size {
                 diff = lfs_aligndown(diff, cfg.read_size);
+                crate::lfs_trace!("bd_read block={} off={} size={}", block, off, diff);
                 let err = read(cfg as *const _, block, off, data, diff);
                 crate::lfs_assert!(err <= 0);
                 if err != 0 {
+                    crate::lfs_trace!("bd_read block={} -> CORRUPT", block);
                     return err;
                 }
                 data = data.add(diff as usize);
@@ -225,6 +227,12 @@ pub fn lfs_bd_read(
                     .saturating_sub(rcache.off),
                 cfg.cache_size,
             );
+            crate::lfs_trace!(
+                "bd_read block={} off={} size={}",
+                rcache.block,
+                rcache.off,
+                rcache.size
+            );
             let err = read(
                 cfg as *const _,
                 rcache.block,
@@ -234,6 +242,7 @@ pub fn lfs_bd_read(
             );
             crate::lfs_assert!(err <= 0);
             if err != 0 {
+                crate::lfs_trace!("bd_read block={} -> CORRUPT", rcache.block);
                 // Don't leave rcache claiming to have this block when the buffer wasn't filled.
                 // A retry (e.g. after bad-block clear) would otherwise serve stale data.
                 rcache.block = crate::types::LFS_BLOCK_NULL;
@@ -443,6 +452,12 @@ pub fn lfs_bd_flush(
         if pcache.block != crate::types::LFS_BLOCK_NULL && pcache.block != LFS_BLOCK_INLINE {
             crate::lfs_assert!(pcache.block < lfs.block_count);
             let diff = lfs_alignup(pcache.size, cfg.prog_size);
+            crate::lfs_trace!(
+                "bd_prog block={} off={} size={}",
+                pcache.block,
+                pcache.off,
+                diff
+            );
             let prog = match cfg.prog {
                 Some(f) => f,
                 None => return LFS_ERR_CORRUPT,
@@ -456,6 +471,7 @@ pub fn lfs_bd_flush(
             );
             crate::lfs_assert!(err <= 0);
             if err != 0 {
+                crate::lfs_trace!("bd_prog block={} -> CORRUPT", pcache.block);
                 return err;
             }
 
@@ -612,6 +628,24 @@ pub fn lfs_bd_prog(
             if block == pcache.block && off >= pcache.off && off < pcache.off + cfg.cache_size {
                 let diff = lfs_min(size, cfg.cache_size - (off - pcache.off));
                 if !pcache.buffer.is_null() && !data.is_null() {
+                    // Trace superblock magic region (offset 12-20 in block 0/1)
+                    if (block == 0 || block == 1) && off <= 12 && off + diff > 12 {
+                        let magic_start = 12usize.saturating_sub(off as usize);
+                        let magic_len = (8).min(diff as usize - magic_start);
+                        if magic_len > 0 {
+                            let slice =
+                                core::slice::from_raw_parts(data.add(magic_start), magic_len);
+                            crate::lfs_trace!(
+                                "bd_prog superblock block={} off={} size={} magic_region[{}..{}]={:?}",
+                                block,
+                                off,
+                                size,
+                                magic_start,
+                                magic_start + magic_len,
+                                slice
+                            );
+                        }
+                    }
                     core::ptr::copy_nonoverlapping(
                         data,
                         pcache.buffer.add((off - pcache.off) as usize),
@@ -666,8 +700,12 @@ pub fn lfs_bd_erase(lfs: *const Lfs, block: lfs_block_t) -> i32 {
             Some(f) => f,
             None => return LFS_ERR_CORRUPT,
         };
+        crate::lfs_trace!("bd_erase block={}", block);
         let err = erase(lfs.cfg, block);
         crate::lfs_assert!(err <= 0);
+        if err != 0 {
+            crate::lfs_trace!("bd_erase block={} -> CORRUPT", block);
+        }
         err
     }
 }

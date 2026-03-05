@@ -5,7 +5,10 @@
 
 #![allow(dead_code)]
 
-use lp_littlefs::LfsConfig;
+pub mod dump;
+
+use core::cell::RefCell;
+use lp_littlefs::{LfsConfig, LFS_ERR_CORRUPT};
 
 /// Initialize env_logger for tests that use logging. Idempotent.
 pub fn init_logger() {
@@ -104,6 +107,83 @@ unsafe extern "C" fn ram_sync(_cfg: *const LfsConfig) -> i32 {
     0
 }
 
+/// RAM storage with bad-block simulation. Wraps RamStorage and returns LFS_ERR_CORRUPT
+/// for read/prog/erase when a block is marked bad. Per upstream lfs_emubd_setwear semantics.
+pub struct BadBlockRamStorage {
+    pub ram: RamStorage,
+    pub bad_blocks: RefCell<Vec<u32>>,
+}
+
+impl BadBlockRamStorage {
+    pub fn new(block_size: u32, block_count: u32) -> Self {
+        Self {
+            ram: RamStorage::new(block_size, block_count),
+            bad_blocks: RefCell::new(Vec::new()),
+        }
+    }
+
+    pub fn set_bad_block(&self, block: u32) {
+        let mut blocks = self.bad_blocks.borrow_mut();
+        if !blocks.contains(&block) {
+            blocks.push(block);
+        }
+    }
+
+    pub fn clear_bad_block(&self, block: u32) {
+        self.bad_blocks.borrow_mut().retain(|&b| b != block);
+    }
+}
+
+unsafe extern "C" fn badblock_read(
+    cfg: *const LfsConfig,
+    block: u32,
+    off: u32,
+    buffer: *mut u8,
+    size: u32,
+) -> i32 {
+    let ctx = (*cfg).context as *mut BadBlockRamStorage;
+    let badblock = &mut *ctx;
+    if badblock.bad_blocks.borrow().contains(&block) {
+        return LFS_ERR_CORRUPT;
+    }
+    let size = size as usize;
+    let buf = core::slice::from_raw_parts_mut(buffer, size);
+    badblock.ram.read(block, off, buf);
+    0
+}
+
+unsafe extern "C" fn badblock_prog(
+    cfg: *const LfsConfig,
+    block: u32,
+    off: u32,
+    buffer: *const u8,
+    size: u32,
+) -> i32 {
+    let ctx = (*cfg).context as *mut BadBlockRamStorage;
+    let badblock = &mut *ctx;
+    if badblock.bad_blocks.borrow().contains(&block) {
+        return LFS_ERR_CORRUPT;
+    }
+    let size = size as usize;
+    let buf = core::slice::from_raw_parts(buffer, size);
+    badblock.ram.prog(block, off, buf);
+    0
+}
+
+unsafe extern "C" fn badblock_erase(cfg: *const LfsConfig, block: u32) -> i32 {
+    let ctx = (*cfg).context as *mut BadBlockRamStorage;
+    let badblock = &mut *ctx;
+    if badblock.bad_blocks.borrow().contains(&block) {
+        return LFS_ERR_CORRUPT;
+    }
+    badblock.ram.erase(block);
+    0
+}
+
+unsafe extern "C" fn badblock_sync(_cfg: *const LfsConfig) -> i32 {
+    0
+}
+
 /// Holds RAM storage, config, and buffers. Keeps pointers valid for lfs_* calls.
 pub struct TestEnv {
     pub ram: RamStorage,
@@ -120,6 +200,50 @@ const BLOCK_SIZE: u32 = 512;
 pub fn config_with_cache(cache_size: u32, block_count: u32) -> TestEnv {
     let mut env = default_config(block_count);
     env.config.cache_size = cache_size;
+    env
+}
+
+/// Build test environment with custom geometry. For geometry-specific tests (block_size=512, block_count=1024).
+pub fn config_with_geometry(block_size: u32, block_count: u32) -> TestEnv {
+    let ram = RamStorage::new(block_size, block_count);
+    let read_buf = vec![0u8; block_size as usize];
+    let prog_buf = vec![0u8; block_size as usize];
+    let lookahead_buf = vec![0u8; block_size as usize];
+
+    let config = LfsConfig {
+        context: core::ptr::null_mut(),
+        read: Some(ram_read),
+        prog: Some(ram_prog),
+        erase: Some(ram_erase),
+        sync: Some(ram_sync),
+        read_size: 16,
+        prog_size: 16,
+        block_size,
+        block_count,
+        block_cycles: -1,
+        cache_size: block_size,
+        lookahead_size: block_size,
+        compact_thresh: u32::MAX,
+        read_buffer: read_buf.as_ptr() as *mut core::ffi::c_void,
+        prog_buffer: prog_buf.as_ptr() as *mut core::ffi::c_void,
+        lookahead_buffer: lookahead_buf.as_ptr() as *mut core::ffi::c_void,
+        name_max: 255,
+        file_max: 2_147_483_647,
+        attr_max: 1022,
+        metadata_max: 0,
+        inline_max: 0,
+    };
+
+    let mut env = TestEnv {
+        ram,
+        config,
+        _read_buf: read_buf,
+        _prog_buf: prog_buf,
+        _lookahead_buf: lookahead_buf,
+    };
+    env.config.read_buffer = env._read_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.prog_buffer = env._prog_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.lookahead_buffer = env._lookahead_buf.as_mut_ptr() as *mut core::ffi::c_void;
     env
 }
 
@@ -175,6 +299,89 @@ pub fn default_config(block_count: u32) -> TestEnv {
 /// must point to env.ram at its final address (after the env has been moved).
 pub fn init_context(env: &mut TestEnv) {
     env.config.context = &mut env.ram as *mut RamStorage as *mut core::ffi::c_void;
+}
+
+/// TestEnv variant with bad-block BD. Use for test_alloc_bad_blocks.
+pub struct BadBlockTestEnv {
+    pub badblock_ram: BadBlockRamStorage,
+    pub config: LfsConfig,
+    pub _read_buf: Vec<u8>,
+    pub _prog_buf: Vec<u8>,
+    pub _lookahead_buf: Vec<u8>,
+}
+
+/// Build test environment with bad-block BD. block_count defaults to 128.
+pub fn config_badblock(block_count: u32) -> BadBlockTestEnv {
+    let block_size = BLOCK_SIZE;
+    let badblock_ram = BadBlockRamStorage::new(block_size, block_count);
+    let read_buf = vec![0u8; block_size as usize];
+    let prog_buf = vec![0u8; block_size as usize];
+    let lookahead_buf = vec![0u8; block_size as usize];
+
+    let config = LfsConfig {
+        context: core::ptr::null_mut(),
+        read: Some(badblock_read),
+        prog: Some(badblock_prog),
+        erase: Some(badblock_erase),
+        sync: Some(badblock_sync),
+        read_size: 16,
+        prog_size: 16,
+        block_size,
+        block_count,
+        block_cycles: -1,
+        cache_size: block_size,
+        lookahead_size: block_size,
+        compact_thresh: u32::MAX,
+        read_buffer: read_buf.as_ptr() as *mut core::ffi::c_void,
+        prog_buffer: prog_buf.as_ptr() as *mut core::ffi::c_void,
+        lookahead_buffer: lookahead_buf.as_ptr() as *mut core::ffi::c_void,
+        name_max: 255,
+        file_max: 2_147_483_647,
+        attr_max: 1022,
+        metadata_max: 0,
+        inline_max: 0,
+    };
+
+    let mut env = BadBlockTestEnv {
+        badblock_ram,
+        config,
+        _read_buf: read_buf,
+        _prog_buf: prog_buf,
+        _lookahead_buf: lookahead_buf,
+    };
+    env.config.read_buffer = env._read_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.prog_buffer = env._prog_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.lookahead_buffer = env._lookahead_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env
+}
+
+/// Call after config_badblock() to set context. Required for BadBlockTestEnv.
+pub fn init_badblock_context(env: &mut BadBlockTestEnv) {
+    env.config.context = &mut env.badblock_ram as *mut BadBlockRamStorage as *mut core::ffi::c_void;
+}
+
+/// Run `f` with a process-level timeout. If the closure does not complete within
+/// `secs` seconds, the process is aborted. Use for tests that may hang (e.g.
+/// infinite loops in write paths).
+pub fn run_with_timeout<F, R>(secs: u64, f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    let guard =
+        std::thread::spawn(
+            move || match rx.recv_timeout(std::time::Duration::from_secs(secs)) {
+                Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    eprintln!("test exceeded {} second timeout, aborting", secs);
+                    std::process::abort();
+                }
+            },
+        );
+    let result = f();
+    let _ = tx.send(());
+    guard.join().expect("timeout guard thread panicked");
+    result
 }
 
 /// Panic if result is not 0.

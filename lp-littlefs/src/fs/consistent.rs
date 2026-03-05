@@ -133,7 +133,9 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
     use crate::dir::commit::lfs_dir_commit;
     use crate::util::{lfs_min, lfs_pair_isnull};
 
+    crate::lfs_trace!("lfs_fs_gc: start");
     let err = super::superblock::lfs_fs_forceconsistency(lfs);
+    crate::lfs_trace!("lfs_fs_gc: after forceconsistency err={}", err);
     if err != 0 {
         return err;
     }
@@ -146,6 +148,7 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
         let compact_thresh = cfg.compact_thresh;
 
         if compact_thresh < block_size.saturating_sub(prog_size) {
+            crate::lfs_trace!("lfs_fs_gc: compact loop start");
             let mut mdir = LfsMdir {
                 pair: [0, 0],
                 rev: 0,
@@ -185,7 +188,9 @@ pub fn lfs_fs_gc_(lfs: *mut super::lfs::Lfs) -> i32 {
         let lookahead_size = cfg.lookahead_size;
         let block_count = lfs_ref.block_count;
         if lfs_ref.lookahead.size < lfs_min(8 * lookahead_size, block_count) {
+            crate::lfs_trace!("lfs_fs_gc: alloc_scan start");
             let err = lfs_alloc_scan(lfs);
+            crate::lfs_trace!("lfs_fs_gc: alloc_scan done err={}", err);
             if err != 0 {
                 return err;
             }

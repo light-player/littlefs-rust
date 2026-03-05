@@ -115,6 +115,7 @@ pub fn lfs_alloc_scan(lfs: *mut Lfs) -> i32 {
     use crate::fs::traverse::lfs_fs_traverse_;
     use crate::util::lfs_min;
 
+    crate::lfs_trace!("alloc_scan: start");
     unsafe {
         let lfs_ref = &mut *lfs;
         let cfg = lfs_ref.cfg.as_ref().expect("cfg");
@@ -141,9 +142,11 @@ pub fn lfs_alloc_scan(lfs: *mut Lfs) -> i32 {
             true,
         );
         if err != 0 {
+            crate::lfs_trace!("alloc_scan: traverse err={}", err);
             lfs_alloc_drop(lfs);
             return err;
         }
+        crate::lfs_trace!("alloc_scan: done");
         0
     }
 }
