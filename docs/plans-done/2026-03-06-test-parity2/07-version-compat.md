@@ -18,7 +18,7 @@ The C code handles the case where `lfsp` is not a separate library by aliasing `
 
 > If lfsp is not linked, and LFSP is not defined, these tests will alias the relevant lfs types/functions as necessary so at least the tests can themselves be tested locally.
 
-We will use this same approach: `lfsp_*` operations use the same `lp_littlefs` crate. This validates the test logic and verifies that format-mount-read/write works end-to-end. Real cross-version testing can be added later by linking `lp-littlefs-c-align` or a previous-version crate as `lfsp`.
+We will use this same approach: `lfsp_*` operations use the same `littlefs_rust` crate. This validates the test logic and verifies that format-mount-read/write works end-to-end. Real cross-version testing can be added later by linking `littlefs-rust-c-align` or a previous-version crate as `lfsp`.
 
 ## Implementation
 
@@ -27,7 +27,7 @@ We will use this same approach: `lfsp_*` operations use the same `lp_littlefs` c
 In `test_compat.rs`, define type aliases and wrapper functions so the test code reads naturally:
 
 ```rust
-use lp_littlefs::{
+use littlefs_rust::{
     Lfs, LfsConfig, LfsDir, LfsFile, LfsInfo,
     lfs_format, lfs_mount, lfs_unmount,
     lfs_mkdir, lfs_dir_open, lfs_dir_read, lfs_dir_close,
@@ -116,10 +116,10 @@ All 17 `test_compat_*` tests. Replace `#[ignore = "stub: requires version compat
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs-core test_compat
+cargo test -p littlefs-rust-core test_compat
 # All 17+ (parameterized) cases should pass
 
 # Verify no stubs remain
-cargo test -p lp-littlefs-core -- --list --ignored 2>&1 | grep -c "compat"
+cargo test -p littlefs-rust-core -- --list --ignored 2>&1 | grep -c "compat"
 # Expected: 0
 ```

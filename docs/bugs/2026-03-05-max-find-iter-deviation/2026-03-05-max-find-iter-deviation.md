@@ -7,7 +7,7 @@ We have a **defensive iteration cap** `MAX_FIND_ITER = 256` in `lfs_dir_find` (d
 ## Reproduction
 
 ```
-cargo test --package lp-littlefs --test test_entries test_entries_resize_too_big
+cargo test --package littlefs-rust --test test_entries test_entries_resize_too_big
 ```
 
 **Config**: 2048 blocks, 512-byte blocks, cache 512 (matches upstream ERASE_COUNT=1M/512). Path: 200 × `"m"` (single-component 200-byte name).
@@ -21,7 +21,7 @@ At panic: `tail=[742, 743]` – we have walked ~372 directory block pairs (each 
 
 ## Affected Code
 
-**File**: `lp-littlefs/src/dir/find.rs`  
+**File**: `littlefs-rust/src/dir/find.rs`  
 **Lines**: 325–365  
 
 The loop at C lfs.c:1567–1584:
@@ -74,7 +74,7 @@ A single file with a 200-byte name should not require hundreds of directory bloc
 
 **`lfs_dir_splittingcompact`** called `lfs_dir_split` with an empty range (`split=1, end_val=1`), creating hundreds of empty directory blocks. Each block became a tail in the chain; `lfs_dir_find` had to traverse them all, exceeding `MAX_FIND_ITER`.
 
-**Fix**: Add guard `if (end_val <= split) break` before calling `lfs_dir_split` in `lfs_dir_splittingcompact` (lp-littlefs/src/dir/commit.rs).
+**Fix**: Add guard `if (end_val <= split) break` before calling `lfs_dir_split` in `lfs_dir_splittingcompact` (littlefs-rust/src/dir/commit.rs).
 
 Trace analysis (parse_trace.py) showed 35 `dir_split` calls with empty range before the fix. C reproducer (resize_too_big.c) passes without modification.
 

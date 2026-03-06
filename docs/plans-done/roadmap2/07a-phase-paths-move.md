@@ -10,7 +10,7 @@ Port remaining path tests and all move/rename tests. Path resolution and absolut
 
 ## Tests to Port
 
-### test_paths (from lp-littlefs-old/tests/test_paths.rs)
+### test_paths (from littlefs-rust-old/tests/test_paths.rs)
 
 | Test | Validates | Notes |
 |------|-----------|-------|
@@ -49,7 +49,7 @@ Port remaining path tests and all move/rename tests. Path resolution and absolut
 
 ## Validation
 
-1. **Build**: `cargo build -p lp-littlefs`
+1. **Build**: `cargo build -p littlefs-rust`
 2. **Tests**: All in-scope path and move tests pass
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings

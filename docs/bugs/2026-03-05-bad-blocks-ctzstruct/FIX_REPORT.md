@@ -42,13 +42,13 @@ Staged investigation (following MAX_FIND_ITER fix approach):
 1. Add CTZSTRUCT-targeted trace in `lfs_dir_commitattr` (id, from_disk, head/size or disk block/off).
 2. Add trace in `lfs_dir_compact` (source pair, begin, end, dir pair).
 3. Add trace in `lfs_dir_traverse` ProcessTag and PopAndProcess for CTZSTRUCT (disk_override usage).
-4. Run with `RUST_LOG=lp_littlefs=trace cargo test --features log test_bad_blocks_ctz_repro -- --nocapture 2>&1 | tee rust-trace.log`.
+4. Run with `RUST_LOG=littlefs_rust=trace cargo test --features log test_bad_blocks_ctz_repro -- --nocapture 2>&1 | tee rust-trace.log`.
 5. Write `parse_trace.py` to extract CTZSTRUCT events.
 
 **Findings**:
 - `commitattr CTZSTRUCT`: id=1 (ghost) from_mem head=6 size=512; id=2 (pacman) from_disk disk=(1,58).
 - `traverse PopAndProcess CTZSTRUCT`: id=2 with `disk_override=TRUE` — the disk_override mechanism correctly supplies the saved `frame.disk` when the outer `disk` variable would have been overwritten by subsequent reads.
-- No corruption: pacman read succeeds. The disk_override fix (lp-littlefs/src/dir/traverse.rs) is working.
+- No corruption: pacman read succeeds. The disk_override fix (littlefs-rust/src/dir/traverse.rs) is working.
 
 ---
 
@@ -68,7 +68,7 @@ Staged investigation (following MAX_FIND_ITER fix approach):
 
 **Root cause** (from original bug report): During `lfs_dir_traverse`, when a tag is read from disk, `buffer = &disk` points at the shared `disk` variable. The loop continues; further `GetNextTag` reads overwrite `disk`. When the inner traversal exhausts tags and pops, `frame.buffer` still points at the shared `disk`, which now contains data from the last read — i.e., another file's CTZ (e.g. ghost's) instead of the original tag's (pacman's).
 
-**Fix** (already present in lp-littlefs): The `disk_override` mechanism in `lfs_dir_traverse` (traverse.rs):
+**Fix** (already present in littlefs-rust): The `disk_override` mechanism in `lfs_dir_traverse` (traverse.rs):
 
 - When pushing a frame, `frame.disk` stores a copy of the current `disk` (lfs_diskoff).
 - On pop, if the tag came from disk (`!lfs_tag_isvalid(frame.tag)`), set `disk_override = Some(frame.disk)`.
@@ -80,7 +80,7 @@ Staged investigation (following MAX_FIND_ITER fix approach):
 
 ## 7. Fix Location
 
-**File**: `lp-littlefs/src/dir/traverse.rs`
+**File**: `littlefs-rust/src/dir/traverse.rs`
 
 **Key logic** (PopAndProcess, ~lines 1066–1080):
 
@@ -114,7 +114,7 @@ res = dispatch_tag(cb, data, tag, actual_buffer, diff);
 
 - `cargo test test_bad_blocks_ctz_repro` — PASS
 - `cargo test test_alloc_bad_blocks_minimal` — PASS
-- `cargo test -p lp-littlefs` — all tests pass
+- `cargo test -p littlefs-rust` — all tests pass
 - `cargo fmt` — no new warnings
 
 ---

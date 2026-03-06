@@ -44,7 +44,7 @@ Three parallel strategies were planned:
 2. Add trace at each `lfs_dir_fetchmatch` return (FOUND / NOENT / CONTINUE).
 3. Add trace in `lfs_dir_split` (split, end, new_tail, dir.pair, dir.tail).
 4. Add trace in `lfs_dir_splittingcompact` (split, end_val, size, break condition).
-5. Run with `RUST_LOG=lp_littlefs=trace cargo test --features log test_entries_resize_too_big 2>&1 | tee rust-trace.log`.
+5. Run with `RUST_LOG=littlefs_rust=trace cargo test --features log test_entries_resize_too_big 2>&1 | tee rust-trace.log`.
 6. Write `parse_trace.py` to extract dir_find, fetchmatch, dir_split events and detect cycles.
 
 **Findings**:
@@ -82,7 +82,7 @@ Three parallel strategies were planned:
 
 ## 7. Fix Applied
 
-**File**: `lp-littlefs/src/dir/commit.rs`
+**File**: `littlefs-rust/src/dir/commit.rs`
 
 **Change** (after `if split == begin { break }`):
 
@@ -102,7 +102,7 @@ if end_val <= split {
 ## 8. Verification
 
 - `cargo test test_entries_resize_too_big` — PASS
-- `cargo test -p lp-littlefs` — all tests pass
+- `cargo test -p littlefs-rust` — all tests pass
 - `cargo fmt` — no new warnings
 
 ---

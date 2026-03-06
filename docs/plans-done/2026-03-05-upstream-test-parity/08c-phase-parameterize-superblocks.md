@@ -7,7 +7,7 @@ Exact replication of upstream `reference/tests/test_superblocks.toml` parameter 
 ## Reference
 
 - Upstream TOML: `reference/tests/test_superblocks.toml`
-- Rust file: `lp-littlefs/tests/test_superblocks.rs`
+- Rust file: `littlefs-rust/tests/test_superblocks.rs`
 
 ## Current State
 
@@ -193,7 +193,7 @@ Current Rust: `#[ignore = "requires metadata_max in config during compaction cyc
 2. test_superblocks_metadata_max: add #[rstest] skeleton with METADATA_MAX and N parameters, keep #[ignore]
 3. Optionally convert expand/magic_expand/expand_power_cycle inner loops to #[rstest]
 4. Update upstream comment headers on all cases
-5. cargo test -p lp-littlefs --test test_superblocks
+5. cargo test -p littlefs-rust --test test_superblocks
 6. Mark any new failures: #[ignore = "bug: <description>"]
 7. cargo fmt && cargo clippy
 ```
@@ -201,7 +201,7 @@ Current Rust: `#[ignore = "requires metadata_max in config during compaction cyc
 ## Validate
 
 ```
-cargo test -p lp-littlefs --test test_superblocks 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust --test test_superblocks 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

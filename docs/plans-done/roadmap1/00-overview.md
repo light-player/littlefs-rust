@@ -1,4 +1,4 @@
-# lp-littlefs Hand-Translation Roadmap
+# littlefs-rust Hand-Translation Roadmap
 
 Hand-translate the LittleFS C implementation to Rust with minimal logic change. Keep architecture close to the C version; use `unsafe` where needed. Once tests pass, optionally wrap in safe Rust or iteratively refactor.
 
@@ -14,7 +14,7 @@ Hand-translate the LittleFS C implementation to Rust with minimal logic change. 
 | Incremental tests | Add tests only for slices being implemented |
 | Format alignment | Validate layout against C early |
 | Manual extraction | Lightweight or no parsing scripts; rely on docs and grep |
-| Use existing docs | `lp-littlefs-old/docs/alignment/metadata-vs-lfs-c.md`, commit mappings |
+| Use existing docs | `littlefs-rust-old/docs/alignment/metadata-vs-lfs-c.md`, commit mappings |
 
 ## Phases
 

@@ -1,0 +1,37 @@
+[package]
+name = "littlefs-rust-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+description = "Port of LittleFS to unsafe rust"
+license = "BSD-3-Clause"
+repository = "https://github.com/light-player/littlefs-rust"
+readme = "README.md"
+keywords = ["littlefs", "filesystem", "embedded", "no-std", "flash"]
+categories = ["embedded", "filesystem", "no-std"]
+
+[lib]
+name = "littlefs_rust_core"
+path = "src/lib.rs"
+
+[dependencies]
+log = { version = "0.4", optional = true }
+
+[dev-dependencies]
+env_logger = "0.10"
+rstest = "0.26"
+
+[features]
+default = ["alloc", "loop_limits"]
+alloc = []
+loop_limits = []  # iteration caps to detect/avoid infinite loops (mount, traverse, fetch, etc.)
+# Enable for debugging: RUST_LOG=littlefs_rust=trace cargo test --features log ...
+std = []
+log = ["dep:log"]
+# LittleFS compile-time flags (match C -DLFS_*)
+readonly = []      # Omit all write operations
+no_malloc = []     # lfs_file_open disabled; use lfs_file_opencfg only
+multiversion = []  # disk_version in config, lfs_fs_disk_version*
+shrink = []        # lfs_shrink_checkblock, shrink in lfs_fs_grow_
+migrate = []       # v1->v2 migration (defer)
+slow_tests = []    # Enable slow power-loss/reentrant tests (CI nightly)

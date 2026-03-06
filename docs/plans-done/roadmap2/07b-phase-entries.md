@@ -10,7 +10,7 @@ Port entry tests that stress metadata overflow and directory compaction. When in
 
 ## Tests to Port
 
-### test_entries (from lp-littlefs-old/tests/test_entries.rs)
+### test_entries (from littlefs-rust-old/tests/test_entries.rs)
 
 | Test | Validates | Notes |
 |------|-----------|-------|
@@ -34,7 +34,7 @@ Port entry tests that stress metadata overflow and directory compaction. When in
 
 ## Validation
 
-1. **Build**: `cargo build -p lp-littlefs`
+1. **Build**: `cargo build -p littlefs-rust`
 2. **Tests**: All in-scope entry tests pass
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings

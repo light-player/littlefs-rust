@@ -2,14 +2,14 @@
 
 ## Scope
 
-Add a `slow_tests` feature flag to `lp-littlefs`. Replace `#[ignore = "slow: ..."]` on all power-loss/reentrant and long-running tests with `#[cfg(feature = "slow_tests")]` so they compile and run only when the feature is active.
+Add a `slow_tests` feature flag to `littlefs-rust`. Replace `#[ignore = "slow: ..."]` on all power-loss/reentrant and long-running tests with `#[cfg(feature = "slow_tests")]` so they compile and run only when the feature is active.
 
 ## Motivation
 
 25 tests are `#[ignore]` purely because they're slow. They're fully implemented and pass when run. Currently they occupy `--ignored` output alongside genuinely broken/stubbed tests, making it hard to see the real gap. A feature flag:
 
 - Separates "slow but working" from "actually broken"
-- Lets CI run `cargo test -p lp-littlefs --features slow_tests` in a nightly lane
+- Lets CI run `cargo test -p littlefs-rust --features slow_tests` in a nightly lane
 - Removes noise from `cargo test -- --ignored` (only genuinely blocked tests remain)
 
 ## Changes
@@ -84,14 +84,14 @@ fn test_relocations_nonreentrant(
 
 ```bash
 # Normal run — slow tests should not appear at all
-cargo test -p lp-littlefs-core 2>&1 | grep -c "reentrant\|power_loss\|nonreentrant"
+cargo test -p littlefs-rust-core 2>&1 | grep -c "reentrant\|power_loss\|nonreentrant"
 # Expected: 0
 
 # With feature — slow tests compile and run
-cargo test -p lp-littlefs-core --features slow_tests -- --list 2>&1 | grep -c "reentrant\|power_loss\|nonreentrant"
+cargo test -p littlefs-rust-core --features slow_tests -- --list 2>&1 | grep -c "reentrant\|power_loss\|nonreentrant"
 # Expected: 25+
 
 # Remaining ignored tests are only genuinely blocked ones
-cargo test -p lp-littlefs-core -- --list --ignored 2>&1
+cargo test -p littlefs-rust-core -- --list --ignored 2>&1
 # Should show only: dir_seek, oopsallspaces, fewer_blocks, orphans, metadata_max, shrink, compat
 ```

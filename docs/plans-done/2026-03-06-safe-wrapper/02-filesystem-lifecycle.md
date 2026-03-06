@@ -10,8 +10,8 @@ Implement `Filesystem<S>` with `format`, `mount`, `unmount`, and `Drop`. This is
 
 ```rust
 struct FsInner<S: Storage> {
-    lfs: MaybeUninit<lp_littlefs_core::Lfs>,
-    config: lp_littlefs_core::LfsConfig,
+    lfs: MaybeUninit<littlefs_rust_core::Lfs>,
+    config: littlefs_rust_core::LfsConfig,
     storage: S,
     read_buf: Vec<u8>,
     prog_buf: Vec<u8>,
@@ -38,7 +38,7 @@ The core's `LfsConfig` requires `unsafe extern "C" fn` callbacks. The wrapper ge
 
 ```rust
 unsafe extern "C" fn trampoline_read<S: Storage>(
-    cfg: *const lp_littlefs_core::LfsConfig,
+    cfg: *const littlefs_rust_core::LfsConfig,
     block: u32,
     off: u32,
     buffer: *mut u8,
@@ -48,7 +48,7 @@ unsafe extern "C" fn trampoline_read<S: Storage>(
     let buf = core::slice::from_raw_parts_mut(buffer, size as usize);
     match storage.read(block, off, buf) {
         Ok(()) => 0,
-        Err(_) => lp_littlefs_core::LFS_ERR_IO,
+        Err(_) => littlefs_rust_core::LFS_ERR_IO,
     }
 }
 ```
@@ -131,7 +131,7 @@ impl<S: Storage> Drop for Filesystem<S> {
     fn drop(&mut self) {
         if let Ok(mut inner) = self.inner.try_borrow_mut() {
             if inner.mounted {
-                let _ = lp_littlefs_core::lfs_unmount(inner.lfs.as_mut_ptr());
+                let _ = littlefs_rust_core::lfs_unmount(inner.lfs.as_mut_ptr());
                 inner.mounted = false;
             }
         }
@@ -162,5 +162,5 @@ Format borrows storage; verify the storage is usable after format returns.
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs
+cargo test -p littlefs-rust
 ```

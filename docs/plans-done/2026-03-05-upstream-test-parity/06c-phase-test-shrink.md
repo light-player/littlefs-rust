@@ -42,8 +42,8 @@ Create FILES_COUNT+1 files of BLOCK_SIZE-0x40 bytes. Call `lfs_fs_grow(AFTER_BLO
 ## Validate
 
 ```
-cargo test -p lp-littlefs test_shrink -- --nocapture
-cargo test -p lp-littlefs 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust test_shrink -- --nocapture
+cargo test -p littlefs-rust 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

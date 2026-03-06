@@ -126,11 +126,11 @@ Also needs `config_with_wear_leveling(block_count, erase_cycles)` helper and cor
 ## Validate
 
 ```
-cargo test -p lp-littlefs 2>&1
+cargo test -p littlefs-rust 2>&1
 # All non-ignored tests still pass
 
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```
 
 Write a few unit tests for the new infrastructure:

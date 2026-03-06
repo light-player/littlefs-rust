@@ -2,7 +2,7 @@
 
 ## Goal
 
-Implement the 14 upstream `test_compat` forward/backward tests from `test_compat.toml`, using `littlefs2-sys` as the "previous version" (`lfsp`) and `lp-littlefs` as the current version (`lfs`).
+Implement the 14 upstream `test_compat` forward/backward tests from `test_compat.toml`, using `littlefs2-sys` as the "previous version" (`lfsp`) and `littlefs-rust` as the current version (`lfs`).
 
 In upstream C, when `lfsp` is not a separate library, both sides alias to the same `lfs_*`. Here, each side is a genuinely different implementation, making these tests meaningful.
 
@@ -13,7 +13,7 @@ Upstream terminology → compat crate mapping:
 | Upstream | Compat crate |
 |----------|-------------|
 | `lfsp_*` (previous version) | `c_impl::*` (littlefs2-sys) |
-| `lfs_*` (current version) | `rust_impl::*` (lp-littlefs) |
+| `lfs_*` (current version) | `rust_impl::*` (littlefs-rust) |
 
 Forward compat = C formats, Rust reads/writes.
 Backward compat = Rust formats, C reads/writes.
@@ -102,7 +102,7 @@ For the write tests, combined mount sessions are needed (e.g. "mount, create 5 m
 
 ### PRNG
 
-Use the same `test_prng` xorshift32 as `lp-littlefs/tests/common/mod.rs`. Copy or factor out. Seed for file `i` is `i` (matching upstream).
+Use the same `test_prng` xorshift32 as `littlefs-rust/tests/common/mod.rs`. Copy or factor out. Seed for file `i` is `i` (matching upstream).
 
 ### Parameterization
 
@@ -116,17 +116,17 @@ fn test_compat_forward_read_files(#[values(4, 32, 512, 8192)] size: u32) {
 }
 ```
 
-## Effect on lp-littlefs/tests/test_compat.rs
+## Effect on littlefs-rust/tests/test_compat.rs
 
-After this phase, the 14 forward/backward stubs in `lp-littlefs/tests/test_compat.rs` should be removed (or replaced with a comment pointing to `lp-littlefs-compat`). The file retains only the 3 version edge cases (`major_incompat`, `minor_incompat`, `minor_bump`), which are implemented separately as part of test-parity2.
+After this phase, the 14 forward/backward stubs in `littlefs-rust/tests/test_compat.rs` should be removed (or replaced with a comment pointing to `littlefs-rust-compat`). The file retains only the 3 version edge cases (`major_incompat`, `minor_incompat`, `minor_bump`), which are implemented separately as part of test-parity2.
 
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs-core-compat test_compat
+cargo test -p littlefs-rust-core-compat test_compat
 # 14 base cases + parameterized variants (10 tests have SIZE parameter = 4 variants each)
 # Expected: ~54 test cases total (4 non-parameterized + 10 * 4 parameterized + 4 non-parameterized)
 
-cargo test -p lp-littlefs-core-compat
+cargo test -p littlefs-rust-core-compat
 # All compat + operation tests pass
 ```

@@ -143,9 +143,9 @@ Write MEDIUMSIZE bytes while truncating to current write position (no-op), trunc
 ## Validate
 
 ```
-cargo test -p lp-littlefs test_seek -- --nocapture
-cargo test -p lp-littlefs test_truncate -- --nocapture
-cargo test -p lp-littlefs 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust test_seek -- --nocapture
+cargo test -p littlefs-rust test_truncate -- --nocapture
+cargo test -p littlefs-rust 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

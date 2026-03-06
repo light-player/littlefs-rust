@@ -128,12 +128,12 @@ Also: replace existing `test_files_append` and `test_files_truncate` with stubbe
 ## Validate
 
 ```
-cargo test -p lp-littlefs -- --list 2>&1 | grep -c "stub"
+cargo test -p littlefs-rust -- --list 2>&1 | grep -c "stub"
 # Should show the total count of stubbed tests
 
-cargo test -p lp-littlefs 2>&1
+cargo test -p littlefs-rust 2>&1
 # All non-ignored tests should still pass
 
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

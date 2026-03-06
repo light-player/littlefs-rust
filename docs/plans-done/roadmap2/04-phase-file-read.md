@@ -25,7 +25,7 @@ File handle: `lfs_file_t`; may need block cache for file data.
 
 ## Tests to Port (All Relevant)
 
-From lp-littlefs-old/test_files.rs, test_entries.rs. Same names per [rules.md §10](../../rules.md).
+From littlefs-rust-old/test_files.rs, test_entries.rs. Same names per [rules.md §10](../../rules.md).
 
 | Source | Test | Validates |
 |--------|------|-----------|
@@ -57,8 +57,8 @@ From lp-littlefs-old/test_files.rs, test_entries.rs. Same names per [rules.md §
 
 Before considering this phase complete:
 
-1. **Build**: `cargo build -p lp-littlefs`
-2. **Tests**: `cargo test -p lp-littlefs`
+1. **Build**: `cargo build -p littlefs-rust`
+2. **Tests**: `cargo test -p littlefs-rust`
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings
 5. **Phase tests**: `test_files_simple_read`, `test_files_seek_tell` pass

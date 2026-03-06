@@ -72,7 +72,7 @@ Hand-translation of LittleFS from C to Rust. These rules govern how to translate
 ## 7. Divergences
 
 - Do not silently change behavior from C
-- If intentional divergence is required, document it (in alignment docs, function comment, or `lp-littlefs-old/docs/alignment/`) with rationale
+- If intentional divergence is required, document it (in alignment docs, function comment, or `littlefs-rust-old/docs/alignment/`) with rationale
 - When tests reveal a divergence, fix the translation before changing the test; never relax a test to accommodate a bug in the translation
 
 ## 8. Macros and Helpers
@@ -108,4 +108,4 @@ Tests are defined in upstream TOML files (`tests/test_*.toml`) which contain C s
 
 - **Refer to C files**: Each test module header: `//! Upstream: tests/test_dirs.toml` plus GitHub URL. Per-test comment: `// Upstream: [cases.test_dirs_many_rename]` (or the C API calls exercised).
 
-- **Strategy**: Start with narrow parameter ranges; broaden after implementation is stable. See `lp-littlefs-old/docs/2026-03-03-parameterized-test-bugs.md` for failures when ranges are expanded too early.
+- **Strategy**: Start with narrow parameter ranges; broaden after implementation is stable. See `littlefs-rust-old/docs/2026-03-03-parameterized-test-bugs.md` for failures when ranges are expanded too early.

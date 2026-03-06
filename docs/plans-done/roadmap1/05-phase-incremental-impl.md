@@ -23,7 +23,7 @@ Implement functions one (or a few) at a time, driven by failing tests. First ver
    - Match error returns (negative ints → `LFS_ERR_*`)
 
 5. **Validate early**
-   - Run format-alignment tests (lp-littlefs-c-align) once format + mount work
+   - Run format-alignment tests (littlefs-rust-c-align) once format + mount work
    - Ensure on-disk layout matches C
 
 ## Success

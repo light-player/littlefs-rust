@@ -7,7 +7,7 @@ Exact replication of upstream `reference/tests/test_alloc.toml` parameter sets. 
 ## Reference
 
 - Upstream TOML: `reference/tests/test_alloc.toml`
-- Rust file: `lp-littlefs/tests/test_alloc.rs`
+- Rust file: `littlefs-rust/tests/test_alloc.rs`
 - Top-level guard: `if = 'BLOCK_CYCLES == -1'` (all existing tests already use `block_cycles: -1`)
 
 ## Current State
@@ -146,7 +146,7 @@ No parameterization. Verify comment.
    c. Wire parameters into test body (gc, compact_thresh, infer_bc, cycles)
    d. Update upstream comment header with full defines
 3. For fixed-config cases: update comment header only
-4. cargo test -p lp-littlefs --test test_alloc
+4. cargo test -p littlefs-rust --test test_alloc
 5. Mark any new failures: #[ignore = "bug: <description>"]
 6. cargo fmt && cargo clippy
 ```
@@ -154,7 +154,7 @@ No parameterization. Verify comment.
 ## Validate
 
 ```
-cargo test -p lp-littlefs --test test_alloc 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust --test test_alloc 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

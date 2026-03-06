@@ -1,4 +1,4 @@
 [workspace]
 git_only = true
 publish = false
-repo_url = "https://github.com/light-player/lp-littlefs"
+repo_url = "https://github.com/light-player/littlefs-rust"

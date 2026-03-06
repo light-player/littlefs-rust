@@ -1,6 +1,6 @@
-# lp-littlefs
+# littlefs-rust
 
-[![CI](https://github.com/light-player/lp-littlefs/actions/workflows/ci.yml/badge.svg)](https://github.com/light-player/lp-littlefs/actions/workflows/ci.yml)
+[![CI](https://github.com/light-player/littlefs-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/light-player/littlefs-rust/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
 Pure Rust port of the [LittleFS](https://github.com/littlefs-project/littlefs) embedded filesystem.
@@ -14,7 +14,7 @@ bindgen — builds on any Rust target.
 
 ```rust
 fn main() {
-    use lp_littlefs::{Config, Filesystem, RamStorage};
+    use littlefs_rust::{Config, Filesystem, RamStorage};
 
     let mut storage = RamStorage::new(512, 128);
     let config = Config::new(512, 128);
@@ -28,64 +28,64 @@ fn main() {
 
 ### Example programs
 
-- [lp-littlefs/examples/ram_hello.rs](lp-littlefs/examples/ram_hello.rs)
-- [lp-littlefs/examples/ram_tree.rs](lp-littlefs/examples/ram_tree.rs)
+- [littlefs-rust/examples/ram_hello.rs](littlefs-rust/examples/ram_hello.rs)
+- [littlefs-rust/examples/ram_tree.rs](littlefs-rust/examples/ram_tree.rs)
 
 ## Getting started
 
-Most users should depend on `lp-littlefs`, which provides a safe Rust API:
+Most users should depend on `littlefs-rust`, which provides a safe Rust API:
 
 ```toml
-lp-littlefs = { git = "https://github.com/light-player/lp-littlefs", branch = "main" }
+littlefs-rust = { git = "https://github.com/light-player/littlefs-rust", branch = "main" }
 ```
 
 Implement the `Storage` trait for your block device, then format, mount, and go. See
-the [lp-littlefs README](lp-littlefs/README.md) for full documentation.
+the [littlefs-rust README](littlefs-rust/README.md) for full documentation.
 
 If you need the low-level C-style API directly (for FFI interop, custom wrappers, or testing),
-depend on `lp-littlefs-core`:
+depend on `littlefs-rust-core`:
 
 ```toml
-lp-littlefs-core = { git = "https://github.com/light-player/lp-littlefs", branch = "main" }
+littlefs-rust-core = { git = "https://github.com/light-player/littlefs-rust", branch = "main" }
 ```
 
 ## Workspace
 
 | Crate                                       | Description                                                                                                                   |
 |---------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| [`lp-littlefs`](lp-littlefs/)               | Safe Rust API — `Filesystem`, `File`, `ReadDir`, `Storage` trait                                                              |
-| [`lp-littlefs-core`](lp-littlefs-core/)     | C-faithful port — raw pointer API matching upstream C signatures                                                              |
-| [`lp-littlefs-compat`](lp-littlefs-compat/) | Cross-implementation compatibility tests using `littlefs2-sys` (optional; requires C toolchain, excluded from default builds) |
+| [`littlefs-rust`](littlefs-rust/)               | Safe Rust API — `Filesystem`, `File`, `ReadDir`, `Storage` trait                                                              |
+| [`littlefs-rust-core`](littlefs-rust-core/)     | C-faithful port — raw pointer API matching upstream C signatures                                                              |
+| [`littlefs-rust-compat`](littlefs-rust-compat/) | Cross-implementation compatibility tests using `littlefs2-sys` (optional; requires C toolchain, excluded from default builds) |
 
-### lp-littlefs
+### littlefs-rust
 
 The safe wrapper crate. Provides `Filesystem<S: Storage>`, `File`, `ReadDir` (iterator), `Config`,
 `Error`, and convenience methods like `read_to_vec` and `write_file`. Multiple open files are
 supported simultaneously. `File` and `ReadDir` implement `Drop` for RAII close.
 
-### lp-littlefs-core
+### littlefs-rust-core
 
 A function-by-function translation of `reference/lfs.c` into Rust. Exposes a C-style API (
 `lfs_format`, `lfs_mount`, `lfs_file_open`, etc.) using raw pointers and `i32` return codes. The
 translation is kept close to the C source so it can be mechanically verified against upstream and
 bug fixes can be ported easily.
 
-### lp-littlefs-compat
+### littlefs-rust-compat
 
 Compatibility tests verifying the Rust port produces byte-identical on-disk images to the C
 implementation. Uses `littlefs2-sys` for the C side. Tests run in both directions: C formats → Rust
 reads, and Rust formats → C reads. Optional: excluded from default builds; requires a C toolchain (
-gcc, clang, libclang-dev). See [lp-littlefs-compat/README.md](lp-littlefs-compat/README.md) for
+gcc, clang, libclang-dev). See [littlefs-rust-compat/README.md](littlefs-rust-compat/README.md) for
 build requirements.
 
-## Why lp-littlefs
+## Why littlefs-rust
 
 Existing Rust
 options ([littlefs2](https://crates.io/crates/littlefs2), [littlefs2-sys](https://crates.io/crates/littlefs2-sys))
 depend on the C library and require a C toolchain for every target. This adds build complexity,
 especially when cross-compiling for embedded targets like RISC-V.
 
-lp-littlefs is pure Rust — no C compiler, no bindgen, no cross-compilation toolchain issues. Created
+littlefs-rust is pure Rust — no C compiler, no bindgen, no cross-compilation toolchain issues. Created
 for [LightPlayer](https://github.com/light-player/lightplayer), an embedded LED effects system
 running on ESP32.
 
@@ -111,15 +111,15 @@ just fci
 ### Running tests
 
 ```bash
-cargo test -p lp-littlefs          # safe wrapper tests
-cargo test -p lp-littlefs-core     # core tests
+cargo test -p littlefs-rust          # safe wrapper tests
+cargo test -p littlefs-rust-core     # core tests
 just compat                       # C compatibility tests (recommended; handles macOS arm64)
-# Or: cargo test -p lp-littlefs-compat  # requires C toolchain
+# Or: cargo test -p littlefs-rust-compat  # requires C toolchain
 ```
 
 Compat tests require a C toolchain. Use `just compat` from the repo root — it sets the bindgen
 workaround on macOS arm64 automatically.
-See [lp-littlefs-compat/README.md](lp-littlefs-compat/README.md) for details.
+See [littlefs-rust-compat/README.md](littlefs-rust-compat/README.md) for details.
 
 ## Upstream and reference
 
@@ -149,10 +149,10 @@ Releases are automated via [release-plz](https://release-plz.dev/) using convent
 
 ## How it was made
 
-lp-littlefs was primarily authored by the Cursor IDE AI, directed by a human engineer.
+littlefs-rust was primarily authored by the Cursor IDE AI, directed by a human engineer.
 
 ## Status
 
 The C-to-Rust core translation is functionally complete — format, mount, file I/O, directories,
 attributes, rename, remove, traverse, grow, and power-loss recovery all pass upstream-derived tests.
-The safe wrapper API (`lp-littlefs`) is implemented and tested.
+The safe wrapper API (`littlefs-rust`) is implemented and tested.

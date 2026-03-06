@@ -47,8 +47,8 @@ All must pass unchanged. Phase validates by non-regression.
 
 Before considering this phase complete:
 
-1. **Build**: `cargo build -p lp-littlefs`
-2. **Tests**: `cargo test -p lp-littlefs` — all existing tests pass
+1. **Build**: `cargo build -p littlefs-rust`
+2. **Tests**: `cargo test -p littlefs-rust` — all existing tests pass
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings
 5. **No new public API**: Caching is internal only

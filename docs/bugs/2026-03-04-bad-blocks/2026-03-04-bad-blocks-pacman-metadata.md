@@ -30,7 +30,7 @@
 
 ## Hypothesis
 
-The corrupted value `(4, 0)` matches the "traverse exhaust-pop buffer bug" symptom (ghost's ctz written as pacman's). A fix exists in `lp-littlefs/src/dir/traverse.rs`:
+The corrupted value `(4, 0)` matches the "traverse exhaust-pop buffer bug" symptom (ghost's ctz written as pacman's). A fix exists in `littlefs-rust/src/dir/traverse.rs`:
 
 - `disk_override: Option<lfs_diskoff>` in `ProcessTag`
 - When popping a frame whose tag was from disk, use `Some(frame.disk)` instead of `frame.buffer`
@@ -46,11 +46,11 @@ The `(4, 0)` pattern suggests a struct for a newly allocated block (head=4) with
 
 ## Relevant Paths
 
-- `lp-littlefs/tests/test_alloc.rs` — `run_badblocks_minimal`, `test_alloc_bad_blocks_minimal`
-- `lp-littlefs/src/dir/traverse.rs` — `disk_override` fix, `LfsDirTraverseStack`
-- `lp-littlefs/src/dir/commit.rs` — `lfs_dir_commitattr`, `lfs_dir_compact`
-- `lp-littlefs/src/file/ctz.rs` — `lfs_ctz_extend`, `lfs_ctz_traverse`
-- `lp-littlefs/src/block_alloc/alloc.rs` — `lfs_alloc`, `lfs_alloc_scan`
+- `littlefs-rust/tests/test_alloc.rs` — `run_badblocks_minimal`, `test_alloc_bad_blocks_minimal`
+- `littlefs-rust/src/dir/traverse.rs` — `disk_override` fix, `LfsDirTraverseStack`
+- `littlefs-rust/src/dir/commit.rs` — `lfs_dir_commitattr`, `lfs_dir_compact`
+- `littlefs-rust/src/file/ctz.rs` — `lfs_ctz_extend`, `lfs_ctz_traverse`
+- `littlefs-rust/src/block_alloc/alloc.rs` — `lfs_alloc`, `lfs_alloc_scan`
 
 ## Next Steps
 

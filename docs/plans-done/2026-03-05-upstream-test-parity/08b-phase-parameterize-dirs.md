@@ -7,7 +7,7 @@ Exact replication of upstream `reference/tests/test_dirs.toml` parameter sets. E
 ## Reference
 
 - Upstream TOML: `reference/tests/test_dirs.toml`
-- Rust file: `lp-littlefs/tests/test_dirs.rs`
+- Rust file: `littlefs-rust/tests/test_dirs.rs`
 
 ## Current State
 
@@ -200,7 +200,7 @@ Current Rust: `for count in [4, 128, 132]` with `#[ignore]`. Already matches.
 3. For file_creation/removal/rename: add missing N values [69, 80, 91]
 4. For rename_append/recursive_remove etc.: convert inner loops to rstest if desired
 5. Update all upstream comment headers
-6. cargo test -p lp-littlefs --test test_dirs
+6. cargo test -p littlefs-rust --test test_dirs
 7. Mark any new failures: #[ignore = "bug: <description>"]
 8. cargo fmt && cargo clippy
 ```
@@ -208,7 +208,7 @@ Current Rust: `for count in [4, 128, 132]` with `#[ignore]`. Already matches.
 ## Validate
 
 ```
-cargo test -p lp-littlefs --test test_dirs 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust --test test_dirs 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

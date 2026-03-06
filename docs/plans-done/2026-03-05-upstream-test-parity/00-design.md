@@ -2,12 +2,12 @@
 
 ## Scope
 
-Bring the lp-littlefs Rust test suite to full parity with the upstream C littlefs test suite (`reference/tests/*.toml`). Every upstream case is represented, with full parameterization matching the C runner's Cartesian-product-of-defines model.
+Bring the littlefs-rust Rust test suite to full parity with the upstream C littlefs test suite (`reference/tests/*.toml`). Every upstream case is represented, with full parameterization matching the C runner's Cartesian-product-of-defines model.
 
 ## File Structure
 
 ```
-lp-littlefs/tests/
+littlefs-rust/tests/
 ├── common/
 │   ├── mod.rs                    # UPDATE: test_prng, write/verify helpers,
 │   │                             #   write_block_raw, config_with_inline_max,

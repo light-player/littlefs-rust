@@ -10,7 +10,7 @@ Implement `ReadDir<'a, S>` (iterator), `DirEntry`, and path operations: `mkdir`,
 
 ```rust
 pub(crate) struct DirAllocation {
-    dir: MaybeUninit<lp_littlefs_core::LfsDir>,
+    dir: MaybeUninit<littlefs_rust_core::LfsDir>,
 }
 ```
 
@@ -36,8 +36,8 @@ impl<S: Storage> Iterator for ReadDir<'_, S> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut inner = self.fs.inner.borrow_mut();
-        let mut info = MaybeUninit::<lp_littlefs_core::LfsInfo>::zeroed();
-        let rc = lp_littlefs_core::lfs_dir_read(
+        let mut info = MaybeUninit::<littlefs_rust_core::LfsInfo>::zeroed();
+        let rc = littlefs_rust_core::lfs_dir_read(
             inner.lfs.as_mut_ptr(),
             self.alloc.dir.as_mut_ptr(),
             info.as_mut_ptr(),
@@ -81,7 +81,7 @@ impl<S: Storage> ReadDir<'_, S> {
     pub fn close(mut self) -> Result<(), Error> {
         self.closed = true;
         let mut inner = self.fs.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_dir_close(
+        let rc = littlefs_rust_core::lfs_dir_close(
             inner.lfs.as_mut_ptr(),
             self.alloc.dir.as_mut_ptr(),
         );
@@ -93,7 +93,7 @@ impl<S: Storage> Drop for ReadDir<'_, S> {
     fn drop(&mut self) {
         if !self.closed {
             if let Ok(mut inner) = self.fs.inner.try_borrow_mut() {
-                let _ = lp_littlefs_core::lfs_dir_close(
+                let _ = littlefs_rust_core::lfs_dir_close(
                     inner.lfs.as_mut_ptr(),
                     self.alloc.dir.as_mut_ptr(),
                 );
@@ -114,7 +114,7 @@ impl<S: Storage> Filesystem<S> {
         let path_bytes = null_terminate(path);
         {
             let mut inner = self.inner.borrow_mut();
-            let rc = lp_littlefs_core::lfs_dir_open(
+            let rc = littlefs_rust_core::lfs_dir_open(
                 inner.lfs.as_mut_ptr(),
                 alloc.dir.as_mut_ptr(),
                 path_bytes.as_ptr(),
@@ -143,7 +143,7 @@ Convenience method. Opens, collects all entries, closes (via `Drop` when the ite
     pub fn mkdir(&self, path: &str) -> Result<(), Error> {
         let path_bytes = null_terminate(path);
         let mut inner = self.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_mkdir(inner.lfs.as_mut_ptr(), path_bytes.as_ptr());
+        let rc = littlefs_rust_core::lfs_mkdir(inner.lfs.as_mut_ptr(), path_bytes.as_ptr());
         from_lfs_result(rc)
     }
 ```
@@ -154,7 +154,7 @@ Convenience method. Opens, collects all entries, closes (via `Drop` when the ite
     pub fn remove(&self, path: &str) -> Result<(), Error> {
         let path_bytes = null_terminate(path);
         let mut inner = self.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_remove(inner.lfs.as_mut_ptr(), path_bytes.as_ptr());
+        let rc = littlefs_rust_core::lfs_remove(inner.lfs.as_mut_ptr(), path_bytes.as_ptr());
         from_lfs_result(rc)
     }
 ```
@@ -166,7 +166,7 @@ Convenience method. Opens, collects all entries, closes (via `Drop` when the ite
         let from_bytes = null_terminate(from);
         let to_bytes = null_terminate(to);
         let mut inner = self.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_rename(
+        let rc = littlefs_rust_core::lfs_rename(
             inner.lfs.as_mut_ptr(),
             from_bytes.as_ptr(),
             to_bytes.as_ptr(),
@@ -180,9 +180,9 @@ Convenience method. Opens, collects all entries, closes (via `Drop` when the ite
 ```rust
     pub fn stat(&self, path: &str) -> Result<Metadata, Error> {
         let path_bytes = null_terminate(path);
-        let mut info = MaybeUninit::<lp_littlefs_core::LfsInfo>::zeroed();
+        let mut info = MaybeUninit::<littlefs_rust_core::LfsInfo>::zeroed();
         let mut inner = self.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_stat(
+        let rc = littlefs_rust_core::lfs_stat(
             inner.lfs.as_mut_ptr(),
             path_bytes.as_ptr(),
             info.as_mut_ptr(),
@@ -204,12 +204,12 @@ Convenience method. Opens, collects all entries, closes (via `Drop` when the ite
 ## Helper functions
 
 ```rust
-fn dir_entry_from_info(info: &lp_littlefs_core::LfsInfo) -> DirEntry {
+fn dir_entry_from_info(info: &littlefs_rust_core::LfsInfo) -> DirEntry {
     let nul = info.name.iter().position(|&b| b == 0).unwrap_or(info.name.len());
     let name = core::str::from_utf8(&info.name[..nul])
         .unwrap_or("")
         .to_string();
-    let file_type = if info.type_ == lp_littlefs_core::lfs_type::LFS_TYPE_DIR {
+    let file_type = if info.type_ == littlefs_rust_core::lfs_type::LFS_TYPE_DIR {
         FileType::Dir
     } else {
         FileType::File
@@ -217,7 +217,7 @@ fn dir_entry_from_info(info: &lp_littlefs_core::LfsInfo) -> DirEntry {
     DirEntry { name, file_type, size: info.size }
 }
 
-fn metadata_from_info(info: &lp_littlefs_core::LfsInfo) -> Metadata {
+fn metadata_from_info(info: &littlefs_rust_core::LfsInfo) -> Metadata {
     let entry = dir_entry_from_info(info);
     Metadata { name: entry.name, file_type: entry.file_type, size: entry.size }
 }
@@ -268,5 +268,5 @@ Create nested directory structure, list recursively (manually via nested `read_d
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs
+cargo test -p littlefs-rust
 ```

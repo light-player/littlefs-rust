@@ -56,8 +56,8 @@ A secondary issue: the `hint` parameter was also wrong (passed `block_size` inst
 
 ## Files changed
 
-- `lp-littlefs/src/file/ctz.rs` — fix `lfs_ctz_traverse` to use pcache parameter
-- `lp-littlefs/tests/test_exhaustion.rs` — un-ignore the two wear leveling tests
+- `littlefs-rust/src/file/ctz.rs` — fix `lfs_ctz_traverse` to use pcache parameter
+- `littlefs-rust/tests/test_exhaustion.rs` — un-ignore the two wear leveling tests
 
 ## Verification
 

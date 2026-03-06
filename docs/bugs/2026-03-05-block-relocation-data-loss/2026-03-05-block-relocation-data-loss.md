@@ -80,6 +80,6 @@ optimization levels or stack layouts.
 
 ## Files changed
 
-- `lp-littlefs/src/dir/commit.rs` — `lfs_dir_orphaningcommit` relocation handler
-- `lp-littlefs/src/file/ops.rs` — `lfs_file_sync_` CTZ buffer lifetime
-- `lp-littlefs/tests/test_exhaustion.rs` — updated ignore annotations
+- `littlefs-rust/src/dir/commit.rs` — `lfs_dir_orphaningcommit` relocation handler
+- `littlefs-rust/src/file/ops.rs` — `lfs_file_sync_` CTZ buffer lifetime
+- `littlefs-rust/tests/test_exhaustion.rs` — updated ignore annotations

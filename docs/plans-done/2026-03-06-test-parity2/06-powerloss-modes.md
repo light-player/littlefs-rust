@@ -107,11 +107,11 @@ No existing tests need changes. The new modes can be used by:
 
 ```bash
 # Existing power-loss tests still pass
-cargo test -p lp-littlefs-core --features slow_tests -- test_powerloss
+cargo test -p littlefs-rust-core --features slow_tests -- test_powerloss
 
 # New modes work with a simple smoke test
-cargo test -p lp-littlefs-core test_powerloss_runner_smoke_log
-cargo test -p lp-littlefs-core test_powerloss_runner_smoke_exhaustive
+cargo test -p littlefs-rust-core test_powerloss_runner_smoke_log
+cargo test -p littlefs-rust-core test_powerloss_runner_smoke_exhaustive
 ```
 
 ## Test additions

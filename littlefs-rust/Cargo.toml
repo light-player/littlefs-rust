@@ -1,0 +1,28 @@
+[package]
+name = "littlefs-rust"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+description = "Safe Rust API for the LittleFS embedded filesystem"
+license = "BSD-3-Clause"
+repository = "https://github.com/light-player/littlefs-rust"
+readme = "README.md"
+keywords = ["littlefs", "filesystem", "embedded", "no-std", "flash"]
+categories = ["embedded", "filesystem", "no-std"]
+
+[lib]
+name = "littlefs_rust"
+path = "src/lib.rs"
+
+[dependencies]
+littlefs-rust-core = { path = "../littlefs-rust-core" }
+bitflags = "2"
+
+[dev-dependencies]
+env_logger = "0.10"
+
+[features]
+default = ["alloc"]
+alloc = ["littlefs-rust-core/alloc"]
+std = ["alloc"]
+log = ["littlefs-rust-core/log"]

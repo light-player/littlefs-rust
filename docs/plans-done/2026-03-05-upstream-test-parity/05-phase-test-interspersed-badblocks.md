@@ -112,9 +112,9 @@ Mark blocks 0 and 1 (superblocks) as worn. Expect `lfs_format` to fail with `LFS
 ## Validate
 
 ```
-cargo test -p lp-littlefs test_interspersed -- --nocapture
-cargo test -p lp-littlefs test_badblocks -- --nocapture
-cargo test -p lp-littlefs 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust test_interspersed -- --nocapture
+cargo test -p littlefs-rust test_badblocks -- --nocapture
+cargo test -p littlefs-rust 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

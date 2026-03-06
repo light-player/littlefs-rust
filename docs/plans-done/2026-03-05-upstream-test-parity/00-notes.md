@@ -2,7 +2,7 @@
 
 ## Scope of Work
 
-Bring the lp-littlefs Rust test suite to full parity with the upstream C littlefs test suite (`reference/tests/*.toml`). This includes:
+Bring the littlefs-rust Rust test suite to full parity with the upstream C littlefs test suite (`reference/tests/*.toml`). This includes:
 
 1. Stubbing all missing tests with `todo!()` + `#[ignore]` so the gap is visible
 2. Adding shared test infrastructure (PRNG, chunked I/O helpers)

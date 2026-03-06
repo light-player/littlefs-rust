@@ -1,10 +1,10 @@
-# lp-littlefs Roadmap 2 — Test-Driven Implementation
+# littlefs-rust Roadmap 2 — Test-Driven Implementation
 
-Phased roadmap for the new lp-littlefs implementation (`lp-littlefs/`). Test-driven: port targeted tests from the reference code, then implement until they pass. Bring over all relevant tests from reference; no test left behind.
+Phased roadmap for the new littlefs-rust implementation (`littlefs-rust/`). Test-driven: port targeted tests from the reference code, then implement until they pass. Bring over all relevant tests from reference; no test left behind.
 
 **Reference**: [docs/rules.md](../../rules.md) — translation rules, test porting, call-graph order.
 
-**Upstream**: littlefs at commit in [docs/reference.md](../reference.md). Tests in `tests/test_*.toml`; reference implementation in lp-littlefs-old and upstream C.
+**Upstream**: littlefs at commit in [docs/reference.md](../reference.md). Tests in `tests/test_*.toml`; reference implementation in littlefs-rust-old and upstream C.
 
 ---
 
@@ -60,7 +60,7 @@ Phase 07 has subphases: [07a](07a-phase-paths-move.md), [07b](07b-phase-entries.
 
 ## Per-Phase Workflow
 
-1. **Select tests** — Minimal set from phase doc; port from lp-littlefs-old or upstream TOML.
+1. **Select tests** — Minimal set from phase doc; port from littlefs-rust-old or upstream TOML.
 2. **Port** — Same names, upstream reference in header ([rules.md §10](../../rules.md)).
 3. **Run** — Test fails on `todo!()` or wrong behavior.
 4. **Implement** — Callees first; C source comments; match logic ([rules.md §0, §2, §3](../../rules.md)).

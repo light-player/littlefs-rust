@@ -32,7 +32,7 @@ defines.COUNT = [4, 128, 132]
 if = 'COUNT < BLOCK_COUNT/2'
 ```
 
-Create COUNT entries in a child dir. Exercise `lfs_dir_seek`, `lfs_dir_tell`, `lfs_dir_rewind`. Match C exactly. Requires these APIs to be exposed in lp-littlefs.
+Create COUNT entries in a child dir. Exercise `lfs_dir_seek`, `lfs_dir_tell`, `lfs_dir_rewind`. Match C exactly. Requires these APIs to be exposed in littlefs-rust.
 
 ### test_dirs_toot_seek
 

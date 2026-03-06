@@ -4,7 +4,7 @@
 
 **Root cause (Rust)**: `lfs_dir_splittingcompact` called `lfs_dir_split` with an empty range (`split=1, end_val=1`), creating hundreds of empty directory blocks. Each block became a tail in the chain; `lfs_dir_find` had to traverse them all, exceeding `MAX_FIND_ITER`.
 
-**Fix**: Add guard `if (end_val <= split) break` before calling `lfs_dir_split` in `lfs_dir_splittingcompact` (lp-littlefs/src/dir/commit.rs).
+**Fix**: Add guard `if (end_val <= split) break` before calling `lfs_dir_split` in `lfs_dir_splittingcompact` (littlefs-rust/src/dir/commit.rs).
 
 ## Behavior Comparison
 

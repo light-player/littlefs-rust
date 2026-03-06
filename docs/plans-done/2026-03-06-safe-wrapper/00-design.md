@@ -1,12 +1,12 @@
-# Safe Wrapper — lp-littlefs
+# Safe Wrapper — littlefs-rust
 
-Add a safe, idiomatic Rust wrapper crate (`lp-littlefs`) on top of the C-faithful core (
-`lp-littlefs-core`). Primary consumer is the LightPlayer ESP32 firmware. Secondary audience is the
+Add a safe, idiomatic Rust wrapper crate (`littlefs-rust`) on top of the C-faithful core (
+`littlefs-rust-core`). Primary consumer is the LightPlayer ESP32 firmware. Secondary audience is the
 open-source embedded Rust community.
 
 ## Motivation
 
-`lp-littlefs-core` is a function-by-function port of the C littlefs. Its API is deliberately C-like:
+`littlefs-rust-core` is a function-by-function port of the C littlefs. Its API is deliberately C-like:
 raw pointers, `MaybeUninit`, integer error codes, `unsafe extern "C"` callbacks. This is the right
 design for the core — it keeps the translation verifiable against upstream and makes porting bug
 fixes straightforward.
@@ -19,8 +19,8 @@ A wrapper crate in this repo provides both, while keeping the core pristine.
 
 ## Current State
 
-- `lp-littlefs-core/` — C-faithful port, passing upstream test suite
-- `lp-littlefs-compat/` — C ↔ Rust interop tests using `littlefs2-sys`
+- `littlefs-rust-core/` — C-faithful port, passing upstream test suite
+- `littlefs-rust-compat/` — C ↔ Rust interop tests using `littlefs2-sys`
 - No safe wrapper exists yet
 
 ## Design
@@ -29,9 +29,9 @@ A wrapper crate in this repo provides both, while keeping the core pristine.
 
 ```
 (workspace root)
-├── Cargo.toml                        # members: lp-littlefs-core, lp-littlefs, lp-littlefs-compat
-├── lp-littlefs-core/                 # unchanged — faithful C port
-├── lp-littlefs/                      # new: safe wrapper
+├── Cargo.toml                        # members: littlefs-rust-core, littlefs-rust, littlefs-rust-compat
+├── littlefs-rust-core/                 # unchanged — faithful C port
+├── littlefs-rust/                      # new: safe wrapper
 │   ├── Cargo.toml
 │   ├── src/
 │   │   ├── lib.rs
@@ -48,7 +48,7 @@ A wrapper crate in this repo provides both, while keeping the core pristine.
 │   └── examples/
 │       ├── ram_hello.rs              # format, write, read
 │       └── ram_tree.rs               # mkdir, list, remove
-├── lp-littlefs-compat/              # unchanged
+├── littlefs-rust-compat/              # unchanged
 └── ...
 ```
 
@@ -270,7 +270,7 @@ Included for tests, examples, and anyone trying the crate without hardware.
 default = ["alloc"]
 alloc = []                        # Vec-based convenience methods, RamStorage, internal cache alloc
 std = ["alloc"]                   # std::error::Error, etc.
-log = ["lp-littlefs-core/log"]   # pass through logging
+log = ["littlefs-rust-core/log"]   # pass through logging
 ```
 
 `alloc` is required for this crate. Without it, the borrow-per-call + `Box<FileAllocation>` design
@@ -298,7 +298,7 @@ doesn't work. A hypothetical `no_alloc` mode (user-provided buffers) is out of s
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs
-cargo run -p lp-littlefs --example ram_hello
-cargo run -p lp-littlefs --example ram_tree
+cargo test -p littlefs-rust
+cargo run -p littlefs-rust --example ram_hello
+cargo run -p littlefs-rust --example ram_tree
 ```

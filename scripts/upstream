@@ -82,10 +82,10 @@ extract_functions() {
 find_rust_file() {
     local func="$1"
     local hit
-    hit=$(rg -l "lfs\.c.*$func|$func.*lfs\.c" lp-littlefs-core/src/ 2>/dev/null | head -1)
+    hit=$(rg -l "lfs\.c.*$func|$func.*lfs\.c" littlefs-rust-core/src/ 2>/dev/null | head -1)
     if [[ -n "$hit" ]]; then
         local line
-        line=$(rg -n "lfs\.c.*$func|$func.*lfs\.c" lp-littlefs-core/src/ 2>/dev/null | head -1 | cut -d: -f2)
+        line=$(rg -n "lfs\.c.*$func|$func.*lfs\.c" littlefs-rust-core/src/ 2>/dev/null | head -1 | cut -d: -f2)
         echo "$hit:$line"
     else
         echo ""
@@ -182,11 +182,11 @@ Read docs/rules.md for translation rules. Read AGENTS.md for commit conventions.
 
 Steps:
 1. Run \`scripts/upstream sync\` to update reference/ to the NEW commit ($short_new).
-2. For each changed function listed in .upstream-cache/pending-sync.md, find the Rust translation in lp-littlefs-core/src/ (grep for the function name in \`Per lfs.c\` comments) and port the change.
+2. For each changed function listed in .upstream-cache/pending-sync.md, find the Rust translation in littlefs-rust-core/src/ (grep for the function name in \`Per lfs.c\` comments) and port the change.
 3. Update \`/// Per lfs.c ... (lines X-Y)\` references for any functions you modify.
-4. If test files changed, port the test changes to the corresponding lp-littlefs-core/tests/ file.
-5. Run: cargo test -p lp-littlefs-core --all-features
-6. Run: cargo test -p lp-littlefs-compat
+4. If test files changed, port the test changes to the corresponding littlefs-rust-core/tests/ file.
+5. Run: cargo test -p littlefs-rust-core --all-features
+6. Run: cargo test -p littlefs-rust-compat
 7. Run: scripts/upstream bump $new_commit
 8. Run: just fci
 9. Commit: fix(core): sync upstream littlefs $short_tracked..$short_new

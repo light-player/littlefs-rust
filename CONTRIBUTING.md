@@ -1,11 +1,11 @@
-# Contributing to lp-littlefs
+# Contributing to littlefs-rust
 
 Contributions are welcome — bug reports, fixes, documentation improvements, and feature ideas all
 help.
 
 ## Reporting bugs
 
-Open a [GitHub issue](https://github.com/light-player/lp-littlefs/issues). Include:
+Open a [GitHub issue](https://github.com/light-player/littlefs-rust/issues). Include:
 
 - What you expected vs. what happened
 - Minimal reproduction steps or a failing test case
@@ -40,8 +40,8 @@ Requires [just](https://github.com/casey/just) to run CI recipes locally.
 ### Running tests
 
 ```bash
-cargo test -p lp-littlefs          # safe wrapper
-cargo test -p lp-littlefs-core     # core
+cargo test -p littlefs-rust          # safe wrapper
+cargo test -p littlefs-rust-core     # core
 just compat                        # C compatibility (requires C toolchain)
 ```
 

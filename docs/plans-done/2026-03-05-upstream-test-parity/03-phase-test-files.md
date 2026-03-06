@@ -103,12 +103,12 @@ Move to bottom of file under `// ── Rust-specific extras ──`:
 ## Validate
 
 ```
-cargo test -p lp-littlefs test_files -- --nocapture
+cargo test -p littlefs-rust test_files -- --nocapture
 # All test_files_* should pass (non-ignored)
 
-cargo test -p lp-littlefs 2>&1
+cargo test -p littlefs-rust 2>&1
 # Full suite still passes
 
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

@@ -2,7 +2,7 @@
 
 **Status**: fixed  
 **Affected test**: `test_alloc_bad_blocks` (128 blocks, hangs forever)  
-**File**: `lp-littlefs/src/file/ctz.rs`, function `lfs_ctz_find`
+**File**: `littlefs-rust/src/file/ctz.rs`, function `lfs_ctz_find`
 
 ---
 
@@ -79,7 +79,7 @@ No existing test creates a file larger than one block and reads it back, so this
 
 ## 4. Proposed Fix
 
-In `lp-littlefs/src/file/ctz.rs`, line 203:
+In `littlefs-rust/src/file/ctz.rs`, line 203:
 
 ```rust
 // Before (buggy):
@@ -106,8 +106,8 @@ block_size,   // hint
 ## 5. Verification Plan
 
 1. Apply the `*off = target_off` fix
-2. Run `test_alloc_bad_blocks` (`cargo test -p lp-littlefs test_alloc_bad_blocks -- --ignored --nocapture`). Should complete within the 30s timeout.
-3. Run full suite (`cargo test -p lp-littlefs`) to check for regressions
+2. Run `test_alloc_bad_blocks` (`cargo test -p littlefs-rust test_alloc_bad_blocks -- --ignored --nocapture`). Should complete within the 30s timeout.
+3. Run full suite (`cargo test -p littlefs-rust`) to check for regressions
 4. Add a dedicated multi-block file read test (write >block_size, read back, verify) to prevent future regressions
 
 ---
@@ -116,7 +116,7 @@ block_size,   // hint
 
 Trace captured with:
 ```
-RUST_LOG=lp_littlefs=trace cargo test -p lp-littlefs test_alloc_bad_blocks --features log -- --ignored --nocapture
+RUST_LOG=littlefs_rust=trace cargo test -p littlefs-rust test_alloc_bad_blocks --features log -- --ignored --nocapture
 ```
 
 Last non-bd_read events before hang:

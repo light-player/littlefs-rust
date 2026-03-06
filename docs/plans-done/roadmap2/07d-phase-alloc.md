@@ -10,7 +10,7 @@ Port block allocator tests. Validates `lfs_alloc`, `lfs_alloc_lookahead`, `lfs_a
 
 ## Tests to Port
 
-### test_alloc (from lp-littlefs-old/tests/test_alloc.rs)
+### test_alloc (from littlefs-rust-old/tests/test_alloc.rs)
 
 | Test | Validates | Notes |
 |------|-----------|-------|
@@ -35,7 +35,7 @@ Port block allocator tests. Validates `lfs_alloc`, `lfs_alloc_lookahead`, `lfs_a
 
 ## Validation
 
-1. **Build**: `cargo build -p lp-littlefs`
+1. **Build**: `cargo build -p littlefs-rust`
 2. **Tests**: All in-scope alloc tests pass
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings

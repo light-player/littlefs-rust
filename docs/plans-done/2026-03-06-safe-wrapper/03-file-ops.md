@@ -10,9 +10,9 @@ Implement `File<'a, S>` with open, read, write, seek, tell, size, sync, truncate
 
 ```rust
 pub(crate) struct FileAllocation {
-    file: MaybeUninit<lp_littlefs_core::LfsFile>,
+    file: MaybeUninit<littlefs_rust_core::LfsFile>,
     cache: Vec<u8>,
-    file_config: lp_littlefs_core::LfsFileConfig,
+    file_config: littlefs_rust_core::LfsFileConfig,
 }
 ```
 
@@ -40,7 +40,7 @@ impl<S: Storage> Filesystem<S> {
         let path_bytes = null_terminate(path);
         {
             let mut inner = self.inner.borrow_mut();
-            let rc = lp_littlefs_core::lfs_file_opencfg(
+            let rc = littlefs_rust_core::lfs_file_opencfg(
                 inner.lfs.as_mut_ptr(),
                 alloc.file.as_mut_ptr(),
                 path_bytes.as_ptr(),
@@ -64,7 +64,7 @@ All methods follow the same borrow pattern:
 impl<S: Storage> File<'_, S> {
     pub fn read(&self, buf: &mut [u8]) -> Result<u32, Error> {
         let mut inner = self.fs.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_file_read(
+        let rc = littlefs_rust_core::lfs_file_read(
             inner.lfs.as_mut_ptr(),
             self.alloc.file.as_mut_ptr(),  // safe: Box is heap-stable
             buf.as_mut_ptr() as *mut c_void,
@@ -99,7 +99,7 @@ Note: `self.alloc.file.as_mut_ptr()` through a shared `&self` is sound because:
     pub fn close(mut self) -> Result<(), Error> {
         self.closed = true;
         let mut inner = self.fs.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_file_close(
+        let rc = littlefs_rust_core::lfs_file_close(
             inner.lfs.as_mut_ptr(),
             self.alloc.file.as_mut_ptr(),
         );
@@ -116,7 +116,7 @@ impl<S: Storage> Drop for File<'_, S> {
     fn drop(&mut self) {
         if !self.closed {
             if let Ok(mut inner) = self.fs.inner.try_borrow_mut() {
-                let _ = lp_littlefs_core::lfs_file_close(
+                let _ = littlefs_rust_core::lfs_file_close(
                     inner.lfs.as_mut_ptr(),
                     self.alloc.file.as_mut_ptr(),
                 );
@@ -171,5 +171,5 @@ Open a path that doesn't exist without `CREATE` → `Error::NoEntry`.
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs
+cargo test -p littlefs-rust
 ```

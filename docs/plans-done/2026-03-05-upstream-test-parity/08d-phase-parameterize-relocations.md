@@ -7,7 +7,7 @@ Exact replication of upstream `reference/tests/test_relocations.toml` parameter 
 ## Reference
 
 - Upstream TOML: `reference/tests/test_relocations.toml`
-- Rust file: `lp-littlefs/tests/test_relocations.rs`
+- Rust file: `littlefs-rust/tests/test_relocations.rs`
 
 ## Current State
 
@@ -148,7 +148,7 @@ Action: Same as nonreentrant.
    c. Wire files, depth, cycles, block_cycles=1 into body
    d. Add DEPTH==3 && CACHE_SIZE!=64 guard
 4. Update upstream comment headers
-5. cargo test -p lp-littlefs --test test_relocations
+5. cargo test -p littlefs-rust --test test_relocations
 6. Mark any new failures: #[ignore = "bug: <description>"]
 7. cargo fmt && cargo clippy
 ```
@@ -156,7 +156,7 @@ Action: Same as nonreentrant.
 ## Validate
 
 ```
-cargo test -p lp-littlefs --test test_relocations 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust --test test_relocations 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

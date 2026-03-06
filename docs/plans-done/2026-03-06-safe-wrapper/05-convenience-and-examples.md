@@ -44,7 +44,7 @@ Writes all data. Loops in case of partial writes (shouldn't happen in practice w
 ```rust
     pub fn fs_size(&self) -> Result<u32, Error> {
         let mut inner = self.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_fs_size(inner.lfs.as_mut_ptr());
+        let rc = littlefs_rust_core::lfs_fs_size(inner.lfs.as_mut_ptr());
         from_lfs_size(rc)
     }
 ```
@@ -54,7 +54,7 @@ Writes all data. Loops in case of partial writes (shouldn't happen in practice w
 ```rust
     pub fn gc(&self) -> Result<(), Error> {
         let mut inner = self.inner.borrow_mut();
-        let rc = lp_littlefs_core::lfs_fs_gc(inner.lfs.as_mut_ptr());
+        let rc = littlefs_rust_core::lfs_fs_gc(inner.lfs.as_mut_ptr());
         from_lfs_result(rc)
     }
 ```
@@ -66,7 +66,7 @@ Writes all data. Loops in case of partial writes (shouldn't happen in practice w
 Minimal example: format, mount, write a file, read it back, print contents.
 
 ```rust
-use lp_littlefs::{Config, Filesystem, OpenFlags, RamStorage};
+use littlefs_rust::{Config, Filesystem, OpenFlags, RamStorage};
 
 fn main() {
     let block_size = 512;
@@ -92,7 +92,7 @@ fn main() {
 Directory operations: create a tree, list it, rename, remove.
 
 ```rust
-use lp_littlefs::{Config, FileType, Filesystem, RamStorage};
+use littlefs_rust::{Config, FileType, Filesystem, RamStorage};
 
 fn main() {
     let mut storage = RamStorage::new(512, 128);
@@ -171,7 +171,7 @@ Format and mount, check `fs_size` returns a small value. Write files, verify `fs
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs
-cargo run -p lp-littlefs --example ram_hello
-cargo run -p lp-littlefs --example ram_tree
+cargo test -p littlefs-rust
+cargo run -p littlefs-rust --example ram_hello
+cargo run -p littlefs-rust --example ram_tree
 ```

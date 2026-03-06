@@ -7,7 +7,7 @@ After creating 26 files in root and removing all of them (interleaved with write
 ## Reproduction
 
 ```
-cargo test -p lp-littlefs --test test_interspersed test_interspersed_remove_files -- files_3_26
+cargo test -p littlefs-rust --test test_interspersed test_interspersed_remove_files -- files_3_26
 ```
 
 **Config**: 128 blocks, 512-byte blocks (default).
@@ -67,7 +67,7 @@ Since `count == 0 < 0xff`, the commit section was entered, writing the deletion 
 
 ## Fix Applied
 
-**File**: `lp-littlefs/src/dir/commit.rs`
+**File**: `littlefs-rust/src/dir/commit.rs`
 
 When `state == LFS_OK_DROPPED`, return early to fixmlist, skipping commit/compact:
 
@@ -79,8 +79,8 @@ if state == crate::error::LFS_OK_DROPPED {
 
 ## Verification
 
-- `cargo test -p lp-littlefs --test test_interspersed test_interspersed_remove_files` — all 6 variants PASS
-- `cargo test -p lp-littlefs` — all tests PASS (except pre-existing sparse-hole issue in test_seek)
+- `cargo test -p littlefs-rust --test test_interspersed test_interspersed_remove_files` — all 6 variants PASS
+- `cargo test -p littlefs-rust` — all tests PASS (except pre-existing sparse-hole issue in test_seek)
 - C reproducer (`repro_remove26.c`) — PASS (confirms C handles this correctly)
 
 ## C Trace Comparison

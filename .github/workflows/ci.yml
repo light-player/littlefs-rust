@@ -30,8 +30,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: sudo apt-get update && sudo apt-get install -y build-essential libclang-dev
-      - run: cargo build -p lp-littlefs-compat
-      - run: cargo test -p lp-littlefs-compat
+      - run: cargo build -p littlefs-rust-compat
+      - run: cargo test -p littlefs-rust-compat
 
   features:
     runs-on: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: rustup target add thumbv6m-none-eabi
-      - run: cargo check -p lp-littlefs-core --target thumbv6m-none-eabi --no-default-features
+      - run: cargo check -p littlefs-rust-core --target thumbv6m-none-eabi --no-default-features
 
   cargo_deny:
     runs-on: ubuntu-latest

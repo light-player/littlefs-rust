@@ -79,8 +79,8 @@ Requires block device that can simulate bad/prog-failing blocks.
 
 Before considering this phase complete:
 
-1. **Build**: `cargo build -p lp-littlefs`
-2. **Tests**: `cargo test -p lp-littlefs` — all implemented robustness tests pass
+1. **Build**: `cargo build -p littlefs-rust`
+2. **Tests**: `cargo test -p littlefs-rust` — all implemented robustness tests pass
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings
 5. **Deferred list**: Document tests requiring infrastructure not yet implemented

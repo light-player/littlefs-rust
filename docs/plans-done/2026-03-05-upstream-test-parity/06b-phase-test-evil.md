@@ -72,8 +72,8 @@ No defines. Create "child" dir. Corrupt child's tail to point at itself (child's
 ## Validate
 
 ```
-cargo test -p lp-littlefs test_evil -- --nocapture
-cargo test -p lp-littlefs 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust test_evil -- --nocapture
+cargo test -p littlefs-rust 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

@@ -32,14 +32,14 @@ isProject: false
 
 `test_alloc_bad_blocks_minimal` (16 blocks) fails: after the bad-block + GC flow, pacman's CTZSTRUCT on disk is `(head=4, size=0)` instead of `(head=6, size=504)`. The `(4, 0)` pattern matches ghost's intermediate CTZ state being written to pacman's id slot during compact. C passes the same scenario.
 
-An existing `disk_override` fix in [traverse.rs](lp-littlefs/src/dir/traverse.rs) (lines 1057-1087) handles one variant of this buffer-pointer confusion, but the bad-block flow introduces relocations and extra compacts that may hit a different code path.
+An existing `disk_override` fix in [traverse.rs](littlefs-rust/src/dir/traverse.rs) (lines 1057-1087) handles one variant of this buffer-pointer confusion, but the bad-block flow introduces relocations and extra compacts that may hit a different code path.
 
 ## Stage 0: Minimal fast reproduction
 
 **Goal**: A test that reproduces the bug as fast as possible and never hangs.
 
 - Create `docs/bugs/2026-03-05-bad-blocks-ctzstruct/` directory for all artifacts.
-- Add a focused test `test_bad_blocks_ctz_repro` in [test_alloc.rs](lp-littlefs/tests/test_alloc.rs) that:
+- Add a focused test `test_bad_blocks_ctz_repro` in [test_alloc.rs](littlefs-rust/tests/test_alloc.rs) that:
   - Uses the smallest block count that reliably reproduces (run `test_alloc_bad_blocks_minimal_narrow` to confirm 16 blocks).
   - Wraps in `run_with_timeout(10, ...)` — if it hangs, the test aborts in 10s instead of forever.
   - Calls `dump_fs` on failure (already done in `run_badblocks_minimal`).
@@ -58,21 +58,21 @@ An existing `disk_override` fix in [traverse.rs](lp-littlefs/src/dir/traverse.rs
 
 Add targeted `lfs_trace!` calls:
 
-1. **[commit.rs](lp-littlefs/src/dir/commit.rs) `lfs_dir_commitattr`** (line ~105): When `lfs_tag_type1(tag) == LFS_TYPE_CTZSTRUCT`, log:
+1. **[commit.rs](littlefs-rust/src/dir/commit.rs) `lfs_dir_commitattr`** (line ~105): When `lfs_tag_type1(tag) == LFS_TYPE_CTZSTRUCT`, log:
 
 - `tag` (hex), `lfs_tag_id(tag)`, `lfs_tag_isvalid(tag)` (disk vs memory)
 - If from disk: `disk.block`, `disk.off`, and the actual bytes read (head, size)
 - If from memory: the buffer bytes (head, size)
 - The commit block and offset
 
-1. **[commit.rs](lp-littlefs/src/dir/commit.rs) `lfs_dir_compact`** (line ~721): Log source pair, begin, end, dir pair at entry and after traverse completes.
-2. **[traverse.rs](lp-littlefs/src/dir/traverse.rs) `ProcessTag`** (line ~771): When dispatching a CTZSTRUCT tag, log whether `disk_override` was used, the tag, and the buffer pointer/content.
-3. **[traverse.rs](lp-littlefs/src/dir/traverse.rs) `PopAndProcess`** (line ~1057): Log the frame being popped: `frame.tag`, `frame.disk`, `frame.buffer`, whether disk_override triggers.
+1. **[commit.rs](littlefs-rust/src/dir/commit.rs) `lfs_dir_compact`** (line ~721): Log source pair, begin, end, dir pair at entry and after traverse completes.
+2. **[traverse.rs](littlefs-rust/src/dir/traverse.rs) `ProcessTag`** (line ~771): When dispatching a CTZSTRUCT tag, log whether `disk_override` was used, the tag, and the buffer pointer/content.
+3. **[traverse.rs](littlefs-rust/src/dir/traverse.rs) `PopAndProcess`** (line ~1057): Log the frame being popped: `frame.tag`, `frame.disk`, `frame.buffer`, whether disk_override triggers.
 
 Run:
 
 ```
-RUST_LOG=lp_littlefs=trace cargo test --features log test_bad_blocks_ctz_repro -- --nocapture 2>&1 | tee docs/bugs/2026-03-05-bad-blocks-ctzstruct/rust-trace.log
+RUST_LOG=littlefs_rust=trace cargo test --features log test_bad_blocks_ctz_repro -- --nocapture 2>&1 | tee docs/bugs/2026-03-05-bad-blocks-ctzstruct/rust-trace.log
 ```
 
 Write a `parse_trace.py` that:
@@ -104,7 +104,7 @@ Apply the fix, verify with:
 
 ```
 cargo test test_bad_blocks_ctz_repro
-cargo test -p lp-littlefs
+cargo test -p littlefs-rust
 cargo fmt
 ```
 

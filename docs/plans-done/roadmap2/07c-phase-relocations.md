@@ -10,7 +10,7 @@ Port relocation tests that validate `dir_compact`, `dir_split`, and `orphaningco
 
 ## Tests to Port
 
-### test_relocations (from lp-littlefs-old/tests/test_relocations.rs)
+### test_relocations (from littlefs-rust-old/tests/test_relocations.rs)
 
 | Test | Validates | Notes |
 |------|-----------|-------|
@@ -33,7 +33,7 @@ Port relocation tests that validate `dir_compact`, `dir_split`, and `orphaningco
 
 ## Validation
 
-1. **Build**: `cargo build -p lp-littlefs`
+1. **Build**: `cargo build -p littlefs-rust`
 2. **Tests**: All in-scope relocation tests pass
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings

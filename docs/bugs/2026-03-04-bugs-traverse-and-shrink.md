@@ -14,7 +14,7 @@ Notes on two bugs, both fixed.
 
 In `lfs_dir_traverse`, when we push on a tag (e.g. NAME) read from disk, we store `frame.buffer = &disk` (pointer to the outer `disk` variable). When we later exhaust tags and pop, we dispatch using `frame.buffer`. By that time, the outer `disk` has been overwritten by subsequent reads—it points at the *last* tag’s data, not the tag we pushed for. The callback therefore gets the wrong data (e.g. ghost’s ctz written as pacman’s).
 
-### Fix (in `lp-littlefs/src/dir/traverse.rs`)
+### Fix (in `littlefs-rust/src/dir/traverse.rs`)
 
 - Add `disk_override: Option<lfs_diskoff>` to `ProcessTag`
 - When popping a frame whose tag was read from disk (`!lfs_tag_isvalid(frame.tag)`), use `Some(frame.disk)`—the copy saved at push—instead of `frame.buffer`
@@ -37,7 +37,7 @@ In `lfs_dir_traverse`, when we push on a tag (e.g. NAME) read from disk, we stor
 
 `lfs_file_open_` passed `&defaults` (a stack-local `LfsFileConfig`) to `lfs_file_opencfg_`, which stored it in `file.cfg`. After return, `defaults` went out of scope; `file.cfg` became a dangling pointer. When `lfs_file_sync_` later accessed `file_ref.cfg.as_ref()` during the metadata commit, it dereferenced freed stack memory and segfaulted.
 
-### Fix (in `lp-littlefs/src/file/ops.rs`)
+### Fix (in `littlefs-rust/src/file/ops.rs`)
 
 - Use `static LFS_FILE_DEFAULTS: LfsFileConfig` instead of a stack-local (matches C: `static const struct lfs_file_config defaults = {0}`)
 - Add `unsafe impl Sync for LfsFileConfig` in `lfs_info.rs` (required for static; safe since the default config has all nulls and is never mutated)

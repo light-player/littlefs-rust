@@ -1,4 +1,4 @@
-# lp-littlefs — Agent instructions
+# littlefs-rust — Agent instructions
 
 ## Commits
 

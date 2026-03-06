@@ -10,7 +10,7 @@ Port attribute tests. Implement `lfs_getattr_`, `lfs_setattr_`, `lfs_removeattr_
 
 ## Tests to Port
 
-### test_attrs (from lp-littlefs-old/tests/test_attrs.rs)
+### test_attrs (from littlefs-rust-old/tests/test_attrs.rs)
 
 | Test | Validates | Notes |
 |------|-----------|-------|
@@ -34,7 +34,7 @@ All require `lfs_getattr`, `lfs_setattr`, `lfs_removeattr`. Per overview: deferr
 
 ## Validation
 
-1. **Build**: `cargo build -p lp-littlefs`
+1. **Build**: `cargo build -p littlefs-rust`
 2. **Tests**: All in-scope attr tests pass (or `#[ignore]` with rationale if implementation deferred)
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings

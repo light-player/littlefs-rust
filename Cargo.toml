@@ -1,4 +1,4 @@
 [workspace]
 resolver = "2"
-members = ["lp-littlefs-core", "lp-littlefs", "lp-littlefs-compat"]
-default-members = ["lp-littlefs-core", "lp-littlefs"]
+members = ["littlefs-rust-core", "littlefs-rust", "littlefs-rust-compat"]
+default-members = ["littlefs-rust-core", "littlefs-rust"]

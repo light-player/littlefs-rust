@@ -24,7 +24,7 @@ Phase 07 is split into subphases to isolate dependencies and enable incremental 
 
 ## Reference
 
-- **Upstream tests**: `reference/tests/test_*.toml` (or lp-littlefs-old port)
+- **Upstream tests**: `reference/tests/test_*.toml` (or littlefs-rust-old port)
 - **C implementation**: `reference/lfs.c` — lfs_rename_ (3961–4138), lfs_getattr_/setattr_/removeattr_ (4107–4196), lfs_commitattr (4141–4163)
 - **Function inventory**: [docs/function-inventory.md](../function-inventory.md)
 
@@ -32,8 +32,8 @@ Phase 07 is split into subphases to isolate dependencies and enable incremental 
 
 ## Phase 07 Validation (All Subphases Complete)
 
-1. **Build**: `cargo build -p lp-littlefs`
-2. **Tests**: `cargo test -p lp-littlefs` — all ported tests in scope pass
+1. **Build**: `cargo build -p littlefs-rust`
+2. **Tests**: `cargo test -p littlefs-rust` — all ported tests in scope pass
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings
 5. **Documentation**: Deferred tests listed with rationale in each subphase

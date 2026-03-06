@@ -87,7 +87,7 @@ Same as `test_orphans_one_orphan` but uses `lfs_fs_mkconsistent` instead of `lfs
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs-core test_orphans_normal
-cargo test -p lp-littlefs-core test_orphans_one_orphan
-cargo test -p lp-littlefs-core test_orphans_mkconsistent_one_orphan
+cargo test -p littlefs-rust-core test_orphans_normal
+cargo test -p littlefs-rust-core test_orphans_one_orphan
+cargo test -p littlefs-rust-core test_orphans_mkconsistent_one_orphan
 ```

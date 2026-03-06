@@ -24,7 +24,7 @@ Populate .rs files with function stubs, `todo!()`, and commented C source. Wire 
 
 ## Success
 
-- `cargo build -p lp-littlefs` succeeds
+- `cargo build -p littlefs-rust` succeeds
 - Every C function has a corresponding Rust stub with `todo!()`
 - C source is present as comments; call graph is wired
 - Running any test that touches the API will panic at the first `todo!()` in that path

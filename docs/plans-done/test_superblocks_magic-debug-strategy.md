@@ -51,7 +51,7 @@ But the bug may also be in commitattr (wrong size, wrong buffer passed) or in pc
 
 ### 1. In‑Module Unit Tests for Traverse (attr iteration)
 
-Add `#[cfg(test)] mod tests` in `lp-littlefs/src/dir/traverse.rs`:
+Add `#[cfg(test)] mod tests` in `littlefs-rust/src/dir/traverse.rs`:
 
 - **Setup**: Minimal `Lfs` + RAM BD, no format/mount.
 - **Test** `traverse_attrs_callback_order`: Call `lfs_dir_traverse` with synthetic attrs `[CREATE, SUPERBLOCK, INLINESTRUCT]` and a callback that appends `(tag_type, buffer_ptr, first_byte)` to a vec. Assert:
@@ -63,7 +63,7 @@ These tests validate that traverse correctly walks attrs and passes the right po
 
 ### 2. In‑Module Unit Tests for Commit Path (commitattr)
 
-Add tests in `lp-littlefs/src/dir/commit.rs`:
+Add tests in `littlefs-rust/src/dir/commit.rs`:
 
 - **Setup**: `Lfs` with RAM BD, `lfs_init`, `lfs_dir_alloc` to get a fresh root.
 - **Helper** `commit_superblock_only(lfs, dir)`: Build attrs `[CREATE, SUPERBLOCK with "littlefs"]`, call `lfs_dir_compact` (or the minimal commit path that writes these tags), then `lfs_bd_sync`.
@@ -79,12 +79,12 @@ Add a `test_superblocks_magic_traced` (or gate tracing behind `RUST_LOG`) that:
   - `lfs_dir_commit_commit_raw`: log `(tag, buffer as usize)` when tag is SUPERBLOCK
   - `lfs_dir_commitattr`: log `(tag, dsize, buffer as usize)` when tag is SUPERBLOCK
   - `lfs_bd_prog`: log `(block, off, size, first 8 bytes)` when the prog touches the superblock block
-- Run with `RUST_LOG=lp_littlefs=trace cargo test test_superblocks_magic -- --nocapture`
+- Run with `RUST_LOG=littlefs_rust=trace cargo test test_superblocks_magic -- --nocapture`
 - Confirm: (a) callback receives non‑null buffer for SUPERBLOCK, (b) commitattr receives that same buffer, (c) bd_prog sees "littlefs" in the payload.
 
 ### 4. Test Helpers (shared by integration and in‑module tests)
 
-In `lp-littlefs/tests/common/mod.rs` (or a `dev_helpers` module):
+In `littlefs-rust/tests/common/mod.rs` (or a `dev_helpers` module):
 
 - `format_and_read_superblock_blocks(env) -> (Vec<u8>, Vec<u8>)`: format, sync, return raw block 0 and block 1.
 - `dump_block_hex(block: &[u8], label: &str)`: pretty‑print first 64 bytes for inspection (useful when a test fails).
@@ -143,7 +143,7 @@ If tests point to traverse:
 
 **Root cause**: `lfs_fs_pred` returned 0 when `pdir.tail == pair` before any fetch. With init `tail = [0, 1]` and root at `[0, 1]`/`[1, 0]`, it matched immediately, so `hasparent = true`. That triggered the tail_attrs `[NOOP, TAIL]` path in orphaningcommit, overwriting the root with a commit that had no SUPERBLOCK.
 
-**Fix**: When `tail == pair` and we haven't fetched yet (`!have_fetched`), fetch first. For the root, the fetched dir has `tail == null`, so return `LFS_ERR_NOENT`. Otherwise return 0. File: `lp-littlefs/src/fs/parent.rs`.
+**Fix**: When `tail == pair` and we haven't fetched yet (`!have_fetched`), fetch first. For the root, the fetched dir has `tail == null`, so return `LFS_ERR_NOENT`. Otherwise return 0. File: `littlefs-rust/src/fs/parent.rs`.
 
 ### H3: MAGIC_OFFSET and block_has_magic (2026-03-04)
 
@@ -156,7 +156,7 @@ If tests point to traverse:
 
 **Root cause**: Rust advanced `off += lfs_tag_dsize(ptag)` *after* the read; C advances *before*. That caused disk.off to point to the wrong offset when reading tag data, so commitattr read/wrote the wrong bytes for block 1.
 
-**Fix**: Move `off += lfs_tag_dsize(ptag)` to before `lfs_bd_read`, matching C. File: `lp-littlefs/src/dir/traverse.rs`.
+**Fix**: Move `off += lfs_tag_dsize(ptag)` to before `lfs_bd_read`, matching C. File: `littlefs-rust/src/dir/traverse.rs`.
 
 ### Remaining Investigation
 

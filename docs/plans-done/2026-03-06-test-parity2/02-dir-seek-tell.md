@@ -65,7 +65,7 @@ If any test fails due to a bug (not a missing API), keep `#[ignore = "..."]` wit
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs-core test_dirs_seek
-cargo test -p lp-littlefs-core test_dirs_toot_seek
-cargo test -p lp-littlefs-core test_dirs_remove_read
+cargo test -p littlefs-rust-core test_dirs_seek
+cargo test -p littlefs-rust-core test_dirs_toot_seek
+cargo test -p littlefs-rust-core test_dirs_remove_read
 ```

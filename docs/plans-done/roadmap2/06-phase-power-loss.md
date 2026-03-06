@@ -23,7 +23,7 @@ Internal: Global state XOR deltas (gstate, gdisk, gdelta); MOVESTATE tag; deorph
 
 ## Tests to Port (All Relevant)
 
-From lp-littlefs-old/test_orphans.rs, test_powerloss.rs. Same names per [rules.md §10](../../rules.md).
+From littlefs-rust-old/test_orphans.rs, test_powerloss.rs. Same names per [rules.md §10](../../rules.md).
 
 | Source | Test | Validates |
 |--------|------|-----------|
@@ -53,8 +53,8 @@ From lp-littlefs-old/test_orphans.rs, test_powerloss.rs. Same names per [rules.m
 
 Before considering this phase complete:
 
-1. **Build**: `cargo build -p lp-littlefs`
-2. **Tests**: `cargo test -p lp-littlefs`
+1. **Build**: `cargo build -p littlefs-rust`
+2. **Tests**: `cargo test -p littlefs-rust`
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings
 5. **Phase tests**: `test_orphans_mkconsistent_no_orphans`, `test_orphans_no_orphans`, `test_powerloss_only_rev` pass

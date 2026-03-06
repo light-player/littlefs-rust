@@ -2,13 +2,13 @@
 
 ## Goal
 
-Implement `c_impl` and `rust_impl` wrapper modules using the current APIs, then port the existing `lp-littlefs-c-align` operation-level tests.
+Implement `c_impl` and `rust_impl` wrapper modules using the current APIs, then port the existing `littlefs-rust-c-align` operation-level tests.
 
 ## Steps
 
 ### 1. c_impl.rs
 
-Port from `lp-littlefs-c-align/src/c_lfs.rs`. Each function calls `littlefs2_sys::lfs_*` and returns `Result<T, i32>`. Functions to implement:
+Port from `littlefs-rust-c-align/src/c_lfs.rs`. Each function calls `littlefs2_sys::lfs_*` and returns `Result<T, i32>`. Functions to implement:
 
 | Function | What it does |
 |----------|-------------|
@@ -30,23 +30,23 @@ The code will be structurally identical to the current `c_lfs.rs` — it's alrea
 
 ### 2. rust_impl.rs
 
-Port from `lp-littlefs-c-align/src/rust_lfs.rs`. Same function set as `c_impl`, but calls `lp_littlefs::lfs_*` (C-style API with raw pointers, `*const u8` paths, `i32` returns). This is a significant rewrite since the old code used the now-removed high-level wrapper.
+Port from `littlefs-rust-c-align/src/rust_lfs.rs`. Same function set as `c_impl`, but calls `littlefs_rust::lfs_*` (C-style API with raw pointers, `*const u8` paths, `i32` returns). This is a significant rewrite since the old code used the now-removed high-level wrapper.
 
 Pattern for each function:
 ```rust
 pub fn format(storage: &SharedStorage, geo: &TestGeometry) -> Result<(), i32> {
     let mut env = storage.build_rust_env(geo);
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<littlefs_rust::Lfs>::zeroed();
     // set config.context to &storage
     env.config.context = storage as *const SharedStorage as *mut c_void;
 
-    let err = lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config);
+    let err = littlefs_rust::lfs_format(lfs.as_mut_ptr(), &env.config);
     if err != 0 { return Err(err); }
 
-    let err = lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config);
+    let err = littlefs_rust::lfs_mount(lfs.as_mut_ptr(), &env.config);
     if err != 0 { return Err(err); }
 
-    let err = lp_littlefs::lfs_unmount(lfs.as_mut_ptr());
+    let err = littlefs_rust::lfs_unmount(lfs.as_mut_ptr());
     if err != 0 { return Err(err); }
 
     Ok(())
@@ -57,7 +57,7 @@ Paths need null termination (`CString` or manual `push(0)`).
 
 ### 3. test_operations.rs
 
-Port all tests from `lp-littlefs-c-align/tests/align_tests.rs`. Each test:
+Port all tests from `littlefs-rust-c-align/tests/align_tests.rs`. Each test:
 1. Creates `SharedStorage` + `TestGeometry` (default geometry)
 2. Calls `c_impl::*` or `rust_impl::*`
 3. Asserts results
@@ -94,6 +94,6 @@ Re-evaluate the `#[ignore]` annotations — some bugs from the old c-align era m
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs-core-compat test_operations
+cargo test -p littlefs-rust-core-compat test_operations
 # All non-ignored tests pass
 ```

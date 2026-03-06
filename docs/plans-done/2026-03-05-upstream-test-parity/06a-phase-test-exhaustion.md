@@ -65,8 +65,8 @@ Run CYCLES write cycles (or until NOSPC). After exhaustion, read per-block wear 
 ## Validate
 
 ```
-cargo test -p lp-littlefs test_exhaustion -- --nocapture
-cargo test -p lp-littlefs 2>&1
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
+cargo test -p littlefs-rust test_exhaustion -- --nocapture
+cargo test -p littlefs-rust 2>&1
+cargo fmt -p littlefs-rust
+cargo clippy -p littlefs-rust
 ```

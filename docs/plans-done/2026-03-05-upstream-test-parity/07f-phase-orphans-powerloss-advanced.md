@@ -28,7 +28,7 @@ Corrupt child's commit to create an orphan directory. Run `lfs_mkdir` (triggers 
 
 ### test_orphans_one_orphan (test_orphans.rs)
 
-Create orphan via internal APIs (`lfs_dir_alloc` + `SOFTTAIL` commit + `lfs_fs_preporphans(+1)`). Run `lfs_fs_forceconsistency`. Verify orphan is cleaned up. These APIs may not be exposed in lp-littlefs; implement if available, else `#[ignore]` with a note.
+Create orphan via internal APIs (`lfs_dir_alloc` + `SOFTTAIL` commit + `lfs_fs_preporphans(+1)`). Run `lfs_fs_forceconsistency`. Verify orphan is cleaned up. These APIs may not be exposed in littlefs-rust; implement if available, else `#[ignore]` with a note.
 
 ### test_orphans_mkconsistent_one_orphan (test_orphans.rs)
 

@@ -24,7 +24,7 @@ Types: `lfs_info` (type, size, name), `lfs_fsinfo`. Upstream lfs.h.
 
 ## Tests to Port (All Relevant)
 
-Port from lp-littlefs-old and upstream. Keep same names per [rules.md §10](../../rules.md).
+Port from littlefs-rust-old and upstream. Keep same names per [rules.md §10](../../rules.md).
 
 | Source | Test | Validates |
 |--------|------|-----------|
@@ -50,8 +50,8 @@ Port from lp-littlefs-old and upstream. Keep same names per [rules.md §10](../.
 
 Before considering this phase complete:
 
-1. **Build**: `cargo build -p lp-littlefs`
-2. **Tests**: `cargo test -p lp-littlefs`
+1. **Build**: `cargo build -p littlefs-rust`
+2. **Tests**: `cargo test -p littlefs-rust`
 3. **Format**: `cargo fmt`
 4. **Warnings**: Zero warnings; fix or document any
 5. **Phase tests**: `test_dirs_root` passes; `test_superblocks_stat` still passes

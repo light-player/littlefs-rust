@@ -2,30 +2,30 @@
 
 ## Goal
 
-Create the `lp-littlefs` crate with foundational types: `Storage` trait, `Config`, `Error`, `RamStorage`. No filesystem operations yet — just the types that everything else builds on.
+Create the `littlefs-rust` crate with foundational types: `Storage` trait, `Config`, `Error`, `RamStorage`. No filesystem operations yet — just the types that everything else builds on.
 
 ## Steps
 
 ### 1. Create crate and add to workspace
 
-Create `lp-littlefs/` with `Cargo.toml`:
+Create `littlefs-rust/` with `Cargo.toml`:
 
 ```toml
 [package]
-name = "lp-littlefs"
+name = "littlefs-rust"
 version = "0.1.0"
 edition = "2021"
 description = "Safe Rust API for the LittleFS embedded filesystem"
 license = "BSD-3-Clause"
-repository = "https://github.com/light-player/lp-littlefs"
+repository = "https://github.com/light-player/littlefs-rust"
 readme = "README.md"
 
 [lib]
-name = "lp_littlefs"
+name = "littlefs_rust"
 path = "src/lib.rs"
 
 [dependencies]
-lp-littlefs-core = { path = "../lp-littlefs-core" }
+littlefs-rust-core = { path = "../littlefs-rust-core" }
 bitflags = "2"
 
 [dev-dependencies]
@@ -33,9 +33,9 @@ env_logger = "0.10"
 
 [features]
 default = ["alloc"]
-alloc = ["lp-littlefs-core/alloc"]
+alloc = ["littlefs-rust-core/alloc"]
 std = ["alloc"]
-log = ["lp-littlefs-core/log"]
+log = ["littlefs-rust-core/log"]
 ```
 
 Add to workspace root `Cargo.toml`:
@@ -43,7 +43,7 @@ Add to workspace root `Cargo.toml`:
 ```toml
 [workspace]
 resolver = "2"
-members = ["lp-littlefs-core", "lp-littlefs", "lp-littlefs-compat"]
+members = ["littlefs-rust-core", "littlefs-rust", "littlefs-rust-compat"]
 ```
 
 ### 2. Error enum (src/error.rs)
@@ -181,13 +181,13 @@ impl Storage for RamStorage { ... }
 
 Erase fills with `0xFF`. Read/write copy to/from the backing `Vec`. Bounds-checked.
 
-### 7. README.md (lp-littlefs/README.md)
+### 7. README.md (littlefs-rust/README.md)
 
 This is the crate-level README, rendered on crates.io via `readme = "README.md"` in `Cargo.toml`. It should contain:
 
 - **What it is** — safe Rust API over a pure-Rust littlefs implementation; no C toolchain needed
 - **Quick usage example** — format, mount, write, read (the `ram_hello` example from phase 5)
-- **Architecture overview** — `lp-littlefs-core` (faithful C port) vs `lp-littlefs` (safe wrapper); `Storage` trait for plugging in block devices
+- **Architecture overview** — `littlefs-rust-core` (faithful C port) vs `littlefs-rust` (safe wrapper); `Storage` trait for plugging in block devices
 - **Design notes** — `RefCell` interior mutability, borrow-per-call pattern, why multiple open files work, RAII close via `Drop`
 - **Feature flags** — `alloc` (default), `std`, `log`
 - **Relationship to upstream** — on-disk format compatible with C littlefs, link to upstream repo and spec
@@ -201,13 +201,13 @@ Crate-level doc comment (`//!`) with a one-paragraph synopsis and a short usage 
 ```rust
 //! Safe Rust API for the LittleFS embedded filesystem.
 //!
-//! Built on [`lp-littlefs-core`], a function-by-function Rust port of the
+//! Built on [`littlefs-rust-core`], a function-by-function Rust port of the
 //! [C littlefs](https://github.com/littlefs-project/littlefs). No C toolchain required.
 //!
 //! # Quick start
 //!
 //! ```rust
-//! use lp_littlefs::{Config, Filesystem, RamStorage};
+//! use littlefs_rust::{Config, Filesystem, RamStorage};
 //!
 //! let mut storage = RamStorage::new(512, 128);
 //! let config = Config::new(512, 128);
@@ -242,6 +242,6 @@ Filesystem, File, ReadDir modules are stubbed as empty — filled in phases 2–
 ## Validate
 
 ```bash
-cargo build -p lp-littlefs
-cargo test -p lp-littlefs   # no tests yet, just compiles
+cargo build -p littlefs-rust
+cargo test -p littlefs-rust   # no tests yet, just compiles
 ```
