@@ -25,6 +25,26 @@ assert_eq!(data, b"Hello, littlefs!");
 fs.unmount().unwrap();
 ```
 
+## Examples
+
+### [ram_hello.rs](examples/ram_hello.rs) — write and read a file
+
+Formats a RAM-backed filesystem, writes a string to `/hello.txt`, reads it back, and prints storage
+statistics on unmount.
+
+```bash
+cargo run -p lp-littlefs --example ram_hello
+```
+
+### [ram_tree.rs](examples/ram_tree.rs) — directories, rename, remove, and stat
+
+Creates a nested directory tree, lists entries with type and size, renames a file, removes a
+subdirectory, and queries filesystem usage.
+
+```bash
+cargo run -p lp-littlefs --example ram_tree
+```
+
 ## Usage
 
 Implement the `Storage` trait for your block device:
@@ -113,17 +133,6 @@ Use explicit `close()` when you need to handle errors from the close operation.
 The crate requires `alloc`. Internal buffers (caches, lookahead) and file/directory allocations are
 heap-allocated via `Box` and `Vec`. This provides stable addresses for the core's internal pointer
 structures without requiring `Pin` or self-referential struct tricks.
-
-## Running examples
-
-From the workspace root:
-
-```bash
-cargo run -p lp-littlefs --example ram_hello
-cargo run -p lp-littlefs --example ram_tree
-```
-
-`ram_hello` writes and reads a file; `ram_tree` demonstrates directory creation and listing.
 
 ## Feature flags
 

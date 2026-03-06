@@ -4,23 +4,28 @@ Pure Rust port of the [LittleFS](https://github.com/littlefs-project/littlefs) e
 On-disk format compatible with upstream LittleFS for interoperability. No C dependencies, no
 bindgen — builds on any Rust target.
 
+### Basic example
+
 ```rust
-use lp_littlefs::{Config, Filesystem, RamStorage};
+fn main() {
+    use lp_littlefs::{Config, Filesystem, RamStorage};
 
-let mut storage = RamStorage::new(512, 128);
-let config = Config::new(512, 128);
+    let mut storage = RamStorage::new(512, 128);
+    let config = Config::new(512, 128);
 
-Filesystem::format( & mut storage, & config).unwrap();
-let fs = Filesystem::mount(storage, config).unwrap();
+    Filesystem::format(&mut storage, &config)?;
+    let fs = Filesystem::mount(storage, config).unwrap();
 
-fs.write_file("/hello.txt", b"Hello, littlefs!").unwrap();
-let data = fs.read_to_vec("/hello.txt").unwrap();
-assert_eq!(data, b"Hello, littlefs!");
-
-fs.unmount().unwrap();
+    fs.write_file("/hello.txt", b"Hello, littlefs!").unwrap();
+}
 ```
 
-## Usage
+### Example programs
+
+- [lp-littlefs/examples/ram_hello.rs](lp-littlefs/examples/ram_hello.rs)
+- [lp-littlefs/examples/ram_tree.rs](lp-littlefs/examples/ram_tree.rs)
+
+## Getting started
 
 Most users should depend on `lp-littlefs`, which provides a safe Rust API:
 
