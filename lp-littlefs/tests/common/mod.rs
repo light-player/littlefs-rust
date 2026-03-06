@@ -108,11 +108,38 @@ unsafe extern "C" fn ram_sync(_cfg: *const LfsConfig) -> i32 {
     0
 }
 
-/// RAM storage with bad-block simulation. Wraps RamStorage and returns LFS_ERR_CORRUPT
-/// for read/prog/erase when a block is marked bad. Per upstream lfs_emubd_setwear semantics.
+/// Mode determining how "bad-blocks" behave during testing.
+/// Matches C lfs_emubd_badblock_behavior_t exactly.
+///
+/// C: reference/bd/lfs_emubd.h:38-44
+/// ```c
+/// typedef enum lfs_emubd_badblock_behavior {
+///     LFS_EMUBD_BADBLOCK_PROGERROR  = 0, // Error on prog
+///     LFS_EMUBD_BADBLOCK_ERASEERROR = 1, // Error on erase
+///     LFS_EMUBD_BADBLOCK_READERROR  = 2, // Error on read
+///     LFS_EMUBD_BADBLOCK_PROGNOOP   = 3, // Prog does nothing silently
+///     LFS_EMUBD_BADBLOCK_ERASENOOP  = 4, // Erase does nothing silently
+/// } lfs_emubd_badblock_behavior_t;
+/// ```
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u32)]
+pub enum BadBlockBehavior {
+    ProgError = 0,
+    EraseError = 1,
+    ReadError = 2,
+    ProgNoop = 3,
+    EraseNoop = 4,
+}
+
+/// RAM storage with bad-block simulation. Wraps RamStorage and applies
+/// BadBlockBehavior in the appropriate callback when a block is marked bad.
+///
+/// Matches the bad-block logic in C lfs_emubd_read/prog/erase
+/// (reference/bd/lfs_emubd.c:287-525).
 pub struct BadBlockRamStorage {
     pub ram: RamStorage,
     pub bad_blocks: RefCell<Vec<u32>>,
+    pub behavior: BadBlockBehavior,
 }
 
 impl BadBlockRamStorage {
@@ -120,6 +147,19 @@ impl BadBlockRamStorage {
         Self {
             ram: RamStorage::new(block_size, block_count),
             bad_blocks: RefCell::new(Vec::new()),
+            behavior: BadBlockBehavior::ProgError,
+        }
+    }
+
+    pub fn new_with_behavior(
+        block_size: u32,
+        block_count: u32,
+        behavior: BadBlockBehavior,
+    ) -> Self {
+        Self {
+            ram: RamStorage::new(block_size, block_count),
+            bad_blocks: RefCell::new(Vec::new()),
+            behavior,
         }
     }
 
@@ -133,8 +173,14 @@ impl BadBlockRamStorage {
     pub fn clear_bad_block(&self, block: u32) {
         self.bad_blocks.borrow_mut().retain(|&b| b != block);
     }
+
+    fn is_bad(&self, block: u32) -> bool {
+        self.bad_blocks.borrow().contains(&block)
+    }
 }
 
+/// C: lfs_emubd_read — block bad check (lfs_emubd.c:303-308)
+/// Only READERROR triggers on read; all other behaviors allow the read through.
 unsafe extern "C" fn badblock_read(
     cfg: *const LfsConfig,
     block: u32,
@@ -144,8 +190,8 @@ unsafe extern "C" fn badblock_read(
 ) -> i32 {
     let ctx = (*cfg).context as *mut BadBlockRamStorage;
     let badblock = &mut *ctx;
-    if badblock.bad_blocks.borrow().contains(&block) {
-        return lp_littlefs::lfs_err!(LFS_ERR_CORRUPT);
+    if badblock.is_bad(block) && badblock.behavior == BadBlockBehavior::ReadError {
+        return LFS_ERR_CORRUPT;
     }
     let size = size as usize;
     let buf = core::slice::from_raw_parts_mut(buffer, size);
@@ -153,6 +199,10 @@ unsafe extern "C" fn badblock_read(
     0
 }
 
+/// C: lfs_emubd_prog — block bad check (lfs_emubd.c:358-370)
+/// PROGERROR → return LFS_ERR_CORRUPT
+/// PROGNOOP or ERASENOOP → return 0 (silently skip the prog)
+/// All others → prog normally
 unsafe extern "C" fn badblock_prog(
     cfg: *const LfsConfig,
     block: u32,
@@ -162,8 +212,12 @@ unsafe extern "C" fn badblock_prog(
 ) -> i32 {
     let ctx = (*cfg).context as *mut BadBlockRamStorage;
     let badblock = &mut *ctx;
-    if badblock.bad_blocks.borrow().contains(&block) {
-        return lp_littlefs::lfs_err!(LFS_ERR_CORRUPT);
+    if badblock.is_bad(block) {
+        match badblock.behavior {
+            BadBlockBehavior::ProgError => return LFS_ERR_CORRUPT,
+            BadBlockBehavior::ProgNoop | BadBlockBehavior::EraseNoop => return 0,
+            _ => {}
+        }
     }
     let size = size as usize;
     let buf = core::slice::from_raw_parts(buffer, size);
@@ -171,11 +225,19 @@ unsafe extern "C" fn badblock_prog(
     0
 }
 
+/// C: lfs_emubd_erase — block bad check (lfs_emubd.c:454-468)
+/// ERASEERROR → return LFS_ERR_CORRUPT
+/// ERASENOOP → return 0 (silently skip the erase)
+/// All others → erase normally
 unsafe extern "C" fn badblock_erase(cfg: *const LfsConfig, block: u32) -> i32 {
     let ctx = (*cfg).context as *mut BadBlockRamStorage;
     let badblock = &mut *ctx;
-    if badblock.bad_blocks.borrow().contains(&block) {
-        return lp_littlefs::lfs_err!(LFS_ERR_CORRUPT);
+    if badblock.is_bad(block) {
+        match badblock.behavior {
+            BadBlockBehavior::EraseError => return LFS_ERR_CORRUPT,
+            BadBlockBehavior::EraseNoop => return 0,
+            _ => {}
+        }
     }
     badblock.ram.erase(block);
     0
@@ -311,10 +373,19 @@ pub struct BadBlockTestEnv {
     pub _lookahead_buf: Vec<u8>,
 }
 
-/// Build test environment with bad-block BD. block_count defaults to 128.
+/// Build test environment with bad-block BD. Default behavior is ProgError
+/// (matching C LFS_EMUBD_BADBLOCK_PROGERROR, the upstream default).
 pub fn config_badblock(block_count: u32) -> BadBlockTestEnv {
+    config_badblock_with_behavior(block_count, BadBlockBehavior::ProgError)
+}
+
+/// Build test environment with bad-block BD and explicit behavior.
+pub fn config_badblock_with_behavior(
+    block_count: u32,
+    behavior: BadBlockBehavior,
+) -> BadBlockTestEnv {
     let block_size = BLOCK_SIZE;
-    let badblock_ram = BadBlockRamStorage::new(block_size, block_count);
+    let badblock_ram = BadBlockRamStorage::new_with_behavior(block_size, block_count, behavior);
     let read_buf = vec![0u8; block_size as usize];
     let prog_buf = vec![0u8; block_size as usize];
     let lookahead_buf = vec![0u8; block_size as usize];
@@ -437,6 +508,17 @@ pub fn read_block_raw(config: *const LfsConfig, block: u32, off: u32, buf: &mut 
     unsafe {
         let read = (*config).read.expect("read callback");
         read(config, block, off, buf.as_mut_ptr(), buf.len() as u32)
+    }
+}
+
+/// Invoke config prog callback for raw block write, bypassing the FS.
+/// Mirrors read_block_raw but for writes. Used for corruption injection (test_evil).
+///
+/// C: lfs_emubd_prog via cfg->prog callback
+pub fn write_block_raw(config: *const LfsConfig, block: u32, off: u32, data: &[u8]) -> i32 {
+    unsafe {
+        let prog = (*config).prog.expect("prog callback");
+        prog(config, block, off, data.as_ptr(), data.len() as u32)
     }
 }
 
@@ -612,6 +694,22 @@ pub fn corrupt_block(env: &mut TestEnv, block: u32) {
     env.ram.prog(block, 0, &buffer);
 }
 
+/// Build test environment with the given block_count and inline_max.
+/// inline_max semantics match upstream C (lfs.c:4328-4347):
+///   inline_max = -1  → (lfs_size_t)-1 = 0xFFFFFFFF → disabled (lfs uses 0)
+///   inline_max = 0   → use library default (computed from cache/attr/metadata)
+///   inline_max = N>0 → use N
+pub fn config_with_inline_max(block_count: u32, inline_max: i32) -> TestEnv {
+    let mut env = default_config(block_count);
+    if inline_max < 0 {
+        // C: (lfs_size_t)-1
+        env.config.inline_max = u32::MAX;
+    } else {
+        env.config.inline_max = inline_max as u32;
+    }
+    env
+}
+
 /// Format fs, sync, return raw content of superblock blocks 0 and 1.
 /// Helper for debug tests. Caller must init_context before.
 pub fn format_and_read_superblock_blocks(env: &mut TestEnv) -> Result<(Vec<u8>, Vec<u8>), i32> {
@@ -632,4 +730,346 @@ pub fn format_and_read_superblock_blocks(env: &mut TestEnv) -> Result<(Vec<u8>, 
         return Err(if err0 != 0 { err0 } else { err1 });
     }
     Ok((block0, block1))
+}
+
+// ── Wear-leveling block device ──────────────────────────────────────────────
+//
+// For test_exhaustion. Wraps RamStorage with per-block erase-cycle tracking.
+// Mirrors C lfs_emubd wear logic (reference/bd/lfs_emubd.c:287-525).
+//
+// erase_cycles = 0 means unlimited (no wear tracking).
+// erase_cycles > 0: each erase increments wear[block]. When wear >= erase_cycles,
+// the block is "bad" and behaves according to badblock_behavior.
+
+/// Per-block erase-cycle tracking BD wrapper.
+/// Mirrors C lfs_emubd with erase_cycles + badblock_behavior.
+///
+/// C: reference/bd/lfs_emubd.h:69-161
+pub struct WearLevelingBd {
+    pub ram: RamStorage,
+    /// Max erase cycles per block before it goes bad. 0 = unlimited.
+    pub erase_cycles: u32,
+    /// How bad blocks behave. Default: ProgError (C default).
+    pub badblock_behavior: BadBlockBehavior,
+    /// Per-block erase count.
+    pub wear: Vec<u32>,
+    pub block_count: u32,
+}
+
+impl WearLevelingBd {
+    pub fn new(block_count: u32, block_size: u32, erase_cycles: u32) -> Self {
+        Self {
+            ram: RamStorage::new(block_size, block_count),
+            erase_cycles,
+            badblock_behavior: BadBlockBehavior::ProgError,
+            wear: vec![0u32; block_count as usize],
+            block_count,
+        }
+    }
+
+    pub fn new_with_behavior(
+        block_count: u32,
+        block_size: u32,
+        erase_cycles: u32,
+        behavior: BadBlockBehavior,
+    ) -> Self {
+        Self {
+            ram: RamStorage::new(block_size, block_count),
+            erase_cycles,
+            badblock_behavior: behavior,
+            wear: vec![0u32; block_count as usize],
+            block_count,
+        }
+    }
+
+    /// Returns true if block has exceeded its erase cycle limit.
+    /// C: `bd->cfg->erase_cycles && b->wear >= bd->cfg->erase_cycles`
+    pub fn is_worn(&self, block: u32) -> bool {
+        self.erase_cycles > 0 && self.wear[block as usize] >= self.erase_cycles
+    }
+
+    /// Get wear count for a block. Mirrors C lfs_emubd_wear.
+    pub fn get_wear(&self, block: u32) -> u32 {
+        self.wear[block as usize]
+    }
+
+    /// Set a specific block's wear count (for test setup).
+    /// Mirrors C lfs_emubd_setwear.
+    pub fn set_wear(&mut self, block: u32, cycles: u32) {
+        self.wear[block as usize] = cycles;
+    }
+}
+
+/// C: lfs_emubd_read — wear check (lfs_emubd.c:303-308)
+/// Only READERROR triggers on read for worn blocks.
+unsafe extern "C" fn wear_read(
+    cfg: *const LfsConfig,
+    block: u32,
+    off: u32,
+    buffer: *mut u8,
+    size: u32,
+) -> i32 {
+    let ctx = (*cfg).context as *mut WearLevelingBd;
+    let bd = &mut *ctx;
+    if bd.is_worn(block) && bd.badblock_behavior == BadBlockBehavior::ReadError {
+        return LFS_ERR_CORRUPT;
+    }
+    let size = size as usize;
+    let buf = core::slice::from_raw_parts_mut(buffer, size);
+    bd.ram.read(block, off, buf);
+    0
+}
+
+/// C: lfs_emubd_prog — wear check (lfs_emubd.c:358-370)
+/// PROGERROR → LFS_ERR_CORRUPT
+/// PROGNOOP or ERASENOOP → return 0 (skip prog)
+unsafe extern "C" fn wear_prog(
+    cfg: *const LfsConfig,
+    block: u32,
+    off: u32,
+    buffer: *const u8,
+    size: u32,
+) -> i32 {
+    let ctx = (*cfg).context as *mut WearLevelingBd;
+    let bd = &mut *ctx;
+    if bd.is_worn(block) {
+        match bd.badblock_behavior {
+            BadBlockBehavior::ProgError => return LFS_ERR_CORRUPT,
+            BadBlockBehavior::ProgNoop | BadBlockBehavior::EraseNoop => return 0,
+            _ => {}
+        }
+    }
+    let size = size as usize;
+    let buf = core::slice::from_raw_parts(buffer, size);
+    bd.ram.prog(block, off, buf);
+    0
+}
+
+/// C: lfs_emubd_erase — wear tracking + bad check (lfs_emubd.c:453-469)
+/// If erase_cycles > 0 and block is worn:
+///   ERASEERROR → LFS_ERR_CORRUPT
+///   ERASENOOP → return 0 (skip erase)
+/// If not worn: increment wear, then erase.
+unsafe extern "C" fn wear_erase(cfg: *const LfsConfig, block: u32) -> i32 {
+    let ctx = (*cfg).context as *mut WearLevelingBd;
+    let bd = &mut *ctx;
+    // C: if (bd->cfg->erase_cycles) { ... }
+    if bd.erase_cycles > 0 {
+        if bd.wear[block as usize] >= bd.erase_cycles {
+            // block bad
+            match bd.badblock_behavior {
+                BadBlockBehavior::EraseError => return LFS_ERR_CORRUPT,
+                BadBlockBehavior::EraseNoop => return 0,
+                _ => {}
+            }
+        } else {
+            // mark wear
+            bd.wear[block as usize] += 1;
+        }
+    }
+    bd.ram.erase(block);
+    0
+}
+
+unsafe extern "C" fn wear_sync(_cfg: *const LfsConfig) -> i32 {
+    0
+}
+
+/// Test environment with wear-leveling BD. Owns WearLevelingBd, config, buffers.
+pub struct WearLevelingEnv {
+    pub bd: WearLevelingBd,
+    pub config: LfsConfig,
+    pub _read_buf: Vec<u8>,
+    pub _prog_buf: Vec<u8>,
+    pub _lookahead_buf: Vec<u8>,
+}
+
+/// Build wear-leveling test environment.
+/// erase_cycles = max erases per block before it goes bad (0 = unlimited).
+pub fn config_with_wear_leveling(block_count: u32, erase_cycles: u32) -> WearLevelingEnv {
+    config_with_wear_leveling_behavior(block_count, erase_cycles, BadBlockBehavior::ProgError)
+}
+
+/// Build wear-leveling test environment with explicit bad-block behavior.
+pub fn config_with_wear_leveling_behavior(
+    block_count: u32,
+    erase_cycles: u32,
+    behavior: BadBlockBehavior,
+) -> WearLevelingEnv {
+    let block_size = BLOCK_SIZE;
+    let bd = WearLevelingBd::new_with_behavior(block_count, block_size, erase_cycles, behavior);
+    let read_buf = vec![0u8; block_size as usize];
+    let prog_buf = vec![0u8; block_size as usize];
+    let lookahead_buf = vec![0u8; block_size as usize];
+
+    let config = LfsConfig {
+        context: core::ptr::null_mut(),
+        read: Some(wear_read),
+        prog: Some(wear_prog),
+        erase: Some(wear_erase),
+        sync: Some(wear_sync),
+        read_size: 16,
+        prog_size: 16,
+        block_size,
+        block_count,
+        block_cycles: -1,
+        cache_size: block_size,
+        lookahead_size: block_size,
+        compact_thresh: u32::MAX,
+        read_buffer: read_buf.as_ptr() as *mut core::ffi::c_void,
+        prog_buffer: prog_buf.as_ptr() as *mut core::ffi::c_void,
+        lookahead_buffer: lookahead_buf.as_ptr() as *mut core::ffi::c_void,
+        name_max: 255,
+        file_max: 2_147_483_647,
+        attr_max: 1022,
+        metadata_max: 0,
+        inline_max: 0,
+    };
+
+    let mut env = WearLevelingEnv {
+        bd,
+        config,
+        _read_buf: read_buf,
+        _prog_buf: prog_buf,
+        _lookahead_buf: lookahead_buf,
+    };
+    env.config.read_buffer = env._read_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.prog_buffer = env._prog_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.lookahead_buffer = env._lookahead_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env
+}
+
+/// Call after config_with_wear_leveling() to set context. Required for WearLevelingEnv.
+pub fn init_wear_leveling_context(env: &mut WearLevelingEnv) {
+    env.config.context = &mut env.bd as *mut WearLevelingBd as *mut core::ffi::c_void;
+}
+
+// ── PRNG and chunked I/O helpers ────────────────────────────────────────────
+
+/// xorshift32 PRNG matching C littlefs TEST_PRNG exactly.
+/// Deterministic; same seed produces same sequence as C.
+///
+/// C: reference/runners/test_runner.c:568-577
+/// ```c
+/// uint32_t test_prng(uint32_t *state) {
+///     uint32_t x = *state;
+///     x ^= x << 13;
+///     x ^= x >> 17;
+///     x ^= x << 5;
+///     *state = x;
+///     return x;
+/// }
+/// ```
+pub fn test_prng(state: &mut u32) -> u32 {
+    let mut x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    *state = x;
+    x
+}
+
+/// Advance PRNG state by `n` steps (call test_prng n times, discard results).
+/// Used when skipping over previously-written PRNG data (e.g. rewrite/append tests).
+///
+/// C pattern: `for (lfs_size_t b = 0; b < skip; b++) { TEST_PRNG(&prng); }`
+pub fn advance_prng(state: &mut u32, n: u32) {
+    for _ in 0..n {
+        test_prng(state);
+    }
+}
+
+/// Write `size` bytes of PRNG data to an open file in `chunk_size` chunks.
+/// PRNG seeded with `seed`. Returns total bytes written.
+///
+/// Matches the C pattern used in test_files_large, test_files_rewrite, etc:
+/// ```c
+/// uint32_t prng = 1;
+/// uint8_t buffer[1024];
+/// for (lfs_size_t i = 0; i < SIZE; i += CHUNKSIZE) {
+///     lfs_size_t chunk = lfs_min(CHUNKSIZE, SIZE-i);
+///     for (lfs_size_t b = 0; b < chunk; b++) {
+///         buffer[b] = TEST_PRNG(&prng) & 0xff;
+///     }
+///     lfs_file_write(&lfs, &file, buffer, chunk) => chunk;
+/// }
+/// ```
+pub fn write_prng_file(
+    lfs: *mut lp_littlefs::Lfs,
+    file: *mut lp_littlefs::LfsFile,
+    size: u32,
+    chunk_size: u32,
+    seed: u32,
+) -> u32 {
+    let mut prng = seed;
+    let mut buffer = [0u8; 1024];
+    let mut i: u32 = 0;
+    while i < size {
+        let chunk = core::cmp::min(chunk_size, size - i);
+        for slot in buffer[..chunk as usize].iter_mut() {
+            *slot = (test_prng(&mut prng) & 0xff) as u8;
+        }
+        let n = lp_littlefs::lfs_file_write(
+            lfs,
+            file,
+            buffer.as_ptr() as *const core::ffi::c_void,
+            chunk,
+        );
+        assert_eq!(
+            n, chunk as i32,
+            "write_prng_file: expected {} bytes written at offset {}, got {}",
+            chunk, i, n
+        );
+        i += chunk;
+    }
+    size
+}
+
+/// Read `size` bytes from an open file in `chunk_size` chunks and verify
+/// against the same PRNG sequence (seeded with `seed`). Panics on mismatch.
+///
+/// Matches the C read+verify pattern:
+/// ```c
+/// prng = 1;
+/// for (lfs_size_t i = 0; i < SIZE; i += CHUNKSIZE) {
+///     lfs_size_t chunk = lfs_min(CHUNKSIZE, SIZE-i);
+///     lfs_file_read(&lfs, &file, buffer, chunk) => chunk;
+///     for (lfs_size_t b = 0; b < chunk; b++) {
+///         assert(buffer[b] == (TEST_PRNG(&prng) & 0xff));
+///     }
+/// }
+/// ```
+pub fn verify_prng_file(
+    lfs: *mut lp_littlefs::Lfs,
+    file: *mut lp_littlefs::LfsFile,
+    size: u32,
+    chunk_size: u32,
+    seed: u32,
+) {
+    let mut prng = seed;
+    let mut buffer = [0u8; 1024];
+    let mut i: u32 = 0;
+    while i < size {
+        let chunk = core::cmp::min(chunk_size, size - i);
+        let n = lp_littlefs::lfs_file_read(
+            lfs,
+            file,
+            buffer.as_mut_ptr() as *mut core::ffi::c_void,
+            chunk,
+        );
+        assert_eq!(
+            n, chunk as i32,
+            "verify_prng_file: expected {} bytes read at offset {}, got {}",
+            chunk, i, n
+        );
+        for (b, &actual) in buffer[..chunk as usize].iter().enumerate() {
+            let expected = (test_prng(&mut prng) & 0xff) as u8;
+            assert_eq!(
+                actual, expected,
+                "verify_prng_file: mismatch at byte {} (chunk offset {}), expected {:#04x}, got {:#04x}",
+                i as usize + b, b, expected, actual
+            );
+        }
+        i += chunk;
+    }
 }
