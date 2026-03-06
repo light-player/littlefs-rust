@@ -1,15 +1,26 @@
 # Phase 8: Parameterize Existing Tests
 
+## Goal
+
+Exact replication of upstream TOML parameter sets in existing Rust tests. Every upstream define combination must appear as a Rust test parameterization. If new parameter combinations expose bugs, mark them `#[ignore = "bug: <description>"]` and move on — bug fixes come later, after implementation.
+
 ## Scope
 
-Upgrade existing Rust tests that map to upstream cases but use a single fixed configuration instead of the full upstream parameter set. Convert to `#[rstest]` with `#[values]` / `#[case]` / inner loops matching the upstream defines.
+Upgrade existing Rust tests that map to upstream cases but use a single fixed configuration (or a subset) instead of the full upstream parameter set. Convert to `#[rstest]` with `#[values]` / `#[case]` matching the upstream defines.
 
-## Code Organization Reminders
+## Sub-plans
 
-- Place upstream cases first, extras at the bottom
-- Include upstream defines + summary comment on every test
-- Keep related functionality grouped together
-- Changes should be incremental — one file at a time, verify between
+Split by file, ordered by amount of work:
+
+- **[08a — test_alloc.rs](08a-phase-parameterize-alloc.md)** — Add GC, COMPACT_THRESH, INFER_BC, CYCLES to 7 cases (12 combos each for parallel/serial). 5 cases already match (fixed defines, no parameterization).
+- **[08b — test_dirs.rs](08b-phase-parameterize-dirs.md)** — Expand many_creation/removal/rename from N=1 to full upstream ranges. Add missing N values to file_creation/removal/rename. ~8 cases need work.
+- **[08c — test_superblocks.rs](08c-phase-parameterize-superblocks.md)** — Expand test_superblocks_grow to 6 combinations. Add metadata_max skeleton. Most cases already match via inner loops.
+- **[08d — test_relocations.rs](08d-phase-parameterize-relocations.md)** — Add BLOCK_CYCLES to 2 cases, FILES/DEPTH/CYCLES define sets to 4 cases. All 6 cases need work.
+
+## Dropped from original plan
+
+- **test_attrs.rs** — Upstream TOML has zero per-case defines. Nothing to parameterize.
+- **test_entries.rs** — Upstream TOML has only a top-level `CACHE_SIZE = 512` guard, no per-case defines. Nothing to parameterize.
 
 ## Strategy
 
@@ -19,67 +30,4 @@ For each test:
 3. Add `#[rstest]` and parameter attributes matching the upstream values
 4. Add `if` guard as early return where applicable
 5. Update the upstream comment header to include the full defines
-6. Run the test to verify all parameter combinations pass
-
-## Files to Update
-
-### test_alloc.rs
-
-Current state: all upstream cases present but some with reduced parameterization.
-
-Check each case against `reference/tests/test_alloc.toml`:
-- `test_alloc_parallel_allocation` — verify defines match
-- `test_alloc_serial_allocation` — verify defines match
-- `test_alloc_exhaustion` — verify defines match
-- `test_alloc_parallel_exhaustion` — verify defines match
-- `test_alloc_bad_blocks` — verify defines match
-- `test_alloc_reentrant` — verify defines match
-- `test_alloc_chained_dir_exhaustion` — verify defines match
-- `test_alloc_split_dir_exhaustion` — verify defines match
-- `test_alloc_outdated_lookahead_exhaustion` — verify defines match
-- `test_alloc_outdated_lookahead_reentrant` — verify defines match
-
-### test_attrs.rs
-
-Check against `reference/tests/test_attrs.toml`. Likely needs INLINE_MAX parameterization.
-
-### test_entries.rs
-
-Check against `reference/tests/test_entries.toml`. Add N/SIZE parameterization where missing.
-
-### test_dirs.rs
-
-Cases already present but may need COUNT/N parameterization upgrade for: `test_dirs_many_creation`, `test_dirs_many_removal`, `test_dirs_many_rename`.
-
-### test_relocations.rs
-
-Check against `reference/tests/test_relocations.toml`. May need ERASE_CYCLES, BLOCK_CYCLES, N parameterization.
-
-### test_superblocks.rs
-
-Existing cases may need BLOCK_SIZE, BLOCK_COUNT, ERASE_COUNT parameterization.
-
-## Process
-
-For each file:
-
-```
-1. Read upstream TOML defines for each case
-2. Compare with current Rust test parameters
-3. Add missing #[rstest] + #[values] attributes
-4. Update upstream comment header
-5. cargo test -p lp-littlefs <test_file_name>
-6. cargo fmt && cargo clippy
-```
-
-## Validate
-
-```
-cargo test -p lp-littlefs 2>&1
-# Full suite passes with expanded parameterization
-
-cargo fmt -p lp-littlefs
-cargo clippy -p lp-littlefs
-```
-
-Note: this phase may reveal new bugs that were masked by limited parameterization. Any test failures should be investigated and fixed before proceeding (or marked `#[ignore = "bug: <description>"]` with a tracking doc).
+6. Run the test — if it fails, `#[ignore = "bug: <description>"]` and move on
