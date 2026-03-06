@@ -1997,7 +1997,7 @@ fn test_paths_oopsallspaces(#[case] dir_mode: bool) {
     ];
     for (old, new) in renames {
         let old_path = path_bytes(&format!("{root}/{old}"));
-        let new_path = path_bytes(&format!("{new}"));
+        let new_path = path_bytes(&new.to_string());
         assert_ok(lfs_rename(lfs, old_path.as_ptr(), new_path.as_ptr()));
     }
     for (_, new) in renames {
@@ -2031,7 +2031,7 @@ fn test_paths_oopsalldels(#[case] dir_mode: bool) {
         let p: Vec<u8> = (0..n).map(|_| 0x7f).collect();
         child_paths.push(path_bytes_raw(&p));
     }
-    for (_i, cp) in child_paths.iter().enumerate() {
+    for cp in child_paths.iter() {
         let mut full: Vec<u8> = vec![0x7f, b'/'];
         full.extend_from_slice(&cp[..cp.len().saturating_sub(1)]);
         full.push(0);
@@ -2133,7 +2133,7 @@ fn test_paths_oopsallffs(#[case] dir_mode: bool) {
         let p: Vec<u8> = (0..n).map(|_| 0xff).collect();
         child_paths.push(path_bytes_raw(&p));
     }
-    for (_i, cp) in child_paths.iter().enumerate() {
+    for cp in child_paths.iter() {
         let mut full: Vec<u8> = vec![0xff, b'/'];
         full.extend_from_slice(&cp[..cp.len().saturating_sub(1)]);
         full.push(0);

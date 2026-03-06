@@ -7,13 +7,15 @@ mod common;
 
 use common::{
     assert_err, assert_ok, assert_superblock_magic, clone_config_with_block_count, default_config,
-    init_context, path_bytes, LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY,
+    init_context, path_bytes,
+    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
+    LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY,
 };
 use lp_littlefs::lfs_type::lfs_type::LFS_TYPE_REG;
 use lp_littlefs::{
-    lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_write, lfs_format, lfs_fs_stat,
-    lfs_mount, lfs_remove, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsFile, LfsFsinfo, LfsInfo,
-    LFS_ERR_INVAL, LFS_ERR_NOENT,
+    lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_write, lfs_format, lfs_fs_grow,
+    lfs_fs_stat, lfs_mount, lfs_remove, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsFile, LfsFsinfo,
+    LfsInfo, LFS_ERR_INVAL, LFS_ERR_NOENT,
 };
 
 // --- test_superblocks_format ---
@@ -175,10 +177,39 @@ fn test_superblocks_mount_unknown_block_count() {
 }
 
 /// Upstream: [cases.test_superblocks_reentrant_format]
+/// reentrant = true, POWERLOSS_BEHAVIOR = [NOOP, OOO]. Format under power-loss, then mount.
 #[test]
-#[ignore = "stub"]
+#[ignore = "slow: power-loss iteration"]
 fn test_superblocks_reentrant_format() {
-    todo!()
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+    let snapshot = env.snapshot();
+
+    let result = run_powerloss_linear(
+        &mut env,
+        &snapshot,
+        500,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                let e = lfs_format(lfs_ptr, config);
+                if e != 0 {
+                    return Err(e);
+                }
+                let e = lfs_mount(lfs_ptr, config);
+                if e != 0 {
+                    return Err(e);
+                }
+            }
+            let e = lfs_unmount(lfs_ptr);
+            if e != 0 {
+                return Err(e);
+            }
+            Ok(())
+        },
+        |_, _| Ok(()),
+    );
+    result.expect("test_superblocks_reentrant_format should complete");
 }
 
 /// Upstream: [cases.test_superblocks_stat_tweaked]
@@ -382,10 +413,93 @@ fn test_superblocks_expand_power_cycle() {
 }
 
 /// Upstream: [cases.test_superblocks_reentrant_expand]
+/// BLOCK_CYCLES = [2, 1], N = 24, reentrant, POWERLOSS_BEHAVIOR = [NOOP, OOO]
 #[test]
-#[ignore = "stub"]
+#[ignore = "slow: power-loss iteration"]
 fn test_superblocks_reentrant_expand() {
-    todo!()
+    const N: u32 = 24;
+    for &block_cycles in &[2i32, 1] {
+        let mut env = powerloss_config(128);
+        init_powerloss_context(&mut env);
+        env.config.block_cycles = block_cycles;
+
+        let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+        assert_ok(lfs_format(
+            lfs.as_mut_ptr(),
+            &env.config as *const LfsConfig,
+        ));
+        assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+        assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+        let snapshot = env.snapshot();
+
+        let dummy = path_bytes("dummy");
+        let result = run_powerloss_linear(
+            &mut env,
+            &snapshot,
+            3000,
+            |lfs_ptr, config| {
+                let err = lfs_mount(lfs_ptr, config);
+                if err != 0 {
+                    let e = lfs_format(lfs_ptr, config);
+                    if e != 0 {
+                        return Err(e);
+                    }
+                    let e = lfs_mount(lfs_ptr, config);
+                    if e != 0 {
+                        return Err(e);
+                    }
+                }
+                for i in 0..N {
+                    let mut info = core::mem::MaybeUninit::<LfsInfo>::uninit();
+                    let err = lfs_stat(lfs_ptr, dummy.as_ptr(), info.as_mut_ptr());
+                    if err == 0 {
+                        let info = unsafe { info.assume_init() };
+                        if info.type_ == LFS_TYPE_REG as u8 {
+                            let e = lfs_remove(lfs_ptr, dummy.as_ptr());
+                            if e != 0 {
+                                let _ = lfs_unmount(lfs_ptr);
+                                return Err(e);
+                            }
+                        }
+                    } else if err != lp_littlefs::LFS_ERR_NOENT || i != 0 {
+                        let _ = lfs_unmount(lfs_ptr);
+                        return Err(err);
+                    }
+                    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+                    let e = lfs_file_open(
+                        lfs_ptr,
+                        file.as_mut_ptr(),
+                        dummy.as_ptr(),
+                        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_EXCL,
+                    );
+                    if e != 0 {
+                        let _ = lfs_unmount(lfs_ptr);
+                        return Err(e);
+                    }
+                    let e = lfs_file_close(lfs_ptr, file.as_mut_ptr());
+                    if e != 0 {
+                        let _ = lfs_unmount(lfs_ptr);
+                        return Err(e);
+                    }
+                    let mut info = core::mem::MaybeUninit::<LfsInfo>::uninit();
+                    let e = lfs_stat(lfs_ptr, dummy.as_ptr(), info.as_mut_ptr());
+                    if e != 0 {
+                        let _ = lfs_unmount(lfs_ptr);
+                        return Err(e);
+                    }
+                }
+                let e = lfs_unmount(lfs_ptr);
+                if e != 0 {
+                    return Err(e);
+                }
+                Ok(())
+            },
+            |_, _| Ok(()),
+        );
+        result.expect(&format!(
+            "test_superblocks_reentrant_expand block_cycles={block_cycles} should complete"
+        ));
+    }
 }
 
 /// Upstream: [cases.test_superblocks_unknown_blocks]
@@ -575,22 +689,81 @@ fn test_superblocks_more_blocks() {
 }
 
 /// Upstream: [cases.test_superblocks_grow]
+/// defines.BLOCK_COUNT, BLOCK_COUNT_2, KNOWN_BLOCK_COUNT. lfs_fs_grow from smaller to larger block count.
 #[test]
-#[ignore = "stub"]
 fn test_superblocks_grow() {
-    todo!()
+    let mut env = default_config(128);
+    init_context(&mut env);
+    let cfg = &env.config as *const LfsConfig;
+
+    // Format with smaller block_count (64), then grow to 128
+    let small_count: u32 = 64;
+    let large_count: u32 = 128;
+    env.config.block_count = small_count;
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(lfs.as_mut_ptr(), cfg));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), cfg));
+
+    // Create a file to verify after grow
+    let path = path_bytes("x");
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_EXCL,
+    ));
+    let buf = b"hello";
+    assert_eq!(
+        buf.len() as i32,
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            buf.as_ptr() as *const core::ffi::c_void,
+            buf.len() as u32,
+        )
+    );
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    assert_ok(lfs_fs_grow(lfs.as_mut_ptr(), large_count));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    // Mount with full block_count and verify
+    env.config.block_count = large_count;
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), cfg));
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path.as_ptr(),
+        LFS_O_RDONLY,
+    ));
+    let mut rbuf = [0u8; 16];
+    let n = lfs_file_read(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        rbuf.as_mut_ptr() as *mut core::ffi::c_void,
+        rbuf.len() as u32,
+    );
+    assert_eq!(n, buf.len() as i32);
+    assert_eq!(&rbuf[..buf.len()], buf);
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 }
 
 /// Upstream: [cases.test_superblocks_shrink]
+/// Requires LFS_SHRINKNONRELOCATING. Shrink via lfs_fs_grow to smaller size.
 #[test]
-#[ignore = "stub"]
+#[ignore = "requires LFS_SHRINKNONRELOCATING feature"]
 fn test_superblocks_shrink() {
-    todo!()
+    todo!("implement when LFS_SHRINKNONRELOCATING is available")
 }
 
 /// Upstream: [cases.test_superblocks_metadata_max]
+/// defines.METADATA_MAX, N = [10, 100, 1000]. Set metadata_max in config during superblock compaction.
 #[test]
-#[ignore = "stub"]
+#[ignore = "requires metadata_max in config during compaction cycles"]
 fn test_superblocks_metadata_max() {
-    todo!()
+    todo!("implement when metadata_max compaction test is wired")
 }

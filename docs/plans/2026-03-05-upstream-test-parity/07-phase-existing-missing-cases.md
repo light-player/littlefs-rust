@@ -1,5 +1,7 @@
 # Phase 7: Missing Cases in Existing Test Files
 
+**Status: Complete.** All sub-phases 7a–7f implemented. Tests that require internal APIs or features use `#[ignore]`.
+
 ## Overview
 
 Phase 7 is split into sub-phases. Each sub-phase implements tests that match the C reference exactly.
