@@ -695,6 +695,18 @@ pub fn lfs_dir_split(
         dir_ref.tail[1] = tail.pair[1];
         dir_ref.split = true;
 
+        crate::lfs_trace!(
+            "dir_split: split={} end={} new_tail=[{},{}] dir.pair=[{},{}] dir.tail=[{},{}]",
+            split,
+            end,
+            tail.pair[0],
+            tail.pair[1],
+            dir_ref.pair[0],
+            dir_ref.pair[1],
+            dir_ref.tail[0],
+            dir_ref.tail[1]
+        );
+
         // update root if needed
         let root = &(*lfs).root;
         if lfs_pair_cmp(&dir_ref.pair, root) == 0 && split == 0 {
@@ -1459,6 +1471,15 @@ pub fn lfs_dir_splittingcompact(
                 };
                 let max_space = effective_max - 40;
                 let half_block = lfs_alignup(effective_max / 2, prog_size);
+                crate::lfs_trace!(
+                    "splittingcompact: split={} end_val={} size={} max_space={} half_block={} break={}",
+                    split,
+                    end_val,
+                    size,
+                    max_space,
+                    half_block,
+                    end_val - split < 0xff && size <= lfs_min(max_space, half_block)
+                );
                 if end_val - split < 0xff && size <= lfs_min(max_space, half_block) {
                     break;
                 }
@@ -1466,9 +1487,23 @@ pub fn lfs_dir_splittingcompact(
             }
 
             if split == begin {
+                crate::lfs_trace!("splittingcompact: no split needed split==begin");
+                break;
+            }
+            if end_val <= split {
+                crate::lfs_trace!(
+                    "splittingcompact: skip empty range split={} end_val={}",
+                    split,
+                    end_val
+                );
                 break;
             }
 
+            crate::lfs_trace!(
+                "splittingcompact: calling dir_split split={} end_val={}",
+                split,
+                end_val
+            );
             let err = lfs_dir_split(lfs, dir, attrs, attrcount, source, split, end_val);
             if err != 0 && err != crate::error::LFS_ERR_NOSPC {
                 return crate::lfs_pass_err!(err);

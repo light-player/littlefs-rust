@@ -338,6 +338,16 @@ pub fn lfs_dir_find(
                         );
                     }
                 }
+                #[cfg(feature = "loop_limits")]
+                crate::lfs_trace!(
+                    "dir_find: iter={} tag={} split={} tail=[{},{}] namelen={}",
+                    find_iter,
+                    tag,
+                    dir_ref.split,
+                    dir_ref.tail[0],
+                    dir_ref.tail[1],
+                    namelen
+                );
                 let mut match_data = LfsDirFindMatch {
                     lfs,
                     name,

@@ -20,6 +20,11 @@ fn env_with_cache_512() -> common::TestEnv {
     config_with_cache(512, 128)
 }
 
+/// 2048 blocks matches upstream C test geometry (ERASE_COUNT=1M/512).
+fn env_with_cache_512_2048_blocks() -> common::TestEnv {
+    config_with_cache(512, 2048)
+}
+
 // --- test_entries_grow ---
 #[test]
 fn test_entries_grow() {
@@ -500,14 +505,11 @@ fn test_entries_create_too_big() {
 
 // --- test_entries_resize_too_big ---
 // Upstream: [cases.test_entries_resize_too_big]
-// Ignored: with 200-byte path, read returns LFS_ERR_NOSPC (-28) after truncate+write 400.
-// Works with shorter path (e.g. 50 bytes). Likely dir commit/split bug when updating
-// inline→CTZ with long name. See create_too_big which passes (fresh create, no truncate).
+// 200-byte path needs ample blocks; 2048 matches upstream geometry (ERASE_COUNT=1M/512).
 #[test]
-#[ignore = "LFS_ERR_NOSPC on read after truncate+write with 200-byte path"]
 fn test_entries_resize_too_big() {
     init_logger();
-    let mut env = env_with_cache_512();
+    let mut env = env_with_cache_512_2048_blocks();
     init_context(&mut env);
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();

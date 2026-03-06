@@ -20,8 +20,7 @@ Port entry tests that stress metadata overflow and directory compaction. When in
 | `test_entries_push_spill` | Grow causes spill | |
 | `test_entries_drop` | Remove + recreate; dir compaction | |
 
-**Fixed**: `test_entries_create_too_big`.
-**Deferred**: `test_entries_resize_too_big` — implemented but ignored: LFS_ERR_NOSPC on read after truncate+write with 200-byte path; works with shorter path.
+**Fixed**: `test_entries_create_too_big`, `test_entries_resize_too_big` (empty-range `lfs_dir_split` in `lfs_dir_splittingcompact`; see docs/bugs/2026-03-05-max-find-iter-deviation/).
 
 ---
 

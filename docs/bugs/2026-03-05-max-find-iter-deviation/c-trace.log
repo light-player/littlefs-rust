@@ -1,0 +1,7 @@
+format OK
+mount OK
+create 40 OK
+read 40 OK
+trunc+write 400 OK
+read 400 OK
+PASS

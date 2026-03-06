@@ -4,3 +4,4 @@ Cargo.lock
 .idea
 reference
 docs/c_reference
+docs/bugs/2026-03-05-max-find-iter-deviation/resize_too_big

@@ -644,10 +644,39 @@ pub fn lfs_dir_fetchmatch(
             }
 
             if lfs_tag_isvalid(besttag as lfs_tag_t) {
+                crate::lfs_trace!(
+                    "fetchmatch: FOUND besttag=0x{:08x} pair=[{},{}] count={} split={} tail=[{},{}]",
+                    besttag as u32,
+                    dir.pair[0],
+                    dir.pair[1],
+                    dir.count,
+                    dir.split,
+                    dir.tail[0],
+                    dir.tail[1]
+                );
                 return besttag;
             } else if lfs_tag_id(besttag as lfs_tag_t) < dir.count {
+                crate::lfs_trace!(
+                    "fetchmatch: NOENT pair=[{},{}] count={} besttag_id={} split={} tail=[{},{}]",
+                    dir.pair[0],
+                    dir.pair[1],
+                    dir.count,
+                    lfs_tag_id(besttag as lfs_tag_t),
+                    dir.split,
+                    dir.tail[0],
+                    dir.tail[1]
+                );
                 return crate::error::LFS_ERR_NOENT as lfs_stag_t;
             } else {
+                crate::lfs_trace!(
+                    "fetchmatch: CONTINUE pair=[{},{}] count={} split={} tail=[{},{}]",
+                    dir.pair[0],
+                    dir.pair[1],
+                    dir.count,
+                    dir.split,
+                    dir.tail[0],
+                    dir.tail[1]
+                );
                 return 0;
             }
         }
