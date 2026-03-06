@@ -138,3 +138,96 @@ fn test_superblocks_stat() {
     assert_eq!(fsinfo.file_max, 2_147_483_647);
     assert_eq!(fsinfo.attr_max, 1022);
 }
+
+// --- Missing upstream stubs ---
+
+/// Upstream: [cases.test_superblocks_mount_unknown_block_count]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_mount_unknown_block_count() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_reentrant_format]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_reentrant_format() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_stat_tweaked]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_stat_tweaked() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_expand]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_expand() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_magic_expand]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_magic_expand() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_expand_power_cycle]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_expand_power_cycle() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_reentrant_expand]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_reentrant_expand() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_unknown_blocks]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_unknown_blocks() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_fewer_blocks]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_fewer_blocks() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_more_blocks]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_more_blocks() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_grow]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_grow() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_shrink]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_shrink() {
+    todo!()
+}
+
+/// Upstream: [cases.test_superblocks_metadata_max]
+#[test]
+#[ignore = "stub"]
+fn test_superblocks_metadata_max() {
+    todo!()
+}

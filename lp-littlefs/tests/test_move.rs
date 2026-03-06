@@ -1513,3 +1513,19 @@ fn test_reentrant_dir() {
     );
     result.expect("test_reentrant_dir should complete");
 }
+
+// --- Missing upstream stubs ---
+
+/// Upstream: [cases.test_move_fix_relocation]
+#[test]
+#[ignore = "stub"]
+fn test_move_fix_relocation() {
+    todo!()
+}
+
+/// Upstream: [cases.test_move_fix_relocation_predecessor]
+#[test]
+#[ignore = "stub"]
+fn test_move_fix_relocation_predecessor() {
+    todo!()
+}

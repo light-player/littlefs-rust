@@ -1196,6 +1196,57 @@ fn test_paths_dotdotdots(#[case] dir_mode: bool) {
     assert_ok(lfs_unmount(lfs));
 }
 
+// --- Missing upstream stubs ---
+
+/// Upstream: [cases.test_paths_noent_trailing_slashes]
+#[test]
+#[ignore = "stub"]
+fn test_paths_noent_trailing_slashes() {
+    todo!()
+}
+
+/// Upstream: [cases.test_paths_noent_trailing_dots]
+#[test]
+#[ignore = "stub"]
+fn test_paths_noent_trailing_dots() {
+    todo!()
+}
+
+/// Upstream: [cases.test_paths_noent_trailing_dotdots]
+#[test]
+#[ignore = "stub"]
+fn test_paths_noent_trailing_dotdots() {
+    todo!()
+}
+
+/// Upstream: [cases.test_paths_utf8_ipa]
+#[test]
+#[ignore = "stub"]
+fn test_paths_utf8_ipa() {
+    todo!()
+}
+
+/// Upstream: [cases.test_paths_oopsallspaces]
+#[test]
+#[ignore = "stub"]
+fn test_paths_oopsallspaces() {
+    todo!()
+}
+
+/// Upstream: [cases.test_paths_oopsalldels]
+#[test]
+#[ignore = "stub"]
+fn test_paths_oopsalldels() {
+    todo!()
+}
+
+/// Upstream: [cases.test_paths_oopsallffs]
+#[test]
+#[ignore = "stub"]
+fn test_paths_oopsallffs() {
+    todo!()
+}
+
 #[rstest]
 #[case::dirs(true)]
 #[case::files(false)]

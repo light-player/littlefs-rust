@@ -129,3 +129,33 @@ fn test_orphans_nonreentrant() {
     assert!(!unsafe { lfs_fs_hasorphans(lfs_ptr) });
     assert_ok(lfs_unmount(lfs_ptr));
 }
+
+// --- Missing upstream stubs ---
+
+/// Upstream: [cases.test_orphans_normal]
+#[test]
+#[ignore = "stub"]
+fn test_orphans_normal() {
+    todo!()
+}
+
+/// Upstream: [cases.test_orphans_one_orphan]
+#[test]
+#[ignore = "stub"]
+fn test_orphans_one_orphan() {
+    todo!()
+}
+
+/// Upstream: [cases.test_orphans_mkconsistent_one_orphan]
+#[test]
+#[ignore = "stub"]
+fn test_orphans_mkconsistent_one_orphan() {
+    todo!()
+}
+
+/// Upstream: [cases.test_orphans_reentrant]
+#[test]
+#[ignore = "stub"]
+fn test_orphans_reentrant() {
+    todo!()
+}

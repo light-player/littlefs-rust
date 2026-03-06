@@ -283,6 +283,13 @@ fn test_powerloss_runner_smoke() {
     result.expect("run_powerloss_linear should complete");
 }
 
+/// Upstream: [cases.test_powerloss_partial_prog]
+#[test]
+#[ignore = "stub"]
+fn test_powerloss_partial_prog() {
+    todo!()
+}
+
 // --- test_powerloss_snapshot_restore ---
 // Unit test: snapshot and restore preserve BD state.
 #[test]

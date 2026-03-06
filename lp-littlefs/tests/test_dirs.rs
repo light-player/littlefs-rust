@@ -201,3 +201,89 @@ fn test_dirs_many_rename() {
 
     assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 }
+
+// --- Missing upstream stubs ---
+
+/// Upstream: [cases.test_dirs_many_rename_append]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_many_rename_append() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_many_reentrant]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_many_reentrant() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_file_creation]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_file_creation() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_file_removal]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_file_removal() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_file_rename]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_file_rename() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_file_reentrant]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_file_reentrant() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_nested]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_nested() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_recursive_remove]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_recursive_remove() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_remove_read]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_remove_read() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_other_errors]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_other_errors() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_seek]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_seek() {
+    todo!()
+}
+
+/// Upstream: [cases.test_dirs_toot_seek]
+#[test]
+#[ignore = "stub"]
+fn test_dirs_toot_seek() {
+    todo!()
+}
