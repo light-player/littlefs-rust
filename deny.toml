@@ -4,11 +4,10 @@ ignore = []
 
 [licenses]
 allow = [
-    "Apache-2.0 WITH LLVM-exception",
     "Apache-2.0",
     "BSD-3-Clause",
+    "ISC",
     "MIT",
-    "Unicode-DFS-2016",
     "Unicode-3.0",
 ]
 

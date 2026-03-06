@@ -1,0 +1,13 @@
+cycle 0 OK
+cycle 1 OK
+cycle 2 OK
+cycle 3 OK
+cycle 4 OK
+cycle 5 OK
+cycle 6 OK
+cycle 7 OK
+cycle 8 OK
+cycle 9 OK
+
+PASS: 10 cycles
+../../../reference/lfs.c:2476:debug: Relocating {0xbc, 0xbb} -> {0xbd, 0xbc}

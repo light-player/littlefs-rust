@@ -1,0 +1,93 @@
+Created 26 files
+
+  BEFORE removes: head=[0,1] m.pair=[0,1] m.count=7 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=7 split=1 tail=[25,26]
+    → followed tail to pair=[26,25] count=13 split=0
+  after remove 'a' (#1): head=[0,1] m.pair=[0,1] m.count=6 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=7 split=1 tail=[25,26]
+    → followed tail to pair=[26,25] count=14 split=0
+  after remove 'b' (#2): head=[0,1] m.pair=[0,1] m.count=5 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=7 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'c' (#3): head=[0,1] m.pair=[0,1] m.count=4 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=7 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'd' (#4): head=[0,1] m.pair=[0,1] m.count=3 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=7 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'e' (#5): head=[0,1] m.pair=[0,1] m.count=2 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=7 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'f' (#6): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=7 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'g' (#7): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=6 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'h' (#8): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=5 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'i' (#9): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=4 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'j' (#10): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=3 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'k' (#11): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=2 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'l' (#12): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[23,24]
+    → followed tail to pair=[23,24] count=1 split=1 tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[107,106] count=7 split=0
+  after remove 'm' (#13): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[25,26]
+    → followed tail to pair=[25,26] count=7 split=1 tail=[106,107]
+    → followed tail to pair=[107,106] count=7 split=0
+  after remove 'n' (#14): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[25,26]
+    → followed tail to pair=[25,26] count=6 split=1 tail=[106,107]
+    → followed tail to pair=[107,106] count=7 split=0
+  after remove 'o' (#15): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[25,26]
+    → followed tail to pair=[25,26] count=5 split=1 tail=[106,107]
+    → followed tail to pair=[107,106] count=7 split=0
+  after remove 'p' (#16): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[25,26]
+    → followed tail to pair=[25,26] count=4 split=1 tail=[106,107]
+    → followed tail to pair=[107,106] count=7 split=0
+  after remove 'q' (#17): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[25,26]
+    → followed tail to pair=[25,26] count=3 split=1 tail=[106,107]
+    → followed tail to pair=[107,106] count=7 split=0
+  after remove 'r' (#18): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[25,26]
+    → followed tail to pair=[25,26] count=2 split=1 tail=[106,107]
+    → followed tail to pair=[107,106] count=7 split=0
+  after remove 's' (#19): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[25,26]
+    → followed tail to pair=[25,26] count=1 split=1 tail=[106,107]
+    → followed tail to pair=[107,106] count=7 split=0
+  after remove 't' (#20): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[106,107]
+    → followed tail to pair=[106,107] count=7 split=0
+  after remove 'u' (#21): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[106,107]
+    → followed tail to pair=[106,107] count=6 split=0
+  after remove 'v' (#22): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[106,107]
+    → followed tail to pair=[106,107] count=5 split=0
+  after remove 'w' (#23): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[106,107]
+    → followed tail to pair=[106,107] count=4 split=0
+  after remove 'x' (#24): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[106,107]
+    → followed tail to pair=[106,107] count=3 split=0
+  after remove 'y' (#25): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[106,107]
+    → followed tail to pair=[107,106] count=2 split=0
+  after remove 'z' (#26): head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[106,107]
+    → followed tail to pair=[107,106] count=1 split=0
+
+FINAL after file_close:
+  FINAL: head=[0,1] m.pair=[0,1] m.count=1 m.split=1 m.tail=[106,107]
+    → followed tail to pair=[107,106] count=1 split=0
+
+PASS

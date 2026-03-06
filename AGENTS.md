@@ -1,4 +1,4 @@
-# lp-littlefs — Agent instructions
+# littlefs-rust — Agent instructions
 
 ## Commits
 
@@ -41,6 +41,21 @@ Fix warnings before committing. Do not ignore them.
 - Use `#![no_std]` where appropriate
 - Gate std-dependent code behind features
 - Follow existing code style
+
+## C-to-Rust Translation
+
+When translating functions from the reference C code (`reference/lfs.c`, `lfs_util.c`) to Rust:
+
+- **Use the local reference only**: Read from `reference/lfs.c` etc. in this repo. Do NOT fetch lfs.c or other C source from the web. If `reference/` is missing, run `scripts/upstream sync`.
+
+- Translate callees first; ensure each function called is already implemented (or stubbed) before implementing
+- Double-check signatures against C; prefer concrete types (`*mut Lfs`, `*const u8`) over `*mut c_void` where known
+- Preserve all `LFS_ASSERT` → translate to `lfs_assert!` (or `debug_assert!` where appropriate)
+- Match C logic and control flow as closely as possible; do not refactor or simplify during translation
+- Include original C source as comments above/below each function with line references (e.g. `//! C: lfs.c:1234-1280`)
+- Use `unsafe` for pointer dereferences and raw buffer access; keep the same error model (negative int → `LFS_ERR_*`)
+- Document any intentional divergence from C; do not silently change behavior
+- See [docs/rules.md](docs/rules.md) for the full translation rules
 
 ## Language
 
