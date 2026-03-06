@@ -11,10 +11,10 @@ use common::{
 };
 use lp_littlefs::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_REG};
 use lp_littlefs::{
-    lfs_dir_close, lfs_dir_open, lfs_dir_read, lfs_file_close, lfs_file_open, lfs_format,
-    lfs_mkdir, lfs_mount, lfs_remove, lfs_rename, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsDir,
-    LfsFile, LfsInfo, LFS_ERR_EXIST, LFS_ERR_ISDIR, LFS_ERR_NOENT, LFS_ERR_NOTDIR,
-    LFS_ERR_NOTEMPTY,
+    lfs_dir_close, lfs_dir_open, lfs_dir_read, lfs_dir_rewind, lfs_dir_seek, lfs_dir_tell,
+    lfs_file_close, lfs_file_open, lfs_format, lfs_mkdir, lfs_mount, lfs_remove, lfs_rename,
+    lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsDir, LfsFile, LfsInfo, LFS_ERR_EXIST, LFS_ERR_ISDIR,
+    LFS_ERR_NOENT, LFS_ERR_NOTDIR, LFS_ERR_NOTEMPTY,
 };
 
 /// Root path: "/" null-terminated.
@@ -723,10 +723,60 @@ fn test_dirs_recursive_remove() {
 }
 
 /// Upstream: [cases.test_dirs_remove_read]
+/// defines.N = 10, if = 'N < BLOCK_COUNT/2'
+/// Create N dirs under prickly-pear/. Nested loop: open dir, iterate to j, remove dir k, iterate rest,
+/// close, recreate k, unmount. Requires lfs_dir_seek.
 #[test]
-#[ignore = "stub"]
+#[ignore = "requires lfs_dir_seek"]
 fn test_dirs_remove_read() {
-    todo!()
+    init_logger();
+    const N: usize = 10;
+    let mut env = default_config(256);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("prickly-pear").as_ptr(),
+    ));
+    for i in 0..N {
+        let path = path_bytes(&format!("prickly-pear/cactus{i:03}"));
+        assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path.as_ptr()));
+    }
+
+    for k in 0..N {
+        for j in 0..=N {
+            let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
+            assert_ok(lfs_dir_open(
+                lfs.as_mut_ptr(),
+                dir.as_mut_ptr(),
+                path_bytes("prickly-pear").as_ptr(),
+            ));
+            assert_ok(lfs_dir_rewind(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+            assert_ok(lfs_dir_seek(lfs.as_mut_ptr(), dir.as_mut_ptr(), j as _));
+            assert_ok(lfs_remove(
+                lfs.as_mut_ptr(),
+                path_bytes(&format!("prickly-pear/cactus{k:03}")).as_ptr(),
+            ));
+            let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+            while lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()) > 0 {}
+            assert_ok(lfs_dir_close(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+            assert_ok(lfs_mkdir(
+                lfs.as_mut_ptr(),
+                path_bytes(&format!("prickly-pear/cactus{k:03}")).as_ptr(),
+            ));
+        }
+        assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+        assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    }
+
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 }
 
 /// Upstream: [cases.test_dirs_other_errors]
@@ -945,15 +995,133 @@ fn test_dirs_other_errors() {
 }
 
 /// Upstream: [cases.test_dirs_seek]
+/// defines.COUNT = [4, 128, 132], if = 'COUNT < BLOCK_COUNT/2'
+/// Create COUNT entries in a child dir. Exercise lfs_dir_seek, lfs_dir_tell, lfs_dir_rewind.
 #[test]
-#[ignore = "stub"]
+#[ignore = "requires lfs_dir_seek/tell/rewind"]
 fn test_dirs_seek() {
-    todo!()
+    init_logger();
+    for count in [4usize, 128, 132] {
+        let mut env = default_config(512);
+        init_context(&mut env);
+
+        let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+        assert_ok(lfs_format(
+            lfs.as_mut_ptr(),
+            &env.config as *const LfsConfig,
+        ));
+        assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+        assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("child").as_ptr()));
+        for i in 0..count {
+            let path = path_bytes(&format!("child/entry{i:03}"));
+            let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+            assert_ok(lfs_file_open(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                path.as_ptr(),
+                LFS_O_WRONLY | LFS_O_CREAT | LFS_O_EXCL,
+            ));
+            assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+        }
+
+        let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
+        assert_ok(lfs_dir_open(
+            lfs.as_mut_ptr(),
+            dir.as_mut_ptr(),
+            path_bytes("child").as_ptr(),
+        ));
+        assert_ok(lfs_dir_rewind(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+        let pos0 = lfs_dir_tell(lfs.as_mut_ptr(), dir.as_mut_ptr());
+        assert!(pos0 >= 0, "tell after rewind");
+
+        let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+        let mut n = 0usize;
+        while lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()) > 0 {
+            n += 1;
+        }
+        assert_eq!(n, count + 2, "COUNT={count}: . and .. plus {count} entries");
+
+        assert_ok(lfs_dir_rewind(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+        let half = (count + 2) / 2;
+        assert_ok(lfs_dir_seek(
+            lfs.as_mut_ptr(),
+            dir.as_mut_ptr(),
+            half as u32,
+        ));
+        let pos_half = lfs_dir_tell(lfs.as_mut_ptr(), dir.as_mut_ptr());
+        assert!(pos_half >= 0, "tell after seek");
+
+        assert_ok(lfs_dir_rewind(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+        let pos_rewind = lfs_dir_tell(lfs.as_mut_ptr(), dir.as_mut_ptr());
+        assert_eq!(pos_rewind, pos0, "tell after rewind matches initial");
+
+        assert_ok(lfs_dir_close(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+        assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    }
 }
 
 /// Upstream: [cases.test_dirs_toot_seek]
+/// defines.COUNT = [4, 128, 132]
+/// Same as seek but on root directory.
 #[test]
-#[ignore = "stub"]
+#[ignore = "requires lfs_dir_seek/tell/rewind"]
 fn test_dirs_toot_seek() {
-    todo!()
+    init_logger();
+    for count in [4usize, 128, 132] {
+        let mut env = default_config(512);
+        init_context(&mut env);
+
+        let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+        assert_ok(lfs_format(
+            lfs.as_mut_ptr(),
+            &env.config as *const LfsConfig,
+        ));
+        assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+        for i in 0..count {
+            let path = path_bytes(&format!("entry{i:03}"));
+            let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+            assert_ok(lfs_file_open(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                path.as_ptr(),
+                LFS_O_WRONLY | LFS_O_CREAT | LFS_O_EXCL,
+            ));
+            assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+        }
+
+        let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
+        assert_ok(lfs_dir_open(
+            lfs.as_mut_ptr(),
+            dir.as_mut_ptr(),
+            ROOT_PATH.as_ptr(),
+        ));
+        assert_ok(lfs_dir_rewind(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+        let pos0 = lfs_dir_tell(lfs.as_mut_ptr(), dir.as_mut_ptr());
+        assert!(pos0 >= 0, "tell after rewind");
+
+        let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+        let mut n = 0usize;
+        while lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()) > 0 {
+            n += 1;
+        }
+        assert_eq!(n, count + 2, "COUNT={count}: . and .. plus {count} entries");
+
+        assert_ok(lfs_dir_rewind(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+        let half = (count + 2) / 2;
+        assert_ok(lfs_dir_seek(
+            lfs.as_mut_ptr(),
+            dir.as_mut_ptr(),
+            half as u32,
+        ));
+        let _pos_half = lfs_dir_tell(lfs.as_mut_ptr(), dir.as_mut_ptr());
+
+        assert_ok(lfs_dir_rewind(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+        let pos_rewind = lfs_dir_tell(lfs.as_mut_ptr(), dir.as_mut_ptr());
+        assert_eq!(pos_rewind, pos0, "tell after rewind matches initial");
+
+        assert_ok(lfs_dir_close(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+        assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    }
 }
