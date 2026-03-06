@@ -1,126 +1,34 @@
 //! Upstream: tests/test_compat.toml
 //!
-//! Version compatibility tests. Requires multiversion / version compat infrastructure.
+//! Version edge-case tests. The 14 forward/backward compat tests live in
+//! lp-littlefs-compat where they test actual C ↔ Rust interop.
+//! These 3 remaining tests exercise superblock version field handling.
 
 mod common;
 
-/// Upstream: [cases.test_compat_forward_mount]
-///
-/// Mount newer-version FS.
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_forward_mount() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_forward_read_dirs]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_forward_read_dirs() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_forward_read_files]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_forward_read_files() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_forward_read_files_in_dirs]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_forward_read_files_in_dirs() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_forward_write_dirs]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_forward_write_dirs() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_forward_write_files]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_forward_write_files() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_forward_write_files_in_dirs]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_forward_write_files_in_dirs() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_backward_mount]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_backward_mount() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_backward_read_dirs]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_backward_read_dirs() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_backward_read_files]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_backward_read_files() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_backward_read_files_in_dirs]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_backward_read_files_in_dirs() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_backward_write_dirs]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_backward_write_dirs() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_backward_write_files]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_backward_write_files() {
-    todo!()
-}
-
-/// Upstream: [cases.test_compat_backward_write_files_in_dirs]
-#[test]
-#[ignore = "stub: requires version compat infrastructure"]
-fn test_compat_backward_write_files_in_dirs() {
-    todo!()
-}
-
 /// Upstream: [cases.test_compat_major_incompat]
+///
+/// Bump major version in superblock, verify mount rejects with LFS_ERR_INVAL.
 #[test]
-#[ignore = "stub: requires version compat infrastructure"]
+#[ignore = "stub: requires internal superblock APIs (test-parity2 phase 7)"]
 fn test_compat_major_incompat() {
     todo!()
 }
 
 /// Upstream: [cases.test_compat_minor_incompat]
+///
+/// Bump minor version in superblock beyond what we support, verify mount rejects.
 #[test]
-#[ignore = "stub: requires version compat infrastructure"]
+#[ignore = "stub: requires internal superblock APIs (test-parity2 phase 7)"]
 fn test_compat_minor_incompat() {
     todo!()
 }
 
 /// Upstream: [cases.test_compat_minor_bump]
+///
+/// Downgrade minor version in superblock, mount works, write triggers minor bump.
 #[test]
-#[ignore = "stub: requires version compat infrastructure"]
+#[ignore = "stub: requires internal superblock APIs (test-parity2 phase 7)"]
 fn test_compat_minor_bump() {
     todo!()
 }

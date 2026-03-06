@@ -1,8 +1,8 @@
 [package]
-name = "lp-littlefs-c-align"
+name = "lp-littlefs-compat"
 version = "0.1.0"
 edition = "2021"
-description = "C ↔ Rust format alignment tests for lp-littlefs"
+description = "C ↔ Rust compatibility tests for lp-littlefs"
 license = "BSD-3-Clause"
 
 [dependencies]
@@ -11,3 +11,4 @@ littlefs2-sys = { version = "0.3", features = ["malloc"] }
 
 [dev-dependencies]
 env_logger = "0.10"
+rstest = "0.26"

@@ -1,4 +1,3 @@
 [workspace]
 resolver = "2"
-members = ["lp-littlefs"]
-# lp-littlefs-c-align excluded until format+mount implemented (depends on old API)
+members = ["lp-littlefs", "lp-littlefs-compat"]
