@@ -9,7 +9,7 @@ use common::{
     assert_err, assert_ok, default_config, init_context, init_logger, path_bytes, LFS_O_CREAT,
     LFS_O_RDONLY, LFS_O_WRONLY,
 };
-use lp_littlefs::{
+use lp_littlefs_core::{
     lfs_file_close, lfs_file_open, lfs_file_opencfg, lfs_file_read, lfs_file_sync, lfs_file_write,
     lfs_format, lfs_getattr, lfs_mkdir, lfs_mount, lfs_removeattr, lfs_setattr, lfs_unmount, Lfs,
     LfsAttr, LfsConfig, LfsFile, LfsFileConfig, LFS_ERR_NOATTR, LFS_ERR_NOSPC,

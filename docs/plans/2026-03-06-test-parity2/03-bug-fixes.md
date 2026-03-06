@@ -70,6 +70,6 @@ if cfg.block_count != 0 && superblock.block_count != cfg.block_count {
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs test_superblocks_fewer_blocks
-cargo test -p lp-littlefs test_paths_oopsallspaces
+cargo test -p lp-littlefs-core test_superblocks_fewer_blocks
+cargo test -p lp-littlefs-core test_paths_oopsallspaces
 ```

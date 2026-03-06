@@ -6,7 +6,7 @@ use common::{
     assert_ok, default_config, init_context, path_bytes, LFS_O_CREAT, LFS_O_RDONLY, LFS_O_RDWR,
     LFS_O_TRUNC, LFS_O_WRONLY, LFS_SEEK_SET,
 };
-use lp_littlefs::{
+use lp_littlefs_core::{
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_seek, lfs_file_size, lfs_file_tell,
     lfs_file_truncate, lfs_file_write, lfs_format, lfs_mount, lfs_unmount, Lfs, LfsConfig, LfsFile,
 };
@@ -549,16 +549,16 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
 
         let config_ptr = &env.config as *const LfsConfig;
         let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
-        assert_ok(lp_littlefs::lfs_format(lfs.as_mut_ptr(), config_ptr));
-        assert_ok(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), config_ptr));
-        assert_ok(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()));
+        assert_ok(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), config_ptr));
+        assert_ok(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), config_ptr));
+        assert_ok(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()));
         let snapshot = env.snapshot();
 
         let op = |lfs_ptr: *mut Lfs, cfg: *const LfsConfig| -> Result<(), i32> {
-            let err = lp_littlefs::lfs_mount(lfs_ptr, cfg);
+            let err = lp_littlefs_core::lfs_mount(lfs_ptr, cfg);
             if err != 0 {
-                let _ = lp_littlefs::lfs_format(lfs_ptr, cfg);
-                let e = lp_littlefs::lfs_mount(lfs_ptr, cfg);
+                let _ = lp_littlefs_core::lfs_format(lfs_ptr, cfg);
+                let e = lp_littlefs_core::lfs_mount(lfs_ptr, cfg);
                 if e != 0 {
                     return Err(e);
                 }
@@ -567,15 +567,15 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
             let path = path_bytes("baldy");
             let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
             let open_err =
-                lp_littlefs::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+                lp_littlefs_core::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
             if open_err == 0 {
-                let sz = lp_littlefs::lfs_file_size(lfs_ptr, file.as_mut_ptr());
+                let sz = lp_littlefs_core::lfs_file_size(lfs_ptr, file.as_mut_ptr());
                 if sz == 0 || sz == LARGE as i32 || sz == medium as i32 || sz == small_size as i32 {
                     let mut buf = [0u8; 16];
                     let mut j: u32 = 0;
                     while j < sz as u32 {
                         let chunk = lfs_min(4, sz as u32 - j);
-                        let n = lp_littlefs::lfs_file_read(
+                        let n = lp_littlefs_core::lfs_file_read(
                             lfs_ptr,
                             file.as_mut_ptr(),
                             buf.as_mut_ptr() as *mut core::ffi::c_void,
@@ -594,15 +594,15 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
                         j += chunk;
                     }
                 }
-                let e = lp_littlefs::lfs_file_close(lfs_ptr, file.as_mut_ptr());
+                let e = lp_littlefs_core::lfs_file_close(lfs_ptr, file.as_mut_ptr());
                 if e != 0 {
                     return Err(e);
                 }
-            } else if open_err != lp_littlefs::LFS_ERR_NOENT {
+            } else if open_err != lp_littlefs_core::LFS_ERR_NOENT {
                 return Err(open_err);
             }
 
-            let e = lp_littlefs::lfs_file_open(
+            let e = lp_littlefs_core::lfs_file_open(
                 lfs_ptr,
                 file.as_mut_ptr(),
                 path.as_ptr(),
@@ -614,7 +614,7 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
             let mut j: u32 = 0;
             while j < LARGE {
                 let chunk = lfs_min(HAIR.len() as u32, LARGE - j);
-                let n = lp_littlefs::lfs_file_write(
+                let n = lp_littlefs_core::lfs_file_write(
                     lfs_ptr,
                     file.as_mut_ptr(),
                     HAIR.as_ptr() as *const core::ffi::c_void,
@@ -626,24 +626,24 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
                 assert_eq!(n, chunk as i32);
                 j += chunk;
             }
-            let e = lp_littlefs::lfs_file_close(lfs_ptr, file.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_close(lfs_ptr, file.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
 
             let e =
-                lp_littlefs::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
+                lp_littlefs_core::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
             if e != 0 {
                 return Err(e);
             }
-            let e = lp_littlefs::lfs_file_truncate(lfs_ptr, file.as_mut_ptr(), medium);
+            let e = lp_littlefs_core::lfs_file_truncate(lfs_ptr, file.as_mut_ptr(), medium);
             if e != 0 {
                 return Err(e);
             }
             let mut j: u32 = 0;
             while j < medium {
                 let chunk = lfs_min(BALD.len() as u32, medium - j);
-                let n = lp_littlefs::lfs_file_write(
+                let n = lp_littlefs_core::lfs_file_write(
                     lfs_ptr,
                     file.as_mut_ptr(),
                     BALD.as_ptr() as *const core::ffi::c_void,
@@ -654,24 +654,24 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
                 }
                 j += chunk;
             }
-            let e = lp_littlefs::lfs_file_close(lfs_ptr, file.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_close(lfs_ptr, file.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
 
             let e =
-                lp_littlefs::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
+                lp_littlefs_core::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
             if e != 0 {
                 return Err(e);
             }
-            let e = lp_littlefs::lfs_file_truncate(lfs_ptr, file.as_mut_ptr(), small_size);
+            let e = lp_littlefs_core::lfs_file_truncate(lfs_ptr, file.as_mut_ptr(), small_size);
             if e != 0 {
                 return Err(e);
             }
             let mut j: u32 = 0;
             while j < small_size {
                 let chunk = lfs_min(COMB.len() as u32, small_size - j);
-                let n = lp_littlefs::lfs_file_write(
+                let n = lp_littlefs_core::lfs_file_write(
                     lfs_ptr,
                     file.as_mut_ptr(),
                     COMB.as_ptr() as *const core::ffi::c_void,
@@ -682,12 +682,12 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
                 }
                 j += chunk;
             }
-            let e = lp_littlefs::lfs_file_close(lfs_ptr, file.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_close(lfs_ptr, file.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
 
-            let e = lp_littlefs::lfs_unmount(lfs_ptr);
+            let e = lp_littlefs_core::lfs_unmount(lfs_ptr);
             if e != 0 {
                 return Err(e);
             }

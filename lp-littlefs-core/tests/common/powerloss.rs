@@ -10,7 +10,7 @@
 
 use core::cell::Cell;
 
-use lp_littlefs::{Lfs, LfsConfig, LFS_ERR_IO};
+use lp_littlefs_core::{Lfs, LfsConfig, LFS_ERR_IO};
 
 use super::{RamStorage, BLOCK_SIZE};
 
@@ -68,7 +68,7 @@ impl PowerLossCtx {
         self.write_count.set(count);
         let fail_at = self.fail_after_writes.get();
         if fail_at > 0 && count >= fail_at {
-            return lp_littlefs::lfs_err!(LFS_ERR_IO);
+            return lp_littlefs_core::lfs_err!(LFS_ERR_IO);
         }
         0
     }
@@ -127,7 +127,7 @@ unsafe extern "C" fn powerloss_prog(
         if ctx.behavior == PowerLossBehavior::Ooo {
             ctx.restore_ooo_block();
         }
-        return lp_littlefs::lfs_pass_err!(err);
+        return lp_littlefs_core::lfs_pass_err!(err);
     }
     if ctx.behavior == PowerLossBehavior::Ooo && ctx.ooo_first_block.is_none() {
         ctx.save_ooo_block(block);
@@ -146,7 +146,7 @@ unsafe extern "C" fn powerloss_erase(cfg: *const LfsConfig, block: u32) -> i32 {
         if ctx.behavior == PowerLossBehavior::Ooo {
             ctx.restore_ooo_block();
         }
-        return lp_littlefs::lfs_pass_err!(err);
+        return lp_littlefs_core::lfs_pass_err!(err);
     }
     if ctx.behavior == PowerLossBehavior::Ooo && ctx.ooo_first_block.is_none() {
         ctx.save_ooo_block(block);

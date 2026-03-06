@@ -45,7 +45,7 @@ The log contains:
 When Rust reproduces the failure (or to compare passing behavior):
 
 ```bash
-RUST_LOG=lp_littlefs=trace cargo test -p lp-littlefs test_alloc_bad_blocks_minimal --features log -- --nocapture 2>&1 | tee docs/logs/rust-badblock-$(date +%Y%m%d-%H%M%S).log
+RUST_LOG=lp_littlefs=trace cargo test -p lp-littlefs-core test_alloc_bad_blocks_minimal --features log -- --nocapture 2>&1 | tee docs/logs/rust-badblock-$(date +%Y%m%d-%H%M%S).log
 ```
 
 Compare:

@@ -116,10 +116,10 @@ All 17 `test_compat_*` tests. Replace `#[ignore = "stub: requires version compat
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs test_compat
+cargo test -p lp-littlefs-core test_compat
 # All 17+ (parameterized) cases should pass
 
 # Verify no stubs remain
-cargo test -p lp-littlefs -- --list --ignored 2>&1 | grep -c "compat"
+cargo test -p lp-littlefs-core -- --list --ignored 2>&1 | grep -c "compat"
 # Expected: 0
 ```

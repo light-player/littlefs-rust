@@ -7,13 +7,13 @@ mod common;
 
 use common::{assert_err, assert_ok, default_config, init_context, init_logger, path_bytes};
 #[allow(unused_imports)]
-use lp_littlefs::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_REG};
-use lp_littlefs::{
+use lp_littlefs_core::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_REG};
+use lp_littlefs_core::{
     lfs_dir_close, lfs_dir_open, lfs_format, lfs_mkdir, lfs_mount, lfs_remove, lfs_rename,
     lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsDir, LfsInfo, LFS_ERR_EXIST, LFS_ERR_INVAL,
     LFS_ERR_ISDIR, LFS_ERR_NAMETOOLONG, LFS_ERR_NOENT, LFS_ERR_NOTDIR, LFS_ERR_NOTEMPTY,
 };
-use lp_littlefs::{lfs_file_close, lfs_file_open, LfsFile};
+use lp_littlefs_core::{lfs_file_close, lfs_file_open, LfsFile};
 use rstest::rstest;
 
 use common::{LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY};

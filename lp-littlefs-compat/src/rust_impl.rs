@@ -1,4 +1,4 @@
-//! Rust (lp-littlefs) wrapper for compat tests.
+//! Rust (lp-littlefs-core) wrapper for compat tests.
 
 use std::mem::MaybeUninit;
 
@@ -14,42 +14,42 @@ const LFS_ERR_EXIST: i32 = -17;
 
 pub fn format(storage: &SharedStorage) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
 pub fn mount_dir_names(storage: &SharedStorage, path: &str) -> Result<Vec<String>, i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     let names = dir_names_mounted(lfs.as_mut_ptr(), path)?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(names)
 }
 
 pub fn mount_read_file(storage: &SharedStorage, path: &str) -> Result<Vec<u8>, i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     let data = read_file_mounted(lfs.as_mut_ptr(), path)?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(data)
 }
 
 pub fn format_mkdir_unmount(storage: &SharedStorage, dir_name: &str) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     mkdir_mounted(lfs.as_mut_ptr(), dir_name)?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -59,13 +59,13 @@ pub fn format_mkdir_file_unmount(
     file_name: &str,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     mkdir_mounted(lfs.as_mut_ptr(), dir_name)?;
     create_empty_file_mounted(lfs.as_mut_ptr(), file_name)?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -75,26 +75,26 @@ pub fn format_file_mkdir_unmount(
     dir_name: &str,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     create_empty_file_mounted(lfs.as_mut_ptr(), file_name)?;
     mkdir_mounted(lfs.as_mut_ptr(), dir_name)?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
 pub fn format_create_three_unmount(storage: &SharedStorage) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     for name in ["aaa", "zzz", "mmm"] {
         create_empty_file_mounted(lfs.as_mut_ptr(), name)?;
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -104,32 +104,32 @@ pub fn format_create_rename_unmount(
     new_name: &str,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     create_empty_file_mounted(lfs.as_mut_ptr(), old_name)?;
     let old = path_cstr(old_name);
     let new = path_cstr(new_name);
-    check(lp_littlefs::lfs_rename(
+    check(lp_littlefs_core::lfs_rename(
         lfs.as_mut_ptr(),
         old.as_ptr(),
         new.as_ptr(),
     ))?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
 pub fn format_create_remove_unmount(storage: &SharedStorage, path: &str) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     create_empty_file_mounted(lfs.as_mut_ptr(), path)?;
     let p = path_cstr(path);
-    check(lp_littlefs::lfs_remove(lfs.as_mut_ptr(), p.as_ptr()))?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_remove(lfs.as_mut_ptr(), p.as_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -139,12 +139,12 @@ pub fn format_create_write_unmount(
     content: &[u8],
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     write_file_mounted(lfs.as_mut_ptr(), path, content)?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -155,16 +155,16 @@ pub fn format_nested_dir_file_unmount(
     file_name: &str,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     mkdir_mounted(lfs.as_mut_ptr(), parent)?;
     let child_path = format!("{parent}/{child}");
     mkdir_mounted(lfs.as_mut_ptr(), &child_path)?;
     let file_path = format!("{child_path}/{file_name}");
     create_empty_file_mounted(lfs.as_mut_ptr(), &file_path)?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -174,29 +174,29 @@ pub fn format_mkdir_file_rmdir_unmount(
     file_name: &str,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     mkdir_mounted(lfs.as_mut_ptr(), dir_name)?;
     let file_path = format!("{dir_name}/{file_name}");
     create_empty_file_mounted(lfs.as_mut_ptr(), &file_path)?;
     let fp = path_cstr(&file_path);
-    check(lp_littlefs::lfs_remove(lfs.as_mut_ptr(), fp.as_ptr()))?;
+    check(lp_littlefs_core::lfs_remove(lfs.as_mut_ptr(), fp.as_ptr()))?;
     let dp = path_cstr(dir_name);
-    check(lp_littlefs::lfs_remove(lfs.as_mut_ptr(), dp.as_ptr()))?;
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_remove(lfs.as_mut_ptr(), dp.as_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
 pub fn mount_mkdir_expect_exist(storage: &SharedStorage, path: &str) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     let p = path_cstr(path);
-    let res = lp_littlefs::lfs_mkdir(lfs.as_mut_ptr(), p.as_ptr());
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    let res = lp_littlefs_core::lfs_mkdir(lfs.as_mut_ptr(), p.as_ptr());
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     if res == LFS_ERR_EXIST {
         Ok(())
     } else if res == 0 {
@@ -210,21 +210,21 @@ pub fn mount_mkdir_expect_exist(storage: &SharedStorage, path: &str) -> Result<(
 
 pub fn format_only(storage: &SharedStorage) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
     Ok(())
 }
 
 pub fn format_create_n_dirs(storage: &SharedStorage, count: usize) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     for i in 0..count {
         mkdir_mounted(lfs.as_mut_ptr(), &format!("dir{i}"))?;
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -235,10 +235,10 @@ pub fn format_create_n_files_prng(
     chunk: u32,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     for i in 0..count {
         write_prng_file_mounted(
             lfs.as_mut_ptr(),
@@ -248,7 +248,7 @@ pub fn format_create_n_files_prng(
             (i + 1) as u32,
         )?;
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -259,10 +259,10 @@ pub fn format_create_n_dirs_with_files_prng(
     chunk: u32,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_format(lfs.as_mut_ptr(), &env.config))?;
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     for i in 0..count {
         let dir = format!("dir{i}");
         mkdir_mounted(lfs.as_mut_ptr(), &dir)?;
@@ -274,15 +274,15 @@ pub fn format_create_n_dirs_with_files_prng(
             (i + 1) as u32,
         )?;
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
 pub fn mount_verify_n_empty_dirs(storage: &SharedStorage, count: usize) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     let root = dir_names_mounted(lfs.as_mut_ptr(), "/")?;
     assert_eq!(
         root.len(),
@@ -299,7 +299,7 @@ pub fn mount_verify_n_empty_dirs(storage: &SharedStorage, count: usize) -> Resul
             "dir {name} should be empty, got {contents:?}"
         );
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -310,9 +310,9 @@ pub fn mount_verify_n_files_prng(
     _chunk: u32,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     let root = dir_names_mounted(lfs.as_mut_ptr(), "/")?;
     assert_eq!(
         root.len(),
@@ -326,7 +326,7 @@ pub fn mount_verify_n_files_prng(
         assert_eq!(data.len(), size as usize, "file {path} size mismatch");
         prng_verify(&data, (i + 1) as u32);
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -337,9 +337,9 @@ pub fn mount_verify_n_dirs_with_files_prng(
     _chunk: u32,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     let root = dir_names_mounted(lfs.as_mut_ptr(), "/")?;
     assert_eq!(
         root.len(),
@@ -355,7 +355,7 @@ pub fn mount_verify_n_dirs_with_files_prng(
         assert_eq!(data.len(), size as usize);
         prng_verify(&data, (i + 1) as u32);
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -366,9 +366,9 @@ pub fn mount_create_dirs_and_list(
     expected: usize,
 ) -> Result<Vec<String>, i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     for i in start..(start + count) {
         mkdir_mounted(lfs.as_mut_ptr(), &format!("dir{i}"))?;
     }
@@ -379,7 +379,7 @@ pub fn mount_create_dirs_and_list(
         "expected {expected} entries, got {}",
         root.len()
     );
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(root)
 }
 
@@ -392,9 +392,9 @@ pub fn mount_create_files_prng_and_verify_all(
     chunk: u32,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     for i in start..(start + count) {
         write_prng_file_mounted(
             lfs.as_mut_ptr(),
@@ -416,7 +416,7 @@ pub fn mount_create_files_prng_and_verify_all(
         assert_eq!(data.len(), size as usize);
         prng_verify(&data, (i + 1) as u32);
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
@@ -429,9 +429,9 @@ pub fn mount_create_dirs_files_prng_and_verify_all(
     chunk: u32,
 ) -> Result<(), i32> {
     let env = storage.build_rust_env();
-    let mut lfs = MaybeUninit::<lp_littlefs::Lfs>::zeroed();
+    let mut lfs = MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
 
-    check(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
+    check(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), &env.config))?;
     for i in start..(start + count) {
         let dir = format!("dir{i}");
         mkdir_mounted(lfs.as_mut_ptr(), &dir)?;
@@ -456,47 +456,47 @@ pub fn mount_create_dirs_files_prng_and_verify_all(
         assert_eq!(data.len(), size as usize);
         prng_verify(&data, (i + 1) as u32);
     }
-    check(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()))?;
     Ok(())
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────
 
-fn mkdir_mounted(lfs: *mut lp_littlefs::Lfs, path: &str) -> Result<(), i32> {
+fn mkdir_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str) -> Result<(), i32> {
     let p = path_cstr(path);
-    check(lp_littlefs::lfs_mkdir(lfs, p.as_ptr()))
+    check(lp_littlefs_core::lfs_mkdir(lfs, p.as_ptr()))
 }
 
-fn create_empty_file_mounted(lfs: *mut lp_littlefs::Lfs, path: &str) -> Result<(), i32> {
+fn create_empty_file_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str) -> Result<(), i32> {
     let p = path_cstr(path);
     let flags = LFS_O_WRONLY | LFS_O_CREAT | LFS_O_EXCL;
-    let mut file = MaybeUninit::<lp_littlefs::LfsFile>::zeroed();
-    check(lp_littlefs::lfs_file_open(
+    let mut file = MaybeUninit::<lp_littlefs_core::LfsFile>::zeroed();
+    check(lp_littlefs_core::lfs_file_open(
         lfs,
         file.as_mut_ptr(),
         p.as_ptr(),
         flags,
     ))?;
-    check(lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr()))
+    check(lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr()))
 }
 
-fn write_file_mounted(lfs: *mut lp_littlefs::Lfs, path: &str, content: &[u8]) -> Result<(), i32> {
+fn write_file_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str, content: &[u8]) -> Result<(), i32> {
     let p = path_cstr(path);
     let flags = LFS_O_WRONLY | LFS_O_CREAT | LFS_O_EXCL;
-    let mut file = MaybeUninit::<lp_littlefs::LfsFile>::zeroed();
-    check(lp_littlefs::lfs_file_open(
+    let mut file = MaybeUninit::<lp_littlefs_core::LfsFile>::zeroed();
+    check(lp_littlefs_core::lfs_file_open(
         lfs,
         file.as_mut_ptr(),
         p.as_ptr(),
         flags,
     ))?;
-    let n = lp_littlefs::lfs_file_write(
+    let n = lp_littlefs_core::lfs_file_write(
         lfs,
         file.as_mut_ptr(),
         content.as_ptr() as *const core::ffi::c_void,
         content.len() as u32,
     );
-    check(lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr()))?;
     if n < 0 {
         return Err(n);
     }
@@ -505,7 +505,7 @@ fn write_file_mounted(lfs: *mut lp_littlefs::Lfs, path: &str, content: &[u8]) ->
 }
 
 fn write_prng_file_mounted(
-    lfs: *mut lp_littlefs::Lfs,
+    lfs: *mut lp_littlefs_core::Lfs,
     path: &str,
     size: u32,
     chunk: u32,
@@ -513,8 +513,8 @@ fn write_prng_file_mounted(
 ) -> Result<(), i32> {
     let p = path_cstr(path);
     let flags = LFS_O_WRONLY | LFS_O_CREAT | LFS_O_EXCL;
-    let mut file = MaybeUninit::<lp_littlefs::LfsFile>::zeroed();
-    check(lp_littlefs::lfs_file_open(
+    let mut file = MaybeUninit::<lp_littlefs_core::LfsFile>::zeroed();
+    check(lp_littlefs_core::lfs_file_open(
         lfs,
         file.as_mut_ptr(),
         p.as_ptr(),
@@ -529,7 +529,7 @@ fn write_prng_file_mounted(
         for slot in buf[..c as usize].iter_mut() {
             *slot = (test_prng(&mut prng) & 0xff) as u8;
         }
-        let n = lp_littlefs::lfs_file_write(
+        let n = lp_littlefs_core::lfs_file_write(
             lfs,
             file.as_mut_ptr(),
             buf.as_ptr() as *const core::ffi::c_void,
@@ -538,13 +538,13 @@ fn write_prng_file_mounted(
         assert_eq!(n, c as i32, "short write at offset {i}");
         i += c;
     }
-    check(lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr()))
+    check(lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr()))
 }
 
-fn read_file_mounted(lfs: *mut lp_littlefs::Lfs, path: &str) -> Result<Vec<u8>, i32> {
+fn read_file_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str) -> Result<Vec<u8>, i32> {
     let p = path_cstr(path);
-    let mut file = MaybeUninit::<lp_littlefs::LfsFile>::zeroed();
-    check(lp_littlefs::lfs_file_open(
+    let mut file = MaybeUninit::<lp_littlefs_core::LfsFile>::zeroed();
+    check(lp_littlefs_core::lfs_file_open(
         lfs,
         file.as_mut_ptr(),
         p.as_ptr(),
@@ -554,14 +554,14 @@ fn read_file_mounted(lfs: *mut lp_littlefs::Lfs, path: &str) -> Result<Vec<u8>, 
     let mut buf = Vec::new();
     let mut chunk = [0u8; 256];
     loop {
-        let n = lp_littlefs::lfs_file_read(
+        let n = lp_littlefs_core::lfs_file_read(
             lfs,
             file.as_mut_ptr(),
             chunk.as_mut_ptr() as *mut core::ffi::c_void,
             chunk.len() as u32,
         );
         if n < 0 {
-            let _ = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+            let _ = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
             return Err(n);
         }
         if n == 0 {
@@ -569,24 +569,24 @@ fn read_file_mounted(lfs: *mut lp_littlefs::Lfs, path: &str) -> Result<Vec<u8>, 
         }
         buf.extend_from_slice(&chunk[..n as usize]);
     }
-    check(lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr()))?;
+    check(lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr()))?;
     Ok(buf)
 }
 
-fn dir_names_mounted(lfs: *mut lp_littlefs::Lfs, path: &str) -> Result<Vec<String>, i32> {
+fn dir_names_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str) -> Result<Vec<String>, i32> {
     let p = path_cstr(path);
-    let mut dir = MaybeUninit::<lp_littlefs::LfsDir>::zeroed();
-    check(lp_littlefs::lfs_dir_open(lfs, dir.as_mut_ptr(), p.as_ptr()))?;
+    let mut dir = MaybeUninit::<lp_littlefs_core::LfsDir>::zeroed();
+    check(lp_littlefs_core::lfs_dir_open(lfs, dir.as_mut_ptr(), p.as_ptr()))?;
 
     let mut names = Vec::new();
-    let mut info = MaybeUninit::<lp_littlefs::LfsInfo>::zeroed();
+    let mut info = MaybeUninit::<lp_littlefs_core::LfsInfo>::zeroed();
     loop {
-        let res = lp_littlefs::lfs_dir_read(lfs, dir.as_mut_ptr(), info.as_mut_ptr());
+        let res = lp_littlefs_core::lfs_dir_read(lfs, dir.as_mut_ptr(), info.as_mut_ptr());
         if res == 0 {
             break;
         }
         if res < 0 {
-            let _ = lp_littlefs::lfs_dir_close(lfs, dir.as_mut_ptr());
+            let _ = lp_littlefs_core::lfs_dir_close(lfs, dir.as_mut_ptr());
             return Err(res);
         }
         let info_ref = unsafe { &*info.as_ptr() };
@@ -598,6 +598,6 @@ fn dir_names_mounted(lfs: *mut lp_littlefs::Lfs, path: &str) -> Result<Vec<Strin
             names.push(name);
         }
     }
-    let _ = lp_littlefs::lfs_dir_close(lfs, dir.as_mut_ptr());
+    let _ = lp_littlefs_core::lfs_dir_close(lfs, dir.as_mut_ptr());
     Ok(names)
 }

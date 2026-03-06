@@ -10,9 +10,9 @@ use common::{
     assert_err, assert_ok, default_config, erase_block_raw, init_context, path_bytes,
     read_block_raw, write_block_raw, LFS_O_CREAT, LFS_O_RDONLY, LFS_O_WRONLY,
 };
-use lp_littlefs::lfs_mattr;
-use lp_littlefs::lfs_type::lfs_type::*;
-use lp_littlefs::{
+use lp_littlefs_core::lfs_mattr;
+use lp_littlefs_core::lfs_type::lfs_type::*;
+use lp_littlefs_core::{
     lfs_ctz_fromle32, lfs_deinit, lfs_dir_commit, lfs_dir_fetch, lfs_dir_get, lfs_dir_open,
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_write, lfs_format, lfs_fs_prepmove,
     lfs_init, lfs_mkdir, lfs_mktag, lfs_mount, lfs_pair_fromle32, lfs_stat, lfs_tole32,

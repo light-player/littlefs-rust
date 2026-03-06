@@ -11,7 +11,7 @@ use common::{
     assert_ok, config_with_cache, init_context, init_logger, path_bytes, LFS_O_CREAT, LFS_O_RDONLY,
     LFS_O_TRUNC, LFS_O_WRONLY,
 };
-use lp_littlefs::{
+use lp_littlefs_core::{
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_write, lfs_format, lfs_mount,
     lfs_remove, lfs_unmount, Lfs, LfsConfig, LfsFile,
 };

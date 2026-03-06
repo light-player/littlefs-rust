@@ -12,7 +12,7 @@ use common::{
     verify_prng_file, verify_prng_file_with_state, write_prng_file, write_prng_file_result,
     LFS_O_APPEND, LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_TRUNC, LFS_O_WRONLY,
 };
-use lp_littlefs::{
+use lp_littlefs_core::{
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_rewind, lfs_file_seek, lfs_file_size,
     lfs_file_sync, lfs_file_tell, lfs_file_truncate, lfs_file_write, lfs_format, lfs_mount,
     lfs_unmount, Lfs, LfsConfig, LfsFile, LFS_ERR_NOENT,
@@ -418,18 +418,18 @@ fn test_files_reentrant_write(
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
 
     // Format and mount for initial snapshot
-    assert_ok(lp_littlefs::lfs_format(lfs.as_mut_ptr(), config_ptr));
-    assert_ok(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), config_ptr));
-    assert_ok(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()));
+    assert_ok(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), config_ptr));
+    assert_ok(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), config_ptr));
+    assert_ok(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()));
     let snapshot = env.snapshot();
 
     let max_iter = 5000;
 
     let op = |lfs: *mut Lfs, cfg: *const LfsConfig| -> Result<(), i32> {
-        let err = lp_littlefs::lfs_mount(lfs, cfg);
+        let err = lp_littlefs_core::lfs_mount(lfs, cfg);
         if err != 0 {
-            let _ = lp_littlefs::lfs_format(lfs, cfg);
-            let e = lp_littlefs::lfs_mount(lfs, cfg);
+            let _ = lp_littlefs_core::lfs_format(lfs, cfg);
+            let e = lp_littlefs_core::lfs_mount(lfs, cfg);
             if e != 0 {
                 return Err(e);
             }
@@ -438,11 +438,11 @@ fn test_files_reentrant_write(
         let path = path_bytes("avacado");
         let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
         let open_err =
-            lp_littlefs::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+            lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
         if open_err == 0 {
-            let sz = lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr());
+            let sz = lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr());
             assert!(sz == 0 || sz == size as i32, "size must be 0 or SIZE");
-            let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
@@ -450,7 +450,7 @@ fn test_files_reentrant_write(
             assert_eq!(open_err, LFS_ERR_NOENT);
         }
 
-        let e = lp_littlefs::lfs_file_open(
+        let e = lp_littlefs_core::lfs_file_open(
             lfs,
             file.as_mut_ptr(),
             path.as_ptr(),
@@ -460,11 +460,11 @@ fn test_files_reentrant_write(
             return Err(e);
         }
         write_prng_file_result(lfs, file.as_mut_ptr(), size, chunk_size, 1)?;
-        let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+        let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
         if e != 0 {
             return Err(e);
         }
-        let e = lp_littlefs::lfs_unmount(lfs);
+        let e = lp_littlefs_core::lfs_unmount(lfs);
         if e != 0 {
             return Err(e);
         }
@@ -472,26 +472,26 @@ fn test_files_reentrant_write(
     };
 
     let verify = |lfs: *mut Lfs, cfg: *const LfsConfig| -> Result<(), i32> {
-        let remount = lp_littlefs::lfs_mount(lfs, cfg);
+        let remount = lp_littlefs_core::lfs_mount(lfs, cfg);
         if remount != 0 {
             return Ok(());
         }
         let path = path_bytes("avacado");
         let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
-        let err = lp_littlefs::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+        let err = lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
         if err != 0 {
-            let _ = lp_littlefs::lfs_unmount(lfs);
+            let _ = lp_littlefs_core::lfs_unmount(lfs);
             return Ok(());
         }
-        let sz = lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr());
+        let sz = lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr());
         if sz == size as i32 {
             verify_prng_file(lfs, file.as_mut_ptr(), size, chunk_size, 1);
         }
-        let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+        let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
         if e != 0 {
             return Err(e);
         }
-        let e = lp_littlefs::lfs_unmount(lfs);
+        let e = lp_littlefs_core::lfs_unmount(lfs);
         if e != 0 {
             return Err(e);
         }
@@ -522,18 +522,18 @@ fn test_files_reentrant_write_sync(
     let config_ptr = &env.config as *const LfsConfig;
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
 
-    assert_ok(lp_littlefs::lfs_format(lfs.as_mut_ptr(), config_ptr));
-    assert_ok(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), config_ptr));
-    assert_ok(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()));
+    assert_ok(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), config_ptr));
+    assert_ok(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), config_ptr));
+    assert_ok(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()));
     let snapshot = env.snapshot();
 
     let max_iter = 5000;
 
     let op = |lfs: *mut Lfs, cfg: *const LfsConfig| -> Result<(), i32> {
-        let err = lp_littlefs::lfs_mount(lfs, cfg);
+        let err = lp_littlefs_core::lfs_mount(lfs, cfg);
         if err != 0 {
-            let _ = lp_littlefs::lfs_format(lfs, cfg);
-            let e = lp_littlefs::lfs_mount(lfs, cfg);
+            let _ = lp_littlefs_core::lfs_format(lfs, cfg);
+            let e = lp_littlefs_core::lfs_mount(lfs, cfg);
             if e != 0 {
                 return Err(e);
             }
@@ -542,16 +542,16 @@ fn test_files_reentrant_write_sync(
         let path = path_bytes("avacado");
         let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
         let open_err =
-            lp_littlefs::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+            lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
         if open_err == 0 {
-            let sz = lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr());
+            let sz = lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr());
             assert!(sz <= size as i32);
             let mut prng = 1u32;
             let mut buf = [0u8; 1024];
             let mut i: u32 = 0;
             while i < sz as u32 {
                 let chunk = (chunk_size.min(sz as u32 - i)) as usize;
-                let n = lp_littlefs::lfs_file_read(
+                let n = lp_littlefs_core::lfs_file_read(
                     lfs,
                     file.as_mut_ptr(),
                     buf.as_mut_ptr() as *mut core::ffi::c_void,
@@ -564,7 +564,7 @@ fn test_files_reentrant_write_sync(
                 }
                 i += chunk as u32;
             }
-            let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
@@ -572,7 +572,7 @@ fn test_files_reentrant_write_sync(
             assert_eq!(open_err, LFS_ERR_NOENT);
         }
 
-        let e = lp_littlefs::lfs_file_open(
+        let e = lp_littlefs_core::lfs_file_open(
             lfs,
             file.as_mut_ptr(),
             path.as_ptr(),
@@ -581,7 +581,7 @@ fn test_files_reentrant_write_sync(
         if e != 0 {
             return Err(e);
         }
-        let current_size = lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr());
+        let current_size = lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr());
         let skip = current_size.max(0) as u32;
         let mut prng = 1u32;
         common::advance_prng(&mut prng, skip);
@@ -592,7 +592,7 @@ fn test_files_reentrant_write_sync(
             for slot in buf[..chunk as usize].iter_mut() {
                 *slot = (common::test_prng(&mut prng) & 0xff) as u8;
             }
-            let n = lp_littlefs::lfs_file_write(
+            let n = lp_littlefs_core::lfs_file_write(
                 lfs,
                 file.as_mut_ptr(),
                 buf.as_ptr() as *const core::ffi::c_void,
@@ -602,17 +602,17 @@ fn test_files_reentrant_write_sync(
                 return Err(n);
             }
             assert_eq!(n, chunk as i32);
-            let e = lp_littlefs::lfs_file_sync(lfs, file.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_sync(lfs, file.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
             i += chunk;
         }
-        let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+        let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
         if e != 0 {
             return Err(e);
         }
-        let e = lp_littlefs::lfs_unmount(lfs);
+        let e = lp_littlefs_core::lfs_unmount(lfs);
         if e != 0 {
             return Err(e);
         }
@@ -620,24 +620,24 @@ fn test_files_reentrant_write_sync(
     };
 
     let verify = |lfs: *mut Lfs, cfg: *const LfsConfig| -> Result<(), i32> {
-        if lp_littlefs::lfs_mount(lfs, cfg) != 0 {
+        if lp_littlefs_core::lfs_mount(lfs, cfg) != 0 {
             return Ok(());
         }
         let path = path_bytes("avacado");
         let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
-        if lp_littlefs::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY) != 0 {
-            let _ = lp_littlefs::lfs_unmount(lfs);
+        if lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY) != 0 {
+            let _ = lp_littlefs_core::lfs_unmount(lfs);
             return Ok(());
         }
-        let sz = lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr());
+        let sz = lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr());
         if sz == size as i32 {
             verify_prng_file(lfs, file.as_mut_ptr(), size, chunk_size, 1);
         }
-        let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+        let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
         if e != 0 {
             return Err(e);
         }
-        let e = lp_littlefs::lfs_unmount(lfs);
+        let e = lp_littlefs_core::lfs_unmount(lfs);
         if e != 0 {
             return Err(e);
         }
@@ -783,18 +783,18 @@ fn test_files_many_power_loss() {
     let config_ptr = &env.config as *const LfsConfig;
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
 
-    assert_ok(lp_littlefs::lfs_format(lfs.as_mut_ptr(), config_ptr));
-    assert_ok(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), config_ptr));
-    assert_ok(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()));
+    assert_ok(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), config_ptr));
+    assert_ok(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), config_ptr));
+    assert_ok(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()));
     let snapshot = env.snapshot();
 
     let max_iter = 2000;
 
     let op = |lfs: *mut Lfs, cfg: *const LfsConfig| -> Result<(), i32> {
-        let err = lp_littlefs::lfs_mount(lfs, cfg);
+        let err = lp_littlefs_core::lfs_mount(lfs, cfg);
         if err != 0 {
-            let _ = lp_littlefs::lfs_format(lfs, cfg);
-            let e = lp_littlefs::lfs_mount(lfs, cfg);
+            let _ = lp_littlefs_core::lfs_format(lfs, cfg);
+            let e = lp_littlefs_core::lfs_mount(lfs, cfg);
             if e != 0 {
                 return Err(e);
             }
@@ -802,7 +802,7 @@ fn test_files_many_power_loss() {
         for i in 0..N {
             let path = path_bytes(&format!("file_{:03}", i));
             let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
-            let e = lp_littlefs::lfs_file_open(
+            let e = lp_littlefs_core::lfs_file_open(
                 lfs,
                 file.as_mut_ptr(),
                 path.as_ptr(),
@@ -814,9 +814,9 @@ fn test_files_many_power_loss() {
             let content = format!("Hi {:03}\0", i);
             let bytes = content.as_bytes();
             assert_eq!(bytes.len(), 7);
-            let sz = lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr());
+            let sz = lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr());
             if sz != bytes.len() as i32 {
-                let n = lp_littlefs::lfs_file_write(
+                let n = lp_littlefs_core::lfs_file_write(
                     lfs,
                     file.as_mut_ptr(),
                     bytes.as_ptr() as *const core::ffi::c_void,
@@ -827,19 +827,19 @@ fn test_files_many_power_loss() {
                 }
                 assert_eq!(n, bytes.len() as i32);
             }
-            let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
 
             let mut rfile = core::mem::MaybeUninit::<LfsFile>::zeroed();
             let e =
-                lp_littlefs::lfs_file_open(lfs, rfile.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+                lp_littlefs_core::lfs_file_open(lfs, rfile.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
             if e != 0 {
                 return Err(e);
             }
             let mut buf = [0u8; 32];
-            let n = lp_littlefs::lfs_file_read(
+            let n = lp_littlefs_core::lfs_file_read(
                 lfs,
                 rfile.as_mut_ptr(),
                 buf.as_mut_ptr() as *mut core::ffi::c_void,
@@ -847,12 +847,12 @@ fn test_files_many_power_loss() {
             );
             assert_eq!(n, 7);
             assert_eq!(&buf[..7], bytes);
-            let e = lp_littlefs::lfs_file_close(lfs, rfile.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_close(lfs, rfile.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
         }
-        let e = lp_littlefs::lfs_unmount(lfs);
+        let e = lp_littlefs_core::lfs_unmount(lfs);
         if e != 0 {
             return Err(e);
         }
@@ -874,7 +874,7 @@ fn test_files_same_session() {
     init_context(&mut env);
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
-    assert_ok(lp_littlefs::lfs_format(
+    assert_ok(lp_littlefs_core::lfs_format(
         lfs.as_mut_ptr(),
         &env.config as *const LfsConfig,
     ));

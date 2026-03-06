@@ -1,4 +1,4 @@
-//! Shared test helpers for lp-littlefs integration tests.
+//! Shared test helpers for lp-littlefs-core integration tests.
 //!
 //! Reduces duplication across test files. Provides RAM block device, config builder,
 //! and assert helpers. Upstream reference: tests/test_superblocks.toml
@@ -9,7 +9,7 @@ pub mod dump;
 pub mod powerloss;
 
 use core::cell::RefCell;
-use lp_littlefs::{LfsConfig, LFS_ERR_CORRUPT};
+use lp_littlefs_core::{LfsConfig, LFS_ERR_CORRUPT};
 
 /// Initialize env_logger for tests that use logging. Idempotent.
 pub fn init_logger() {
@@ -616,11 +616,11 @@ pub fn path_bytes(s: &str) -> Vec<u8> {
 
 /// Read directory entry names (excluding "." and "..") from path. For use in dir tests.
 pub fn dir_entry_names(
-    lfs: *mut lp_littlefs::Lfs,
+    lfs: *mut lp_littlefs_core::Lfs,
     _config: *const LfsConfig,
     path_str: &str,
 ) -> Result<Vec<String>, i32> {
-    use lp_littlefs::{lfs_dir_close, lfs_dir_open, lfs_dir_read, LfsDir, LfsInfo};
+    use lp_littlefs_core::{lfs_dir_close, lfs_dir_open, lfs_dir_read, LfsDir, LfsInfo};
 
     let path = path_bytes(path_str);
     let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
@@ -673,7 +673,7 @@ pub const LFS_FILE_MAX: i32 = 2_147_483_647;
 /// Format, mount, create "hello" file with "Hello World!\0", unmount.
 /// Returns env. Caller mounts again before reading.
 pub fn fs_with_hello(env: &mut TestEnv) -> Result<(), i32> {
-    use lp_littlefs::{
+    use lp_littlefs_core::{
         lfs_file_close, lfs_file_open, lfs_file_write, lfs_format, lfs_mount, lfs_unmount, Lfs,
         LfsConfig, LfsFile,
     };
@@ -727,14 +727,14 @@ pub fn fs_with_hello(env: &mut TestEnv) -> Result<(), i32> {
 
 /// Get the metadata block number (`m.pair[0]`) for a directory while mounted.
 /// Caller must unmount before corrupting the returned block.
-pub fn dir_block(lfs: *mut lp_littlefs::Lfs, dir_path: &str) -> u32 {
+pub fn dir_block(lfs: *mut lp_littlefs_core::Lfs, dir_path: &str) -> u32 {
     dir_pair(lfs, dir_path)[0]
 }
 
 /// Get both metadata block numbers (`m.pair[0]`, `m.pair[1]`) for a directory while mounted.
 /// Used by fix_relocation tests to set wear on dir pairs.
-pub fn dir_pair(lfs: *mut lp_littlefs::Lfs, dir_path: &str) -> [u32; 2] {
-    use lp_littlefs::{lfs_dir_close, lfs_dir_open, LfsDir};
+pub fn dir_pair(lfs: *mut lp_littlefs_core::Lfs, dir_path: &str) -> [u32; 2] {
+    use lp_littlefs_core::{lfs_dir_close, lfs_dir_open, LfsDir};
 
     let path = path_bytes(dir_path);
     let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
@@ -788,7 +788,7 @@ pub fn config_with_inline_max(block_count: u32, inline_max: i32) -> TestEnv {
 /// Format fs, sync, return raw content of superblock blocks 0 and 1.
 /// Helper for debug tests. Caller must init_context before.
 pub fn format_and_read_superblock_blocks(env: &mut TestEnv) -> Result<(Vec<u8>, Vec<u8>), i32> {
-    use lp_littlefs::{lfs_format, Lfs};
+    use lp_littlefs_core::{lfs_format, Lfs};
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
     let err = lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig);
@@ -1145,8 +1145,8 @@ pub fn advance_prng(state: &mut u32, n: u32) {
 /// }
 /// ```
 pub fn write_prng_file(
-    lfs: *mut lp_littlefs::Lfs,
-    file: *mut lp_littlefs::LfsFile,
+    lfs: *mut lp_littlefs_core::Lfs,
+    file: *mut lp_littlefs_core::LfsFile,
     size: u32,
     chunk_size: u32,
     seed: u32,
@@ -1159,7 +1159,7 @@ pub fn write_prng_file(
         for slot in buffer[..chunk as usize].iter_mut() {
             *slot = (test_prng(&mut prng) & 0xff) as u8;
         }
-        let n = lp_littlefs::lfs_file_write(
+        let n = lp_littlefs_core::lfs_file_write(
             lfs,
             file,
             buffer.as_ptr() as *const core::ffi::c_void,
@@ -1178,8 +1178,8 @@ pub fn write_prng_file(
 /// Like write_prng_file but returns Err on write failure (e.g. power-loss LFS_ERR_IO).
 /// Use in power-loss tests where writes can legitimately fail.
 pub fn write_prng_file_result(
-    lfs: *mut lp_littlefs::Lfs,
-    file: *mut lp_littlefs::LfsFile,
+    lfs: *mut lp_littlefs_core::Lfs,
+    file: *mut lp_littlefs_core::LfsFile,
     size: u32,
     chunk_size: u32,
     seed: u32,
@@ -1192,7 +1192,7 @@ pub fn write_prng_file_result(
         for slot in buffer[..chunk as usize].iter_mut() {
             *slot = (test_prng(&mut prng) & 0xff) as u8;
         }
-        let n = lp_littlefs::lfs_file_write(
+        let n = lp_littlefs_core::lfs_file_write(
             lfs,
             file,
             buffer.as_ptr() as *const core::ffi::c_void,
@@ -1224,8 +1224,8 @@ pub fn write_prng_file_result(
 /// }
 /// ```
 pub fn verify_prng_file(
-    lfs: *mut lp_littlefs::Lfs,
-    file: *mut lp_littlefs::LfsFile,
+    lfs: *mut lp_littlefs_core::Lfs,
+    file: *mut lp_littlefs_core::LfsFile,
     size: u32,
     chunk_size: u32,
     seed: u32,
@@ -1235,7 +1235,7 @@ pub fn verify_prng_file(
     let mut i: u32 = 0;
     while i < size {
         let chunk = core::cmp::min(chunk_size, size - i);
-        let n = lp_littlefs::lfs_file_read(
+        let n = lp_littlefs_core::lfs_file_read(
             lfs,
             file,
             buffer.as_mut_ptr() as *mut core::ffi::c_void,
@@ -1261,8 +1261,8 @@ pub fn verify_prng_file(
 /// Same as verify_prng_file but uses existing PRNG state (for verifying a tail after advance).
 /// Used when reading SIZE2..SIZE1 in test_files_rewrite (PRNG was advanced by SIZE2 from seed 1).
 pub fn verify_prng_file_with_state(
-    lfs: *mut lp_littlefs::Lfs,
-    file: *mut lp_littlefs::LfsFile,
+    lfs: *mut lp_littlefs_core::Lfs,
+    file: *mut lp_littlefs_core::LfsFile,
     size: u32,
     chunk_size: u32,
     prng: &mut u32,
@@ -1271,7 +1271,7 @@ pub fn verify_prng_file_with_state(
     let mut i: u32 = 0;
     while i < size {
         let chunk = core::cmp::min(chunk_size, size - i);
-        let n = lp_littlefs::lfs_file_read(
+        let n = lp_littlefs_core::lfs_file_read(
             lfs,
             file,
             buffer.as_mut_ptr() as *mut core::ffi::c_void,

@@ -92,5 +92,5 @@ After phase 3, update test-parity2 phase 7 to cover only the 3 version edge case
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs-compat
+cargo test -p lp-littlefs-core-compat
 ```

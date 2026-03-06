@@ -9,8 +9,8 @@ use common::{
     assert_err, assert_ok, assert_superblock_magic, clone_config_with_block_count, default_config,
     init_context, path_bytes, LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY,
 };
-use lp_littlefs::lfs_type::lfs_type::LFS_TYPE_REG;
-use lp_littlefs::{
+use lp_littlefs_core::lfs_type::lfs_type::LFS_TYPE_REG;
+use lp_littlefs_core::{
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_write, lfs_format, lfs_fs_grow,
     lfs_fs_stat, lfs_mount, lfs_remove, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsFile, LfsFsinfo,
     LfsInfo, LFS_ERR_INVAL, LFS_ERR_NOENT,
@@ -66,10 +66,10 @@ fn test_traverse_attrs_callback_order() {
     let mut env = default_config(128);
     init_context(&mut env);
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
-    let mut out = lp_littlefs::TraverseTestOut::default();
+    let mut out = lp_littlefs_core::TraverseTestOut::default();
 
     assert_ok(unsafe {
-        lp_littlefs::test_traverse_format_attrs(
+        lp_littlefs_core::test_traverse_format_attrs(
             lfs.as_mut_ptr(),
             &env.config as *const LfsConfig,
             &mut out as *mut _,
@@ -88,10 +88,10 @@ fn test_traverse_filter_gets_superblock_after_push() {
     let mut env = default_config(128);
     init_context(&mut env);
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
-    let mut out = lp_littlefs::TraverseTestOut::default();
+    let mut out = lp_littlefs_core::TraverseTestOut::default();
 
     assert_ok(unsafe {
-        lp_littlefs::test_traverse_filter_gets_superblock_after_push(
+        lp_littlefs_core::test_traverse_filter_gets_superblock_after_push(
             lfs.as_mut_ptr(),
             &env.config as *const LfsConfig,
             &mut out as *mut _,
@@ -121,7 +121,7 @@ fn test_superblocks_invalid_mount() {
     init_context(&mut env);
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
     let err = lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig);
-    assert_err(lp_littlefs::LFS_ERR_CORRUPT, err);
+    assert_err(lp_littlefs_core::LFS_ERR_CORRUPT, err);
 }
 
 // --- test_superblocks_stat ---
@@ -460,7 +460,7 @@ fn test_superblocks_reentrant_expand() {
                                 return Err(e);
                             }
                         }
-                    } else if err != lp_littlefs::LFS_ERR_NOENT || i != 0 {
+                    } else if err != lp_littlefs_core::LFS_ERR_NOENT || i != 0 {
                         let _ = lfs_unmount(lfs_ptr);
                         return Err(err);
                     }

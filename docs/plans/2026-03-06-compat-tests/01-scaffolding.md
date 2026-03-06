@@ -88,7 +88,7 @@ Empty modules with doc comments. Implementation comes in phase 2.
 ### 5. Verify build
 
 ```bash
-cargo build -p lp-littlefs-compat
+cargo build -p lp-littlefs-core-compat
 ```
 
 Both `littlefs2-sys` (C compilation + bindgen) and `lp-littlefs` must link cleanly.
@@ -96,6 +96,6 @@ Both `littlefs2-sys` (C compilation + bindgen) and `lp-littlefs` must link clean
 ## Validate
 
 ```bash
-cargo build -p lp-littlefs-compat
-cargo test -p lp-littlefs-compat  # no tests yet, just verify it compiles
+cargo build -p lp-littlefs-core-compat
+cargo test -p lp-littlefs-core-compat  # no tests yet, just verify it compiles
 ```

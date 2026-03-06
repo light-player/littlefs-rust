@@ -122,10 +122,10 @@ impl SharedStorage {
         0
     }
 
-    // ── Rust (lp-littlefs) callbacks ────────────────────────────────────
+    // ── Rust (lp-littlefs-core) callbacks ────────────────────────────────────
 
     unsafe extern "C" fn rust_read(
-        c: *const lp_littlefs::LfsConfig,
+        c: *const lp_littlefs_core::LfsConfig,
         block: u32,
         off: u32,
         buffer: *mut u8,
@@ -137,7 +137,7 @@ impl SharedStorage {
     }
 
     unsafe extern "C" fn rust_prog(
-        c: *const lp_littlefs::LfsConfig,
+        c: *const lp_littlefs_core::LfsConfig,
         block: u32,
         off: u32,
         buffer: *const u8,
@@ -148,12 +148,12 @@ impl SharedStorage {
         storage.prog_impl(block, off, buf)
     }
 
-    unsafe extern "C" fn rust_erase(c: *const lp_littlefs::LfsConfig, block: u32) -> i32 {
+    unsafe extern "C" fn rust_erase(c: *const lp_littlefs_core::LfsConfig, block: u32) -> i32 {
         let storage = &*((*c).context as *const SharedStorage);
         storage.erase_impl(block)
     }
 
-    unsafe extern "C" fn rust_sync(_c: *const lp_littlefs::LfsConfig) -> i32 {
+    unsafe extern "C" fn rust_sync(_c: *const lp_littlefs_core::LfsConfig) -> i32 {
         0
     }
 
@@ -187,7 +187,7 @@ impl SharedStorage {
         }
     }
 
-    /// Build an `lp_littlefs::LfsConfig` with owned buffers pointing at this storage.
+    /// Build an `lp_littlefs_core::LfsConfig` with owned buffers pointing at this storage.
     pub fn build_rust_env(&self) -> RustEnv {
         let cache_sz = self.geo.cache_size as usize;
         let la_sz = self.geo.lookahead_size as usize;
@@ -195,7 +195,7 @@ impl SharedStorage {
         let mut prog_buf = vec![0u8; cache_sz];
         let mut lookahead_buf = vec![0u8; la_sz];
 
-        let config = lp_littlefs::LfsConfig {
+        let config = lp_littlefs_core::LfsConfig {
             context: self as *const SharedStorage as *mut c_void,
             read: Some(Self::rust_read),
             prog: Some(Self::rust_prog),
@@ -228,10 +228,10 @@ impl SharedStorage {
     }
 }
 
-/// Owned config + buffers for the Rust (lp-littlefs) side.
+/// Owned config + buffers for the Rust (lp-littlefs-core) side.
 /// Buffers must outlive any lfs_* calls using this config.
 pub struct RustEnv {
-    pub config: lp_littlefs::LfsConfig,
+    pub config: lp_littlefs_core::LfsConfig,
     _read_buf: Vec<u8>,
     _prog_buf: Vec<u8>,
     _lookahead_buf: Vec<u8>,

@@ -11,7 +11,7 @@ use common::{
     assert_ok, config_with_wear_leveling_full, init_wear_leveling_context, BadBlockBehavior,
     LFS_O_CREAT, LFS_O_RDONLY, LFS_O_WRONLY,
 };
-use lp_littlefs::{
+use lp_littlefs_core::{
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_write, lfs_format, lfs_mkdir, lfs_mount,
     lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsFile, LfsInfo, LFS_ERR_CORRUPT, LFS_ERR_NOSPC,
 };

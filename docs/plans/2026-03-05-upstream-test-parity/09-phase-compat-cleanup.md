@@ -66,17 +66,17 @@ All guarded by `LFS_DISK_VERSION == LFSP_DISK_VERSION && DISK_VERSION == 0`.
 
 ```bash
 # Full suite (all non-ignored tests pass)
-cargo test -p lp-littlefs 2>&1
+cargo test -p lp-littlefs-core 2>&1
 
 # List all tests
-cargo test -p lp-littlefs -- --list 2>&1 | wc -l
+cargo test -p lp-littlefs-core -- --list 2>&1 | wc -l
 
 # Count stubs remaining
-cargo test -p lp-littlefs -- --list --ignored 2>&1 | grep -c "stub"
+cargo test -p lp-littlefs-core -- --list --ignored 2>&1 | grep -c "stub"
 
 # Formatting and lints
-cargo fmt -p lp-littlefs --check
-cargo clippy -p lp-littlefs -- -D warnings
+cargo fmt -p lp-littlefs-core --check
+cargo clippy -p lp-littlefs-core -- -D warnings
 ```
 
 ### Coverage report

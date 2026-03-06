@@ -1,7 +1,7 @@
 //! Upstream: tests/test_compat.toml
 //!
 //! Version edge-case tests. The 14 forward/backward compat tests live in
-//! lp-littlefs-compat where they test actual C ↔ Rust interop.
+//! lp-littlefs-core-compat where they test actual C ↔ Rust interop.
 //! These 3 remaining tests exercise superblock version field handling.
 
 mod common;

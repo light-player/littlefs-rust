@@ -13,7 +13,7 @@ use common::{
     },
     read_block_raw, write_block_raw, LFS_O_APPEND, LFS_O_CREAT, LFS_O_RDONLY, LFS_O_WRONLY,
 };
-use lp_littlefs::{
+use lp_littlefs_core::{
     lfs_dir_close, lfs_dir_open, lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_sync,
     lfs_file_write, lfs_format, lfs_mkdir, lfs_mount, lfs_unmount, Lfs, LfsConfig, LfsDir, LfsFile,
     LFS_ERR_IO,
@@ -328,8 +328,8 @@ fn test_powerloss_partial_prog() {
                 &format!("mount after corrupt off={byte_off} val=0x{byte_value:02x}"),
                 lfs_mount(lfs.as_mut_ptr(), cfg),
             );
-            let mut info = core::mem::MaybeUninit::<lp_littlefs::LfsInfo>::zeroed();
-            let r = lp_littlefs::lfs_stat(lfs.as_mut_ptr(), path_a.as_ptr(), info.as_mut_ptr());
+            let mut info = core::mem::MaybeUninit::<lp_littlefs_core::LfsInfo>::zeroed();
+            let r = lp_littlefs_core::lfs_stat(lfs.as_mut_ptr(), path_a.as_ptr(), info.as_mut_ptr());
             assert!(r == 0, "lfs_stat a after corrupt: {r}");
             assert_ok_at("unmount after verify", lfs_unmount(lfs.as_mut_ptr()));
         }

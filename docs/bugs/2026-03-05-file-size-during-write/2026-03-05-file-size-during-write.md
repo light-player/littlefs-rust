@@ -18,7 +18,7 @@ High. Affects all callers of `lfs_file_size` and `lfs_file_seek` with
 The Rust `lfs_file_size_` is a direct translation of only the fallback path:
 
 ```rust
-// lp-littlefs/src/file/ops.rs:1684-1689
+// lp-littlefs-core/src/file/ops.rs:1684-1689
 pub fn lfs_file_size_(
     _lfs: *const core::ffi::c_void,
     file: *const LfsFile,

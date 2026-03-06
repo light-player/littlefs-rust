@@ -9,8 +9,8 @@ use common::{
     assert_err, assert_ok, default_config, dir_entry_names, init_context, init_logger, path_bytes,
     LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY,
 };
-use lp_littlefs::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_REG};
-use lp_littlefs::{
+use lp_littlefs_core::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_REG};
+use lp_littlefs_core::{
     lfs_dir_close, lfs_dir_open, lfs_dir_read, lfs_dir_rewind, lfs_dir_seek, lfs_dir_tell,
     lfs_file_close, lfs_file_open, lfs_format, lfs_mkdir, lfs_mount, lfs_remove, lfs_rename,
     lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsDir, LfsFile, LfsInfo, LFS_ERR_EXIST, LFS_ERR_ISDIR,

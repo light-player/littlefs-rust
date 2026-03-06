@@ -1,5 +1,5 @@
 [package]
-name = "lp-littlefs"
+name = "lp-littlefs-core"
 version = "0.1.0"
 edition = "2021"
 description = "Hand-translated LittleFS from C to Rust (no C dependencies)"
@@ -7,7 +7,7 @@ license = "BSD-3-Clause"
 repository = "https://github.com/light-player/lp-littlefs"
 
 [lib]
-name = "lp_littlefs"
+name = "lp_littlefs_core"
 path = "src/lib.rs"
 
 [dependencies]

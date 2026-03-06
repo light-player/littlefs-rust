@@ -104,6 +104,6 @@ Gate the test with `#[cfg(feature = "shrink")]`. The test should note that it re
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs test_superblocks_metadata_max
-cargo test -p lp-littlefs --features shrink test_superblocks_shrink
+cargo test -p lp-littlefs-core test_superblocks_metadata_max
+cargo test -p lp-littlefs-core --features shrink test_superblocks_shrink
 ```

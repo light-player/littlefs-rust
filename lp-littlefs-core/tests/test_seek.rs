@@ -6,7 +6,7 @@ use common::{
     assert_ok, default_config, init_context, path_bytes, LFS_FILE_MAX, LFS_O_APPEND, LFS_O_CREAT,
     LFS_O_RDONLY, LFS_O_RDWR, LFS_O_WRONLY, LFS_SEEK_CUR, LFS_SEEK_END, LFS_SEEK_SET,
 };
-use lp_littlefs::{
+use lp_littlefs_core::{
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_rewind, lfs_file_seek, lfs_file_size,
     lfs_file_sync, lfs_file_tell, lfs_file_write, lfs_format, lfs_mount, lfs_unmount, Lfs,
     LfsConfig, LfsFile, LFS_ERR_INVAL,
@@ -1162,16 +1162,16 @@ fn test_seek_reentrant_write(#[case] count: u32) {
     let config_ptr = &env.config as *const LfsConfig;
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
 
-    assert_ok(lp_littlefs::lfs_format(lfs.as_mut_ptr(), config_ptr));
-    assert_ok(lp_littlefs::lfs_mount(lfs.as_mut_ptr(), config_ptr));
-    assert_ok(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()));
+    assert_ok(lp_littlefs_core::lfs_format(lfs.as_mut_ptr(), config_ptr));
+    assert_ok(lp_littlefs_core::lfs_mount(lfs.as_mut_ptr(), config_ptr));
+    assert_ok(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()));
     let snapshot = env.snapshot();
 
     let op = |lfs: *mut Lfs, cfg: *const LfsConfig| -> Result<(), i32> {
-        let err = lp_littlefs::lfs_mount(lfs, cfg);
+        let err = lp_littlefs_core::lfs_mount(lfs, cfg);
         if err != 0 {
-            let _ = lp_littlefs::lfs_format(lfs, cfg);
-            let e = lp_littlefs::lfs_mount(lfs, cfg);
+            let _ = lp_littlefs_core::lfs_format(lfs, cfg);
+            let e = lp_littlefs_core::lfs_mount(lfs, cfg);
             if e != 0 {
                 return Err(e);
             }
@@ -1182,13 +1182,13 @@ fn test_seek_reentrant_write(#[case] count: u32) {
         let mut buf = [0u8; 32];
 
         let open_err =
-            lp_littlefs::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+            lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
         if open_err == 0 {
-            let sz = lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr());
+            let sz = lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr());
             if sz != 0 {
                 assert_eq!(sz, (count * 11) as i32);
                 for _ in 0..count {
-                    let n = lp_littlefs::lfs_file_read(
+                    let n = lp_littlefs_core::lfs_file_read(
                         lfs,
                         file.as_mut_ptr(),
                         buf.as_mut_ptr() as *mut core::ffi::c_void,
@@ -1203,7 +1203,7 @@ fn test_seek_reentrant_write(#[case] count: u32) {
                     );
                 }
             }
-            let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+            let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
             if e != 0 {
                 return Err(e);
             }
@@ -1211,7 +1211,7 @@ fn test_seek_reentrant_write(#[case] count: u32) {
             assert_eq!(open_err, LFS_ERR_NOENT);
         }
 
-        let e = lp_littlefs::lfs_file_open(
+        let e = lp_littlefs_core::lfs_file_open(
             lfs,
             file.as_mut_ptr(),
             path.as_ptr(),
@@ -1220,9 +1220,9 @@ fn test_seek_reentrant_write(#[case] count: u32) {
         if e != 0 {
             return Err(e);
         }
-        if lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr()) == 0 {
+        if lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr()) == 0 {
             for _ in 0..count {
-                let n = lp_littlefs::lfs_file_write(
+                let n = lp_littlefs_core::lfs_file_write(
                     lfs,
                     file.as_mut_ptr(),
                     KITTY.as_ptr() as *const core::ffi::c_void,
@@ -1234,17 +1234,17 @@ fn test_seek_reentrant_write(#[case] count: u32) {
                 assert_eq!(n, KITTY.len() as i32);
             }
         }
-        let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+        let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
         if e != 0 {
             return Err(e);
         }
 
-        let e = lp_littlefs::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
+        let e = lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
         if e != 0 {
             return Err(e);
         }
         assert_eq!(
-            lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr()),
+            lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr()),
             (count * 11) as i32
         );
 
@@ -1252,11 +1252,11 @@ fn test_seek_reentrant_write(#[case] count: u32) {
         for _ in 0..count {
             off = (5 * off + 1) % count;
             let pos = (off * 11) as i32;
-            let seek_res = lp_littlefs::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
+            let seek_res = lp_littlefs_core::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
             if seek_res != pos {
                 return Err(-1);
             }
-            let n = lp_littlefs::lfs_file_read(
+            let n = lp_littlefs_core::lfs_file_read(
                 lfs,
                 file.as_mut_ptr(),
                 buf.as_mut_ptr() as *mut core::ffi::c_void,
@@ -1268,11 +1268,11 @@ fn test_seek_reentrant_write(#[case] count: u32) {
             assert!(&buf[..11] == KITTY || &buf[..11] == DOGGO);
             if &buf[..11] != DOGGO {
                 let seek_res =
-                    lp_littlefs::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
+                    lp_littlefs_core::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
                 if seek_res != pos {
                     return Err(-1);
                 }
-                let n = lp_littlefs::lfs_file_write(
+                let n = lp_littlefs_core::lfs_file_write(
                     lfs,
                     file.as_mut_ptr(),
                     DOGGO.as_ptr() as *const core::ffi::c_void,
@@ -1283,11 +1283,11 @@ fn test_seek_reentrant_write(#[case] count: u32) {
                 }
                 assert_eq!(n, DOGGO.len() as i32);
                 let seek_res =
-                    lp_littlefs::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
+                    lp_littlefs_core::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
                 if seek_res != pos {
                     return Err(-1);
                 }
-                let n = lp_littlefs::lfs_file_read(
+                let n = lp_littlefs_core::lfs_file_read(
                     lfs,
                     file.as_mut_ptr(),
                     buf.as_mut_ptr() as *mut core::ffi::c_void,
@@ -1297,16 +1297,16 @@ fn test_seek_reentrant_write(#[case] count: u32) {
                     return Err(-1);
                 }
                 assert_eq!(&buf[..11], DOGGO);
-                let e = lp_littlefs::lfs_file_sync(lfs, file.as_mut_ptr());
+                let e = lp_littlefs_core::lfs_file_sync(lfs, file.as_mut_ptr());
                 if e != 0 {
                     return Err(e);
                 }
                 let seek_res =
-                    lp_littlefs::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
+                    lp_littlefs_core::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
                 if seek_res != pos {
                     return Err(-1);
                 }
-                let n = lp_littlefs::lfs_file_read(
+                let n = lp_littlefs_core::lfs_file_read(
                     lfs,
                     file.as_mut_ptr(),
                     buf.as_mut_ptr() as *mut core::ffi::c_void,
@@ -1319,21 +1319,21 @@ fn test_seek_reentrant_write(#[case] count: u32) {
             }
         }
 
-        let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+        let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
         if e != 0 {
             return Err(e);
         }
 
-        let e = lp_littlefs::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
+        let e = lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
         if e != 0 {
             return Err(e);
         }
         assert_eq!(
-            lp_littlefs::lfs_file_size(lfs, file.as_mut_ptr()),
+            lp_littlefs_core::lfs_file_size(lfs, file.as_mut_ptr()),
             (count * 11) as i32
         );
         for _ in 0..count {
-            let n = lp_littlefs::lfs_file_read(
+            let n = lp_littlefs_core::lfs_file_read(
                 lfs,
                 file.as_mut_ptr(),
                 buf.as_mut_ptr() as *mut core::ffi::c_void,
@@ -1344,11 +1344,11 @@ fn test_seek_reentrant_write(#[case] count: u32) {
             }
             assert_eq!(&buf[..11], DOGGO);
         }
-        let e = lp_littlefs::lfs_file_close(lfs, file.as_mut_ptr());
+        let e = lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr());
         if e != 0 {
             return Err(e);
         }
-        let e = lp_littlefs::lfs_unmount(lfs);
+        let e = lp_littlefs_core::lfs_unmount(lfs);
         if e != 0 {
             return Err(e);
         }

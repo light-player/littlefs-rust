@@ -123,10 +123,10 @@ After this phase, the 14 forward/backward stubs in `lp-littlefs/tests/test_compa
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs-compat test_compat
+cargo test -p lp-littlefs-core-compat test_compat
 # 14 base cases + parameterized variants (10 tests have SIZE parameter = 4 variants each)
 # Expected: ~54 test cases total (4 non-parameterized + 10 * 4 parameterized + 4 non-parameterized)
 
-cargo test -p lp-littlefs-compat
+cargo test -p lp-littlefs-core-compat
 # All compat + operation tests pass
 ```

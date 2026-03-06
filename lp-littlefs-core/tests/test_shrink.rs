@@ -8,7 +8,7 @@ use common::{
     assert_err, assert_ok, clone_config_with_block_count, default_config, init_context,
     LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY,
 };
-use lp_littlefs::{
+use lp_littlefs_core::{
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_write, lfs_format, lfs_fs_grow,
     lfs_mount, lfs_unmount, Lfs, LfsConfig, LfsFile, LFS_ERR_INVAL, LFS_ERR_NOTEMPTY,
 };

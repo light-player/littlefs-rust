@@ -1,7 +1,7 @@
 //! Upstream forward/backward compatibility tests.
 //!
 //! Mirrors test_compat.toml from the C littlefs test suite.
-//! "Forward" = C (littlefs2-sys) creates, Rust (lp-littlefs) reads/writes.
+//! "Forward" = C (littlefs2-sys) creates, Rust (lp-littlefs-core) reads/writes.
 //! "Backward" = Rust creates, C reads/writes.
 
 use lp_littlefs_compat::c_impl;

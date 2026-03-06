@@ -94,6 +94,6 @@ Re-evaluate the `#[ignore]` annotations — some bugs from the old c-align era m
 ## Validate
 
 ```bash
-cargo test -p lp-littlefs-compat test_operations
+cargo test -p lp-littlefs-core-compat test_operations
 # All non-ignored tests pass
 ```

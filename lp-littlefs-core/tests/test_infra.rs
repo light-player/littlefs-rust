@@ -9,7 +9,7 @@ use common::{
     init_badblock_context, init_context, init_wear_leveling_context, test_prng, verify_prng_file,
     write_block_raw, write_prng_file, BadBlockBehavior, LFS_O_CREAT, LFS_O_RDONLY, LFS_O_WRONLY,
 };
-use lp_littlefs::{LfsConfig, LFS_ERR_CORRUPT};
+use lp_littlefs_core::{LfsConfig, LFS_ERR_CORRUPT};
 
 // ── PRNG tests ──────────────────────────────────────────────────────────────
 
@@ -259,48 +259,48 @@ fn test_write_verify_prng_file() {
     let mut env = default_config(128);
     init_context(&mut env);
 
-    let mut lfs = core::mem::MaybeUninit::<lp_littlefs::Lfs>::zeroed();
-    assert_ok(lp_littlefs::lfs_format(
+    let mut lfs = core::mem::MaybeUninit::<lp_littlefs_core::Lfs>::zeroed();
+    assert_ok(lp_littlefs_core::lfs_format(
         lfs.as_mut_ptr(),
         &env.config as *const LfsConfig,
     ));
-    assert_ok(lp_littlefs::lfs_mount(
+    assert_ok(lp_littlefs_core::lfs_mount(
         lfs.as_mut_ptr(),
         &env.config as *const LfsConfig,
     ));
 
     let path = common::path_bytes("prng_test");
-    let mut file = core::mem::MaybeUninit::<lp_littlefs::LfsFile>::zeroed();
+    let mut file = core::mem::MaybeUninit::<lp_littlefs_core::LfsFile>::zeroed();
 
     // Write 256 bytes in 31-byte chunks with seed=1
-    assert_ok(lp_littlefs::lfs_file_open(
+    assert_ok(lp_littlefs_core::lfs_file_open(
         lfs.as_mut_ptr(),
         file.as_mut_ptr(),
         path.as_ptr(),
         LFS_O_WRONLY | LFS_O_CREAT,
     ));
     write_prng_file(lfs.as_mut_ptr(), file.as_mut_ptr(), 256, 31, 1);
-    assert_ok(lp_littlefs::lfs_file_close(
+    assert_ok(lp_littlefs_core::lfs_file_close(
         lfs.as_mut_ptr(),
         file.as_mut_ptr(),
     ));
-    assert_ok(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()));
+    assert_ok(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()));
 
     // Remount and verify
-    assert_ok(lp_littlefs::lfs_mount(
+    assert_ok(lp_littlefs_core::lfs_mount(
         lfs.as_mut_ptr(),
         &env.config as *const LfsConfig,
     ));
-    assert_ok(lp_littlefs::lfs_file_open(
+    assert_ok(lp_littlefs_core::lfs_file_open(
         lfs.as_mut_ptr(),
         file.as_mut_ptr(),
         path.as_ptr(),
         LFS_O_RDONLY,
     ));
     verify_prng_file(lfs.as_mut_ptr(), file.as_mut_ptr(), 256, 31, 1);
-    assert_ok(lp_littlefs::lfs_file_close(
+    assert_ok(lp_littlefs_core::lfs_file_close(
         lfs.as_mut_ptr(),
         file.as_mut_ptr(),
     ));
-    assert_ok(lp_littlefs::lfs_unmount(lfs.as_mut_ptr()));
+    assert_ok(lp_littlefs_core::lfs_unmount(lfs.as_mut_ptr()));
 }

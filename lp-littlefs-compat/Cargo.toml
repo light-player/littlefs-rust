@@ -6,7 +6,7 @@ description = "C ↔ Rust compatibility tests for lp-littlefs"
 license = "BSD-3-Clause"
 
 [dependencies]
-lp-littlefs = { path = "../lp-littlefs" }
+lp-littlefs-core = { path = "../lp-littlefs-core" }
 littlefs2-sys = { version = "0.3", features = ["malloc"] }
 
 [dev-dependencies]

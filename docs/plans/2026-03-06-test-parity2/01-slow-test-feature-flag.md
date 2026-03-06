@@ -84,14 +84,14 @@ fn test_relocations_nonreentrant(
 
 ```bash
 # Normal run — slow tests should not appear at all
-cargo test -p lp-littlefs 2>&1 | grep -c "reentrant\|power_loss\|nonreentrant"
+cargo test -p lp-littlefs-core 2>&1 | grep -c "reentrant\|power_loss\|nonreentrant"
 # Expected: 0
 
 # With feature — slow tests compile and run
-cargo test -p lp-littlefs --features slow_tests -- --list 2>&1 | grep -c "reentrant\|power_loss\|nonreentrant"
+cargo test -p lp-littlefs-core --features slow_tests -- --list 2>&1 | grep -c "reentrant\|power_loss\|nonreentrant"
 # Expected: 25+
 
 # Remaining ignored tests are only genuinely blocked ones
-cargo test -p lp-littlefs -- --list --ignored 2>&1
+cargo test -p lp-littlefs-core -- --list --ignored 2>&1
 # Should show only: dir_seek, oopsallspaces, fewer_blocks, orphans, metadata_max, shrink, compat
 ```

@@ -1,5 +1,5 @@
 //! C ↔ Rust operation-level compat tests.
-//! Ported from lp-littlefs-c-align/tests/align_tests.rs.
+//! Ported from lp-littlefs-core-c-align/tests/align_tests.rs.
 
 use lp_littlefs_compat::c_impl;
 use lp_littlefs_compat::rust_impl;
