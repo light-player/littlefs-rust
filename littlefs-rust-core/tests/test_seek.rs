@@ -1244,7 +1244,8 @@ fn test_seek_reentrant_write(#[case] count: u32) {
             return Err(e);
         }
 
-        let e = littlefs_rust_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
+        let e =
+            littlefs_rust_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
         if e != 0 {
             return Err(e);
         }
@@ -1330,7 +1331,8 @@ fn test_seek_reentrant_write(#[case] count: u32) {
             return Err(e);
         }
 
-        let e = littlefs_rust_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
+        let e =
+            littlefs_rust_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
         if e != 0 {
             return Err(e);
         }

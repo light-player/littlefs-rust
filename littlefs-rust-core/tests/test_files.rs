@@ -626,7 +626,8 @@ fn test_files_reentrant_write_sync(
         }
         let path = path_bytes("avacado");
         let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
-        if littlefs_rust_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY) != 0
+        if littlefs_rust_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY)
+            != 0
         {
             let _ = littlefs_rust_core::lfs_unmount(lfs);
             return Ok(());

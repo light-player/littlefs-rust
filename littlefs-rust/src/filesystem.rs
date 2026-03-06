@@ -153,8 +153,10 @@ impl<S: Storage> Filesystem<S> {
     pub fn format(storage: &mut S, config: &Config) -> Result<(), Error> {
         let mut inner = build_inner_borrowed(storage, config);
         wire_context_borrowed(&mut inner);
-        let rc =
-            littlefs_rust_core::lfs_format(inner.lfs.as_mut_ptr(), &inner.config as *const LfsConfig);
+        let rc = littlefs_rust_core::lfs_format(
+            inner.lfs.as_mut_ptr(),
+            &inner.config as *const LfsConfig,
+        );
         from_lfs_result(rc)
     }
 
@@ -162,8 +164,10 @@ impl<S: Storage> Filesystem<S> {
     pub fn mount(storage: S, config: Config) -> Result<Self, Error> {
         let mut inner = Box::new(build_inner(storage, &config));
         wire_context(&mut inner);
-        let rc =
-            littlefs_rust_core::lfs_mount(inner.lfs.as_mut_ptr(), &inner.config as *const LfsConfig);
+        let rc = littlefs_rust_core::lfs_mount(
+            inner.lfs.as_mut_ptr(),
+            &inner.config as *const LfsConfig,
+        );
         if rc != 0 {
             return Err(Error::from(rc));
         }
