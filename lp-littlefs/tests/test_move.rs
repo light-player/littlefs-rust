@@ -3,12 +3,13 @@
 //! Upstream: tests/test_move.toml
 //! Source: https://github.com/littlefs-project/littlefs/blob/master/tests/test_move.toml
 //!
-//! Corruption and powerloss tests deferred; cross-dir rename implemented via lfs_rename_.
+//! Corruption and powerloss tests; cross-dir rename implemented via lfs_rename_.
 
 mod common;
 
 use common::{
-    assert_err, assert_ok, default_config, dir_entry_names, init_context, init_logger, path_bytes,
+    assert_err, assert_ok, corrupt_block, default_config, dir_block, dir_entry_names, init_context,
+    init_logger, path_bytes,
     powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
     LFS_O_CREAT, LFS_O_RDONLY, LFS_O_TRUNC, LFS_O_WRONLY,
 };
@@ -692,19 +693,412 @@ fn test_move_create_delete_different() {
     assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 }
 
-// --- Deferred: corruption and powerloss ---
+// --- Corruption: file rename ---
 
+// Upstream: test_move_file_corrupt_source
+// Corrupt source dir after rename; rename should stick.
 #[test]
-#[ignore = "block-level corruption simulation not implemented"]
-fn test_move_file_corrupt_source() {}
+fn test_move_file_corrupt_source() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
 
-#[test]
-#[ignore = "block-level corruption simulation not implemented"]
-fn test_move_file_corrupt_source_dest() {}
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("b").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("c").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d").as_ptr()));
 
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC,
+    ));
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"hola\n".as_ptr() as *const core::ffi::c_void,
+            5,
+        ),
+        5
+    );
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"bonjour\n".as_ptr() as *const core::ffi::c_void,
+            8,
+        ),
+        8
+    );
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"ohayo\n".as_ptr() as *const core::ffi::c_void,
+            6,
+        ),
+        6
+    );
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        path_bytes("c/hello").as_ptr(),
+    ));
+
+    let ablock = dir_block(lfs.as_mut_ptr(), "a");
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    corrupt_block(&mut env, ablock);
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    let a_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "a").unwrap();
+    assert_eq!(a_names.len(), 0);
+    let c_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "c").unwrap();
+    assert_eq!(c_names.len(), 1);
+    assert_eq!(c_names[0], "hello");
+
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    assert_ok(lfs_stat(
+        lfs.as_mut_ptr(),
+        path_bytes("c/hello").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_eq!(unsafe { (*info.as_ptr()).size }, 5 + 8 + 6);
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("a/hello").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("b/hello").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path_bytes("c/hello").as_ptr(),
+        LFS_O_RDONLY,
+    ));
+    let mut buf = [0u8; 32];
+    let n = lfs_file_read(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        buf.as_mut_ptr() as *mut core::ffi::c_void,
+        32,
+    );
+    assert_eq!(n, 5 + 8 + 6);
+    assert_eq!(&buf[..5], b"hola\n");
+    assert_eq!(&buf[5..13], b"bonjour\n");
+    assert_eq!(&buf[13..19], b"ohayo\n");
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path_bytes("d/hello").as_ptr(),
+            LFS_O_RDONLY,
+        ),
+    );
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// Upstream: test_move_file_corrupt_source_dest
+// Corrupt both source and dest dirs; rename should roll back.
 #[test]
-#[ignore = "block-level corruption simulation not implemented"]
-fn test_move_file_after_corrupt() {}
+fn test_move_file_corrupt_source_dest() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("b").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("c").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d").as_ptr()));
+
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC,
+    ));
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"hola\n".as_ptr() as *const core::ffi::c_void,
+            5,
+        ),
+        5
+    );
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"bonjour\n".as_ptr() as *const core::ffi::c_void,
+            8,
+        ),
+        8
+    );
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"ohayo\n".as_ptr() as *const core::ffi::c_void,
+            6,
+        ),
+        6
+    );
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        path_bytes("c/hello").as_ptr(),
+    ));
+
+    let ablock = dir_block(lfs.as_mut_ptr(), "a");
+    let cblock = dir_block(lfs.as_mut_ptr(), "c");
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    corrupt_block(&mut env, ablock);
+    corrupt_block(&mut env, cblock);
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    let a_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "a").unwrap();
+    assert_eq!(a_names.len(), 1);
+    assert_eq!(a_names[0], "hello");
+    let c_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "c").unwrap();
+    assert_eq!(c_names.len(), 0);
+
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    assert_ok(lfs_stat(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_eq!(unsafe { (*info.as_ptr()).size }, 5 + 8 + 6);
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("b/hello").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("c/hello").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        LFS_O_RDONLY,
+    ));
+    let mut buf = [0u8; 32];
+    let n = lfs_file_read(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        buf.as_mut_ptr() as *mut core::ffi::c_void,
+        32,
+    );
+    assert_eq!(n, 5 + 8 + 6);
+    assert_eq!(&buf[..5], b"hola\n");
+    assert_eq!(&buf[5..13], b"bonjour\n");
+    assert_eq!(&buf[13..19], b"ohayo\n");
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path_bytes("d/hello").as_ptr(),
+            LFS_O_RDONLY,
+        ),
+    );
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// Upstream: test_move_file_after_corrupt
+// Corrupt both, then redo rename; rename should succeed.
+#[test]
+fn test_move_file_after_corrupt() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("b").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("c").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d").as_ptr()));
+
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC,
+    ));
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"hola\n".as_ptr() as *const core::ffi::c_void,
+            5,
+        ),
+        5
+    );
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"bonjour\n".as_ptr() as *const core::ffi::c_void,
+            8,
+        ),
+        8
+    );
+    assert_eq!(
+        lfs_file_write(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            b"ohayo\n".as_ptr() as *const core::ffi::c_void,
+            6,
+        ),
+        6
+    );
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        path_bytes("c/hello").as_ptr(),
+    ));
+
+    let ablock = dir_block(lfs.as_mut_ptr(), "a");
+    let cblock = dir_block(lfs.as_mut_ptr(), "c");
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    corrupt_block(&mut env, ablock);
+    corrupt_block(&mut env, cblock);
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hello").as_ptr(),
+        path_bytes("c/hello").as_ptr(),
+    ));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    let a_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "a").unwrap();
+    assert_eq!(a_names.len(), 0);
+    let c_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "c").unwrap();
+    assert_eq!(c_names.len(), 1);
+    assert_eq!(c_names[0], "hello");
+
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    assert_ok(lfs_stat(
+        lfs.as_mut_ptr(),
+        path_bytes("c/hello").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_eq!(unsafe { (*info.as_ptr()).size }, 5 + 8 + 6);
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("a/hello").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("b/hello").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+
+    let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+    assert_ok(lfs_file_open(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        path_bytes("c/hello").as_ptr(),
+        LFS_O_RDONLY,
+    ));
+    let mut buf = [0u8; 32];
+    let n = lfs_file_read(
+        lfs.as_mut_ptr(),
+        file.as_mut_ptr(),
+        buf.as_mut_ptr() as *mut core::ffi::c_void,
+        32,
+    );
+    assert_eq!(n, 5 + 8 + 6);
+    assert_eq!(&buf[..5], b"hola\n");
+    assert_eq!(&buf[5..13], b"bonjour\n");
+    assert_eq!(&buf[13..19], b"ohayo\n");
+    assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path_bytes("d/hello").as_ptr(),
+            LFS_O_RDONLY,
+        ),
+    );
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
 
 // --- test_move_reentrant_file ---
 // Power-loss at rename points; verify FS consistent after each simulated power loss.
@@ -768,17 +1162,296 @@ fn test_move_reentrant_file() {
     result.expect("test_move_reentrant_file should complete");
 }
 
+// Upstream: test_move_dir_corrupt_source
+// Corrupt source dir after dir rename; rename should stick.
 #[test]
-#[ignore = "block-level corruption simulation not implemented"]
-fn test_move_dir_corrupt_source() {}
+fn test_move_dir_corrupt_source() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
 
-#[test]
-#[ignore = "block-level corruption simulation not implemented"]
-fn test_move_dir_corrupt_source_dest() {}
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("b").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("c").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a/hi").as_ptr()));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/hola").as_ptr(),
+    ));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/bonjour").as_ptr(),
+    ));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/ohayo").as_ptr(),
+    ));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi").as_ptr(),
+        path_bytes("c/hi").as_ptr(),
+    ));
+
+    let ablock = dir_block(lfs.as_mut_ptr(), "a");
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    corrupt_block(&mut env, ablock);
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    let a_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "a").unwrap();
+    assert_eq!(a_names.len(), 0);
+    let c_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "c").unwrap();
+    assert_eq!(c_names.len(), 1);
+    assert_eq!(c_names[0], "hi");
+
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    assert_ok(lfs_stat(
+        lfs.as_mut_ptr(),
+        path_bytes("c/hi").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_eq!(unsafe { (*info.as_ptr()).type_ }, LFS_TYPE_DIR as u8);
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("a/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("b/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+
+    let hi_names =
+        dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "c/hi").unwrap();
+    assert!(hi_names.contains(&"hola".to_string()));
+    assert!(hi_names.contains(&"bonjour".to_string()));
+    assert!(hi_names.contains(&"ohayo".to_string()));
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("d/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// Upstream: test_move_dir_corrupt_source_dest
+// Corrupt both source and dest; dir rename should roll back.
 #[test]
-#[ignore = "block-level corruption simulation not implemented"]
-fn test_move_dir_after_corrupt() {}
+fn test_move_dir_corrupt_source_dest() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("b").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("c").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a/hi").as_ptr()));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/hola").as_ptr(),
+    ));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/bonjour").as_ptr(),
+    ));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/ohayo").as_ptr(),
+    ));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi").as_ptr(),
+        path_bytes("c/hi").as_ptr(),
+    ));
+
+    let ablock = dir_block(lfs.as_mut_ptr(), "a");
+    let cblock = dir_block(lfs.as_mut_ptr(), "c");
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    corrupt_block(&mut env, ablock);
+    corrupt_block(&mut env, cblock);
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    let a_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "a").unwrap();
+    assert_eq!(a_names.len(), 1);
+    assert_eq!(a_names[0], "hi");
+    let c_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "c").unwrap();
+    assert_eq!(c_names.len(), 0);
+
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    assert_ok(lfs_stat(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_eq!(unsafe { (*info.as_ptr()).type_ }, LFS_TYPE_DIR as u8);
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("b/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("c/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+
+    let hi_names =
+        dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "a/hi").unwrap();
+    assert!(hi_names.contains(&"hola".to_string()));
+    assert!(hi_names.contains(&"bonjour".to_string()));
+    assert!(hi_names.contains(&"ohayo".to_string()));
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("d/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
+
+// Upstream: test_move_dir_after_corrupt
+// Corrupt both, then redo dir rename; rename should succeed.
+#[test]
+fn test_move_dir_after_corrupt() {
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("b").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("c").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("d").as_ptr()));
+    assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("a/hi").as_ptr()));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/hola").as_ptr(),
+    ));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/bonjour").as_ptr(),
+    ));
+    assert_ok(lfs_mkdir(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi/ohayo").as_ptr(),
+    ));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi").as_ptr(),
+        path_bytes("c/hi").as_ptr(),
+    ));
+
+    let ablock = dir_block(lfs.as_mut_ptr(), "a");
+    let cblock = dir_block(lfs.as_mut_ptr(), "c");
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    corrupt_block(&mut env, ablock);
+    corrupt_block(&mut env, cblock);
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    assert_ok(lfs_rename(
+        lfs.as_mut_ptr(),
+        path_bytes("a/hi").as_ptr(),
+        path_bytes("c/hi").as_ptr(),
+    ));
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+    let a_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "a").unwrap();
+    assert_eq!(a_names.len(), 0);
+    let c_names = dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "c").unwrap();
+    assert_eq!(c_names.len(), 1);
+    assert_eq!(c_names[0], "hi");
+
+    let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+    assert_ok(lfs_stat(
+        lfs.as_mut_ptr(),
+        path_bytes("c/hi").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_eq!(unsafe { (*info.as_ptr()).type_ }, LFS_TYPE_DIR as u8);
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("a/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("b/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+
+    let hi_names =
+        dir_entry_names(lfs.as_mut_ptr(), &env.config as *const LfsConfig, "c/hi").unwrap();
+    assert!(hi_names.contains(&"hola".to_string()));
+    assert!(hi_names.contains(&"bonjour".to_string()));
+    assert!(hi_names.contains(&"ohayo".to_string()));
+
+    assert_err(
+        LFS_ERR_NOENT,
+        lfs_stat(
+            lfs.as_mut_ptr(),
+            path_bytes("d/hi").as_ptr(),
+            info.as_mut_ptr(),
+        ),
+    );
+    assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+}
 
 // --- test_reentrant_dir ---
 // Power-loss at cross-dir dir rename points; verify FS consistent after each.

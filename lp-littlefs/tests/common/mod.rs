@@ -574,6 +574,44 @@ pub fn fs_with_hello(env: &mut TestEnv) -> Result<(), i32> {
     Ok(())
 }
 
+/// Get the metadata block number (`m.pair[0]`) for a directory while mounted.
+/// Caller must unmount before corrupting the returned block.
+pub fn dir_block(lfs: *mut lp_littlefs::Lfs, dir_path: &str) -> u32 {
+    use lp_littlefs::{lfs_dir_close, lfs_dir_open, LfsDir};
+
+    let path = path_bytes(dir_path);
+    let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
+    assert_ok(lfs_dir_open(lfs, dir.as_mut_ptr(), path.as_ptr()));
+    let block = unsafe { (*dir.as_ptr()).m.pair[0] };
+    assert_ok(lfs_dir_close(lfs, dir.as_mut_ptr()));
+    block
+}
+
+/// Corrupt a metadata block by overwriting 3 bytes near the last written byte.
+/// Mirrors upstream test_move.toml corruption: find last non-erased (0xff) byte,
+/// then set bytes [off-3..off] to 0x00 (BLOCK_SIZE & 0xff for BLOCK_SIZE=512).
+/// Must be called while FS is unmounted.
+pub fn corrupt_block(env: &mut TestEnv, block: u32) {
+    let block_size = BLOCK_SIZE as usize;
+    let mut buffer = vec![0u8; block_size];
+    assert_eq!(
+        read_block_raw(&env.config as *const LfsConfig, block, 0, &mut buffer),
+        0
+    );
+
+    let mut off = block_size as i32 - 1;
+    while off >= 0 && buffer[off as usize] == 0xff {
+        off -= 1;
+    }
+    assert!(off >= 3, "block {block} has fewer than 4 written bytes");
+
+    let start = (off - 3) as usize;
+    buffer[start..start + 3].fill(0x00);
+
+    env.ram.erase(block);
+    env.ram.prog(block, 0, &buffer);
+}
+
 /// Format fs, sync, return raw content of superblock blocks 0 and 1.
 /// Helper for debug tests. Caller must init_context before.
 pub fn format_and_read_superblock_blocks(env: &mut TestEnv) -> Result<(Vec<u8>, Vec<u8>), i32> {
