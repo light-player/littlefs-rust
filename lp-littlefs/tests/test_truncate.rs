@@ -537,7 +537,7 @@ fn test_truncate_write(#[case] medium: u32, #[case] large: u32) {
 #[rstest]
 #[case(4)]
 #[case(512)]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_truncate_reentrant_write(#[case] small_size: u32) {
     const LARGE: u32 = 2048;
     let medium_sizes = [0u32, 3, 4, 5, 31, 32, 33, 511, 512, 513, 1023, 1024, 1025];

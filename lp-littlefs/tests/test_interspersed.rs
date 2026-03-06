@@ -528,7 +528,7 @@ fn test_interspersed_remove_inconveniently(#[values(10, 100)] size: usize) {
 /// SIZE bytes per file with sync after each byte when size <= i. Close.
 /// Verify directory and read 10 bytes from each.
 #[rstest]
-#[ignore = "power-loss"]
+#[cfg(feature = "slow_tests")]
 fn test_interspersed_reentrant_files(
     #[values(10, 100)] size: usize,
     #[values(4, 10, 26)] files: usize,

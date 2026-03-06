@@ -142,7 +142,7 @@ fn test_relocations_outdated_head(#[values(8, 1)] block_cycles: i32) {
 #[case(6, 1, 2000)]
 #[case(26, 1, 2000)]
 #[case(3, 3, 2000)]
-#[ignore = "slow: CYCLES=2000"]
+#[cfg(feature = "slow_tests")]
 fn test_relocations_nonreentrant(
     #[case] files: usize,
     #[case] depth: usize,
@@ -190,7 +190,7 @@ fn test_relocations_nonreentrant(
 #[case(6, 1, 2000)]
 #[case(26, 1, 2000)]
 #[case(3, 3, 2000)]
-#[ignore = "slow"]
+#[cfg(feature = "slow_tests")]
 fn test_relocations_nonreentrant_renames(
     #[case] _files: usize,
     #[case] depth: usize,
@@ -271,7 +271,7 @@ fn test_relocations_nonreentrant_renames(
 #[case(6, 1, 20)]
 #[case(26, 1, 20)]
 #[case(3, 3, 20)]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_relocations_reentrant(#[case] files: usize, #[case] depth: usize, #[case] cycles: usize) {
     if depth == 3 {
         return; // guard: DEPTH==3 && CACHE_SIZE!=64
@@ -347,7 +347,7 @@ fn test_relocations_reentrant(#[case] files: usize, #[case] depth: usize, #[case
 #[case(6, 1, 20)]
 #[case(26, 1, 20)]
 #[case(3, 3, 20)]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_relocations_reentrant_renames(
     #[case] _files: usize,
     #[case] depth: usize,

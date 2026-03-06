@@ -325,7 +325,7 @@ fn test_dirs_many_rename_append() {
 /// Upstream: [cases.test_dirs_many_reentrant]
 /// defines.N = [5, 11], BLOCK_COUNT >= 4*N, reentrant, POWERLOSS_BEHAVIOR = [NOOP, OOO]
 #[test]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_dirs_many_reentrant() {
     init_logger();
     for n in [5usize, 11] {
@@ -656,7 +656,7 @@ fn test_dirs_file_rename() {
 /// Upstream: [cases.test_dirs_file_reentrant]
 /// defines.N = [5, 25], N < BLOCK_COUNT/2, reentrant, POWERLOSS_BEHAVIOR = [NOOP, OOO]
 #[test]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_dirs_file_reentrant() {
     init_logger();
     for n in [5usize, 25] {

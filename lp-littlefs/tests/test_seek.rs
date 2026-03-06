@@ -1156,7 +1156,7 @@ fn test_seek_inline_write(#[case] size: u32) {
 #[case(4)]
 #[case(64)]
 #[case(128)]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_seek_reentrant_write(#[case] count: u32) {
     let mut env = powerloss_config(256);
     init_powerloss_context(&mut env);

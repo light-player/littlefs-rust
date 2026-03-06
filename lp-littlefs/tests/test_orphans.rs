@@ -165,7 +165,7 @@ fn test_orphans_mkconsistent_one_orphan() {
 /// Upstream: [cases.test_orphans_reentrant]
 /// FILES=[6,26], DEPTH=1; FILES=3,DEPTH=3 skipped when CACHE_SIZE!=64. reentrant, CYCLES=20.
 #[test]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_orphans_reentrant() {
     init_logger();
     const CYCLES: u32 = 20;

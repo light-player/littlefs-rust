@@ -180,7 +180,7 @@ fn test_superblocks_mount_unknown_block_count() {
 /// Upstream: [cases.test_superblocks_reentrant_format]
 /// reentrant = true, POWERLOSS_BEHAVIOR = [NOOP, OOO]. Format under power-loss, then mount.
 #[test]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_superblocks_reentrant_format() {
     let mut env = powerloss_config(128);
     init_powerloss_context(&mut env);
@@ -416,7 +416,7 @@ fn test_superblocks_expand_power_cycle() {
 /// Upstream: [cases.test_superblocks_reentrant_expand]
 /// BLOCK_CYCLES = [2, 1], N = 24, reentrant, POWERLOSS_BEHAVIOR = [NOOP, OOO]
 #[test]
-#[ignore = "slow: power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_superblocks_reentrant_expand() {
     const N: u32 = 24;
     for &block_cycles in &[2i32, 1] {

@@ -774,7 +774,7 @@ fn test_files_many_power_cycle() {
 /// Reentrant creation of 300 files with power-loss simulation.
 /// Can take 30+ seconds due to iteration over power-loss points.
 #[test]
-#[ignore = "slow: 300 files × power-loss iteration"]
+#[cfg(feature = "slow_tests")]
 fn test_files_many_power_loss() {
     const N: usize = 300;
     let mut env = powerloss_config(BLOCK_COUNT_MANY);
