@@ -17,6 +17,7 @@ use lp_littlefs::{
     lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsDir, LfsFile, LfsInfo, LFS_ERR_EXIST, LFS_ERR_ISDIR,
     LFS_ERR_NOENT, LFS_ERR_NOTDIR, LFS_ERR_NOTEMPTY,
 };
+use rstest::rstest;
 
 /// Root path: "/" null-terminated.
 static ROOT_PATH: [u8; 2] = [b'/', 0];
@@ -102,11 +103,24 @@ fn test_dirs_one_mkdir() {
 }
 
 // --- test_dirs_many_creation ---
-// Upstream: defines.N = range(3,100,3). Subset: start with 1 until second-mkdir bug fixed.
-#[test]
-fn test_dirs_many_creation() {
+/// Upstream: [cases.test_dirs_many_creation]
+/// defines.N = range(3, 100, 3), if = 'N < BLOCK_COUNT/2'
+///
+/// Create N dirs dir000..dir{N-1}, unmount, mount, verify dir_read.
+#[rstest]
+fn test_dirs_many_creation(
+    #[values(
+        3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69,
+        72, 75, 78, 81, 84, 87, 90, 93, 96, 99
+    )]
+    n: usize,
+) {
     init_logger();
-    let mut env = default_config(128);
+    let block_count = 256u32;
+    if n >= block_count as usize / 2 {
+        return;
+    }
+    let mut env = default_config(block_count);
     init_context(&mut env);
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
@@ -116,9 +130,8 @@ fn test_dirs_many_creation() {
     ));
     assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
 
-    let n = 1usize; // Subset: upstream range(3,100,3); n>1 untested
     for i in 0..n {
-        let path = path_bytes(&format!("d{i}"));
+        let path = path_bytes(&format!("dir{i:03}"));
         let err = lfs_mkdir(lfs.as_mut_ptr(), path.as_ptr());
         assert_ok(err);
     }
@@ -128,7 +141,7 @@ fn test_dirs_many_creation() {
     assert_eq!(names.len(), n);
     let mut names_sorted = names.clone();
     names_sorted.sort();
-    let expected: Vec<String> = (0..n).map(|i| format!("d{i}")).collect();
+    let expected: Vec<String> = (0..n).map(|i| format!("dir{i:03}")).collect();
     let mut expected_sorted = expected.clone();
     expected_sorted.sort();
     assert_eq!(names_sorted, expected_sorted);
@@ -137,11 +150,18 @@ fn test_dirs_many_creation() {
 }
 
 // --- test_dirs_many_removal ---
-// Upstream: defines.N = range(3,100,11). Subset: 1 until many_creation fixed for n>1.
-#[test]
-fn test_dirs_many_removal() {
+/// Upstream: [cases.test_dirs_many_removal]
+/// defines.N = range(3, 100, 11), if = 'N < BLOCK_COUNT/2'
+///
+/// Create N dirs removeme000.., verify, remove all, verify empty.
+#[rstest]
+fn test_dirs_many_removal(#[values(3, 14, 25, 36, 47, 58, 69, 80, 91)] n: usize) {
     init_logger();
-    let mut env = default_config(128);
+    let block_count = 256u32;
+    if n >= block_count as usize / 2 {
+        return;
+    }
+    let mut env = default_config(block_count);
     init_context(&mut env);
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
@@ -151,13 +171,12 @@ fn test_dirs_many_removal() {
     ));
     assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
 
-    let n = 1usize;
     for i in 0..n {
-        let path = path_bytes(&format!("d{i}"));
+        let path = path_bytes(&format!("removeme{i:03}"));
         assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path.as_ptr()));
     }
     for i in 0..n {
-        let path = path_bytes(&format!("d{i}"));
+        let path = path_bytes(&format!("removeme{i:03}"));
         assert_ok(lfs_remove(lfs.as_mut_ptr(), path.as_ptr()));
     }
 
@@ -169,11 +188,18 @@ fn test_dirs_many_removal() {
 }
 
 // --- test_dirs_many_rename ---
-// Upstream: defines.N = range(3,100,11). Subset: 1 (currently fails: rename returns -1).
-#[test]
-fn test_dirs_many_rename() {
+/// Upstream: [cases.test_dirs_many_rename]
+/// defines.N = range(3, 100, 11), if = 'N < BLOCK_COUNT/2'
+///
+/// Create N dirs test000.., rename to tedd000.., verify.
+#[rstest]
+fn test_dirs_many_rename(#[values(3, 14, 25, 36, 47, 58, 69, 80, 91)] n: usize) {
     init_logger();
-    let mut env = default_config(128);
+    let block_count = 256u32;
+    if n >= block_count as usize / 2 {
+        return;
+    }
+    let mut env = default_config(block_count);
     init_context(&mut env);
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
@@ -183,14 +209,13 @@ fn test_dirs_many_rename() {
     ));
     assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
 
-    let n = 1usize;
     for i in 0..n {
-        let path = path_bytes(&format!("d{i}"));
+        let path = path_bytes(&format!("test{i:03}"));
         assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path.as_ptr()));
     }
     for i in 0..n {
-        let old_path = path_bytes(&format!("d{i}"));
-        let new_path = path_bytes(&format!("x{i}"));
+        let old_path = path_bytes(&format!("test{i:03}"));
+        let new_path = path_bytes(&format!("tedd{i:03}"));
         let err = lfs_rename(lfs.as_mut_ptr(), old_path.as_ptr(), new_path.as_ptr());
         assert_ok(err);
     }
@@ -200,7 +225,7 @@ fn test_dirs_many_rename() {
     assert_eq!(names.len(), n);
     let mut names_sorted = names.clone();
     names_sorted.sort();
-    let expected: Vec<String> = (0..n).map(|i| format!("x{i}")).collect();
+    let expected: Vec<String> = (0..n).map(|i| format!("tedd{i:03}")).collect();
     let mut expected_sorted = expected.clone();
     expected_sorted.sort();
     assert_eq!(names_sorted, expected_sorted);
@@ -441,7 +466,7 @@ fn test_dirs_many_reentrant() {
 #[test]
 fn test_dirs_file_creation() {
     init_logger();
-    for n in [3usize, 14, 25, 36, 47, 58] {
+    for n in [3usize, 14, 25, 36, 47, 58, 69, 80, 91] {
         let mut env = default_config(128);
         init_context(&mut env);
 
@@ -519,7 +544,7 @@ fn test_dirs_file_creation() {
 #[test]
 fn test_dirs_file_removal() {
     init_logger();
-    for n in [3usize, 14, 25, 36, 47, 58] {
+    for n in [3usize, 14, 25, 36, 47, 58, 69, 80, 91] {
         let mut env = default_config(128);
         init_context(&mut env);
 
@@ -574,7 +599,7 @@ fn test_dirs_file_removal() {
 #[test]
 fn test_dirs_file_rename() {
     init_logger();
-    for n in [3usize, 14, 25, 36, 47, 58] {
+    for n in [3usize, 14, 25, 36, 47, 58, 69, 80, 91] {
         let mut env = default_config(128);
         init_context(&mut env);
 
