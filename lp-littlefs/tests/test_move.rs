@@ -8,16 +8,17 @@
 mod common;
 
 use common::{
-    assert_err, assert_ok, corrupt_block, default_config, dir_block, dir_entry_names, init_context,
-    init_logger, path_bytes,
+    assert_err, assert_ok, config_with_wear_leveling, corrupt_block, default_config, dir_block,
+    dir_entry_names, dir_pair, init_context, init_logger, init_wear_leveling_context, path_bytes,
     powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
     LFS_O_CREAT, LFS_O_RDONLY, LFS_O_TRUNC, LFS_O_WRONLY,
 };
-use lp_littlefs::lfs_type::lfs_type::LFS_TYPE_DIR;
+use lp_littlefs::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_REG};
 use lp_littlefs::LFS_ERR_NOENT;
 use lp_littlefs::{
-    lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_write, lfs_format, lfs_mkdir, lfs_mount,
-    lfs_remove, lfs_rename, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsFile, LfsInfo,
+    lfs_dir_close, lfs_dir_open, lfs_dir_read, lfs_file_close, lfs_file_open, lfs_file_read,
+    lfs_file_write, lfs_format, lfs_mkdir, lfs_mount, lfs_remove, lfs_rename, lfs_stat,
+    lfs_unmount, Lfs, LfsConfig, LfsDir, LfsFile, LfsInfo,
 };
 
 // --- test_move_nop ---
@@ -1517,15 +1518,450 @@ fn test_reentrant_dir() {
 // --- Missing upstream stubs ---
 
 /// Upstream: [cases.test_move_fix_relocation]
+/// RELOCATIONS in 0..4, ERASE_CYCLES=0xffffffff. Force dir relocation via set_wear, then rename.
 #[test]
-#[ignore = "stub"]
 fn test_move_fix_relocation() {
-    todo!()
+    init_logger();
+    const ERASE_CYCLES: u32 = 0xffffffff;
+    let mut env = config_with_wear_leveling(256, ERASE_CYCLES);
+    init_wear_leveling_context(&mut env);
+
+    for relocations in 0..4u32 {
+        let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+        assert_ok(lfs_format(
+            lfs.as_mut_ptr(),
+            &env.config as *const LfsConfig,
+        ));
+        assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+        assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("parent").as_ptr()));
+        assert_ok(lfs_mkdir(
+            lfs.as_mut_ptr(),
+            path_bytes("parent/child").as_ptr(),
+        ));
+
+        let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+        assert_ok(lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path_bytes("parent/1.move_me").as_ptr(),
+            LFS_O_WRONLY | LFS_O_CREAT,
+        ));
+        assert_eq!(
+            lfs_file_write(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                b"move me\0".as_ptr() as *const core::ffi::c_void,
+                8,
+            ),
+            8
+        );
+        assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+        for (path, content) in [
+            ("parent/0.before", b"test.1\0"),
+            ("parent/2.after", b"test.2\0"),
+            ("parent/child/0.before", b"test.3\0"),
+            ("parent/child/2.after", b"test.4\0"),
+        ] {
+            assert_ok(lfs_file_open(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                path_bytes(path).as_ptr(),
+                LFS_O_WRONLY | LFS_O_CREAT,
+            ));
+            assert_eq!(
+                lfs_file_write(
+                    lfs.as_mut_ptr(),
+                    file.as_mut_ptr(),
+                    content.as_ptr() as *const core::ffi::c_void,
+                    7,
+                ),
+                7
+            );
+            assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+        }
+
+        let mut files = [
+            core::mem::MaybeUninit::<LfsFile>::zeroed(),
+            core::mem::MaybeUninit::<LfsFile>::zeroed(),
+            core::mem::MaybeUninit::<LfsFile>::zeroed(),
+            core::mem::MaybeUninit::<LfsFile>::zeroed(),
+        ];
+        let paths = [
+            "parent/0.before",
+            "parent/2.after",
+            "parent/child/0.before",
+            "parent/child/2.after",
+        ];
+        for (f, p) in files.iter_mut().zip(paths) {
+            assert_ok(lfs_file_open(
+                lfs.as_mut_ptr(),
+                f.as_mut_ptr(),
+                path_bytes(p).as_ptr(),
+                LFS_O_WRONLY | LFS_O_TRUNC,
+            ));
+        }
+        for (f, content) in
+            files
+                .iter_mut()
+                .zip([b"test.5\0", b"test.6\0", b"test.7\0", b"test.8\0"])
+        {
+            assert_eq!(
+                lfs_file_write(
+                    lfs.as_mut_ptr(),
+                    f.as_mut_ptr(),
+                    content.as_ptr() as *const core::ffi::c_void,
+                    7,
+                ),
+                7
+            );
+        }
+
+        if relocations & 1 != 0 {
+            let pair = dir_pair(lfs.as_mut_ptr(), "parent");
+            env.bd.set_wear(pair[0], 0xffffffff);
+            env.bd.set_wear(pair[1], 0xffffffff);
+        }
+        if relocations & 2 != 0 {
+            let pair = dir_pair(lfs.as_mut_ptr(), "parent/child");
+            env.bd.set_wear(pair[0], 0xffffffff);
+            env.bd.set_wear(pair[1], 0xffffffff);
+        }
+
+        assert_ok(lfs_rename(
+            lfs.as_mut_ptr(),
+            path_bytes("parent/1.move_me").as_ptr(),
+            path_bytes("parent/child/1.move_me").as_ptr(),
+        ));
+
+        for f in &mut files {
+            assert_ok(lfs_file_close(lfs.as_mut_ptr(), f.as_mut_ptr()));
+        }
+
+        let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+        let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
+        assert_ok(lfs_dir_open(
+            lfs.as_mut_ptr(),
+            dir.as_mut_ptr(),
+            path_bytes("parent").as_ptr(),
+        ));
+        let expect_parent = ["0.before", "2.after", "child"];
+        let mut idx = 0;
+        loop {
+            let n = lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr());
+            assert!(n >= 0);
+            if n == 0 {
+                break;
+            }
+            let info_ref = unsafe { &*info.as_ptr() };
+            let nul = info_ref.name.iter().position(|&b| b == 0).unwrap_or(256);
+            let name = core::str::from_utf8(&info_ref.name[..nul]).unwrap();
+            if name == "." || name == ".." {
+                continue;
+            }
+            assert!(idx < expect_parent.len(), "extra entry: {name}");
+            assert_eq!(name, expect_parent[idx]);
+            if idx < 2 {
+                assert_eq!(info_ref.type_, LFS_TYPE_REG as u8);
+                assert_eq!(info_ref.size, 7);
+            } else {
+                assert_eq!(info_ref.type_, LFS_TYPE_DIR as u8);
+            }
+            idx += 1;
+        }
+        assert_eq!(idx, expect_parent.len());
+        assert_eq!(
+            lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+            0
+        );
+        assert_ok(lfs_dir_close(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+
+        assert_ok(lfs_dir_open(
+            lfs.as_mut_ptr(),
+            dir.as_mut_ptr(),
+            path_bytes("parent/child").as_ptr(),
+        ));
+        let expect_child = ["0.before", "1.move_me", "2.after"];
+        let mut idx = 0;
+        loop {
+            let n = lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr());
+            assert!(n >= 0);
+            if n == 0 {
+                break;
+            }
+            let info_ref = unsafe { &*info.as_ptr() };
+            let nul = info_ref.name.iter().position(|&b| b == 0).unwrap_or(256);
+            let name = core::str::from_utf8(&info_ref.name[..nul]).unwrap();
+            if name == "." || name == ".." {
+                continue;
+            }
+            assert!(idx < expect_child.len(), "extra entry: {name}");
+            assert_eq!(name, expect_child[idx]);
+            assert_eq!(info_ref.type_, LFS_TYPE_REG as u8);
+            assert_eq!(info_ref.size, if name == "1.move_me" { 8 } else { 7 });
+            idx += 1;
+        }
+        assert_eq!(idx, expect_child.len());
+        assert_ok(lfs_dir_close(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+
+        let mut buf = [0u8; 32];
+        for (path, expected) in [
+            ("parent/0.before", b"test.5\0"),
+            ("parent/2.after", b"test.6\0"),
+            ("parent/child/0.before", b"test.7\0"),
+            ("parent/child/2.after", b"test.8\0"),
+        ] {
+            assert_ok(lfs_file_open(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                path_bytes(path).as_ptr(),
+                LFS_O_RDONLY,
+            ));
+            assert_eq!(
+                lfs_file_read(
+                    lfs.as_mut_ptr(),
+                    file.as_mut_ptr(),
+                    buf.as_mut_ptr() as *mut core::ffi::c_void,
+                    7,
+                ),
+                7
+            );
+            assert_eq!(&buf[..6], &expected[..6]);
+            assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+        }
+
+        assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    }
 }
 
 /// Upstream: [cases.test_move_fix_relocation_predecessor]
+/// RELOCATIONS in 0..8. Move sibling/1.move_me -> child/1.move_me with forced relocations.
 #[test]
-#[ignore = "stub"]
 fn test_move_fix_relocation_predecessor() {
-    todo!()
+    init_logger();
+    const ERASE_CYCLES: u32 = 0xffffffff;
+    let mut env = config_with_wear_leveling(256, ERASE_CYCLES);
+    init_wear_leveling_context(&mut env);
+
+    for relocations in 0..8u32 {
+        let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+        assert_ok(lfs_format(
+            lfs.as_mut_ptr(),
+            &env.config as *const LfsConfig,
+        ));
+        assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+        assert_ok(lfs_mkdir(lfs.as_mut_ptr(), path_bytes("parent").as_ptr()));
+        assert_ok(lfs_mkdir(
+            lfs.as_mut_ptr(),
+            path_bytes("parent/child").as_ptr(),
+        ));
+        assert_ok(lfs_mkdir(
+            lfs.as_mut_ptr(),
+            path_bytes("parent/sibling").as_ptr(),
+        ));
+
+        let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
+        assert_ok(lfs_file_open(
+            lfs.as_mut_ptr(),
+            file.as_mut_ptr(),
+            path_bytes("parent/sibling/1.move_me").as_ptr(),
+            LFS_O_WRONLY | LFS_O_CREAT,
+        ));
+        assert_eq!(
+            lfs_file_write(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                b"move me\0".as_ptr() as *const core::ffi::c_void,
+                8,
+            ),
+            8
+        );
+        assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+
+        for (path, content) in [
+            ("parent/sibling/0.before", b"test.1\0"),
+            ("parent/sibling/2.after", b"test.2\0"),
+            ("parent/child/0.before", b"test.3\0"),
+            ("parent/child/2.after", b"test.4\0"),
+        ] {
+            assert_ok(lfs_file_open(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                path_bytes(path).as_ptr(),
+                LFS_O_WRONLY | LFS_O_CREAT,
+            ));
+            assert_eq!(
+                lfs_file_write(
+                    lfs.as_mut_ptr(),
+                    file.as_mut_ptr(),
+                    content.as_ptr() as *const core::ffi::c_void,
+                    7,
+                ),
+                7
+            );
+            assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+        }
+
+        let mut files = [
+            core::mem::MaybeUninit::<LfsFile>::zeroed(),
+            core::mem::MaybeUninit::<LfsFile>::zeroed(),
+            core::mem::MaybeUninit::<LfsFile>::zeroed(),
+            core::mem::MaybeUninit::<LfsFile>::zeroed(),
+        ];
+        let paths = [
+            "parent/sibling/0.before",
+            "parent/sibling/2.after",
+            "parent/child/0.before",
+            "parent/child/2.after",
+        ];
+        for (f, p) in files.iter_mut().zip(paths) {
+            assert_ok(lfs_file_open(
+                lfs.as_mut_ptr(),
+                f.as_mut_ptr(),
+                path_bytes(p).as_ptr(),
+                LFS_O_WRONLY | LFS_O_TRUNC,
+            ));
+        }
+        for (f, content) in
+            files
+                .iter_mut()
+                .zip([b"test.5\0", b"test.6\0", b"test.7\0", b"test.8\0"])
+        {
+            assert_eq!(
+                lfs_file_write(
+                    lfs.as_mut_ptr(),
+                    f.as_mut_ptr(),
+                    content.as_ptr() as *const core::ffi::c_void,
+                    7,
+                ),
+                7
+            );
+        }
+
+        if relocations & 1 != 0 {
+            let pair = dir_pair(lfs.as_mut_ptr(), "parent");
+            env.bd.set_wear(pair[0], 0xffffffff);
+            env.bd.set_wear(pair[1], 0xffffffff);
+        }
+        if relocations & 2 != 0 {
+            let pair = dir_pair(lfs.as_mut_ptr(), "parent/sibling");
+            env.bd.set_wear(pair[0], 0xffffffff);
+            env.bd.set_wear(pair[1], 0xffffffff);
+        }
+        if relocations & 4 != 0 {
+            let pair = dir_pair(lfs.as_mut_ptr(), "parent/child");
+            env.bd.set_wear(pair[0], 0xffffffff);
+            env.bd.set_wear(pair[1], 0xffffffff);
+        }
+
+        assert_ok(lfs_rename(
+            lfs.as_mut_ptr(),
+            path_bytes("parent/sibling/1.move_me").as_ptr(),
+            path_bytes("parent/child/1.move_me").as_ptr(),
+        ));
+
+        for f in &mut files {
+            assert_ok(lfs_file_close(lfs.as_mut_ptr(), f.as_mut_ptr()));
+        }
+
+        let mut info = core::mem::MaybeUninit::<LfsInfo>::zeroed();
+        let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
+        assert_ok(lfs_dir_open(
+            lfs.as_mut_ptr(),
+            dir.as_mut_ptr(),
+            path_bytes("parent/sibling").as_ptr(),
+        ));
+        // Skip . and ..
+        assert_eq!(
+            lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+            1
+        );
+        assert_eq!(
+            lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+            1
+        );
+        let expect_sibling = ["0.before", "2.after"];
+        for name in expect_sibling {
+            assert_eq!(
+                lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+                1
+            );
+            let info_ref = unsafe { &*info.as_ptr() };
+            let nul = info_ref.name.iter().position(|&b| b == 0).unwrap_or(256);
+            assert_eq!(core::str::from_utf8(&info_ref.name[..nul]).unwrap(), name);
+            assert_eq!(info_ref.type_, LFS_TYPE_REG as u8);
+            assert_eq!(info_ref.size, 7);
+        }
+        assert_eq!(
+            lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+            0
+        );
+        assert_ok(lfs_dir_close(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+
+        assert_ok(lfs_dir_open(
+            lfs.as_mut_ptr(),
+            dir.as_mut_ptr(),
+            path_bytes("parent/child").as_ptr(),
+        ));
+        // Skip . and ..
+        assert_eq!(
+            lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+            1
+        );
+        assert_eq!(
+            lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+            1
+        );
+        let expect_child = ["0.before", "1.move_me", "2.after"];
+        for (_i, name) in expect_child.iter().enumerate() {
+            assert_eq!(
+                lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+                1
+            );
+            let info_ref = unsafe { &*info.as_ptr() };
+            let nul = info_ref.name.iter().position(|&b| b == 0).unwrap_or(256);
+            assert_eq!(core::str::from_utf8(&info_ref.name[..nul]).unwrap(), *name);
+            assert_eq!(info_ref.type_, LFS_TYPE_REG as u8);
+            if *name == "1.move_me" {
+                assert_eq!(info_ref.size, 8);
+            } else {
+                assert_eq!(info_ref.size, 7);
+            }
+        }
+        assert_eq!(
+            lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
+            0
+        );
+        assert_ok(lfs_dir_close(lfs.as_mut_ptr(), dir.as_mut_ptr()));
+
+        let mut buf = [0u8; 32];
+        for (path, expected) in [
+            ("parent/sibling/0.before", b"test.5\0"),
+            ("parent/sibling/2.after", b"test.6\0"),
+            ("parent/child/0.before", b"test.7\0"),
+            ("parent/child/2.after", b"test.8\0"),
+        ] {
+            assert_ok(lfs_file_open(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                path_bytes(path).as_ptr(),
+                LFS_O_RDONLY,
+            ));
+            assert_eq!(
+                lfs_file_read(
+                    lfs.as_mut_ptr(),
+                    file.as_mut_ptr(),
+                    buf.as_mut_ptr() as *mut core::ffi::c_void,
+                    7,
+                ),
+                7
+            );
+            assert_eq!(&buf[..6], &expected[..6]);
+            assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
+        }
+
+        assert_ok(lfs_unmount(lfs.as_mut_ptr()));
+    }
 }

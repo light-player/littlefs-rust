@@ -728,14 +728,20 @@ pub fn fs_with_hello(env: &mut TestEnv) -> Result<(), i32> {
 /// Get the metadata block number (`m.pair[0]`) for a directory while mounted.
 /// Caller must unmount before corrupting the returned block.
 pub fn dir_block(lfs: *mut lp_littlefs::Lfs, dir_path: &str) -> u32 {
+    dir_pair(lfs, dir_path)[0]
+}
+
+/// Get both metadata block numbers (`m.pair[0]`, `m.pair[1]`) for a directory while mounted.
+/// Used by fix_relocation tests to set wear on dir pairs.
+pub fn dir_pair(lfs: *mut lp_littlefs::Lfs, dir_path: &str) -> [u32; 2] {
     use lp_littlefs::{lfs_dir_close, lfs_dir_open, LfsDir};
 
     let path = path_bytes(dir_path);
     let mut dir = core::mem::MaybeUninit::<LfsDir>::zeroed();
     assert_ok(lfs_dir_open(lfs, dir.as_mut_ptr(), path.as_ptr()));
-    let block = unsafe { (*dir.as_ptr()).m.pair[0] };
+    let pair = unsafe { (*dir.as_ptr()).m.pair };
     assert_ok(lfs_dir_close(lfs, dir.as_mut_ptr()));
-    block
+    [pair[0], pair[1]]
 }
 
 /// Corrupt a metadata block by overwriting 3 bytes near the last written byte.
