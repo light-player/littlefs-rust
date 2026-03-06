@@ -17,6 +17,7 @@ use lp_littlefs::{
     lfs_fs_stat, lfs_mount, lfs_remove, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsFile, LfsFsinfo,
     LfsInfo, LFS_ERR_INVAL, LFS_ERR_NOENT,
 };
+use rstest::rstest;
 
 // --- test_superblocks_format ---
 // Upstream: lfs_format(&lfs, cfg) => 0
@@ -688,17 +689,26 @@ fn test_superblocks_more_blocks() {
     assert_err(LFS_ERR_INVAL, err);
 }
 
+const ERASE_COUNT_GROW: u32 = 128;
+
 /// Upstream: [cases.test_superblocks_grow]
-/// defines.BLOCK_COUNT, BLOCK_COUNT_2, KNOWN_BLOCK_COUNT. lfs_fs_grow from smaller to larger block count.
-#[test]
-fn test_superblocks_grow() {
-    let mut env = default_config(128);
+/// defines.BLOCK_COUNT = [ERASE_COUNT/2, ERASE_COUNT/4, 2], BLOCK_COUNT_2 = ERASE_COUNT,
+/// KNOWN_BLOCK_COUNT = [true, false]. lfs_fs_grow from smaller to larger block count.
+#[rstest]
+fn test_superblocks_grow(
+    #[values(
+        ERASE_COUNT_GROW / 2,
+        ERASE_COUNT_GROW / 4,
+        2u32
+    )]
+    small_count: u32,
+    #[values(false, true)] known_block_count: bool,
+) {
+    let mut env = default_config(ERASE_COUNT_GROW);
     init_context(&mut env);
     let cfg = &env.config as *const LfsConfig;
 
-    // Format with smaller block_count (64), then grow to 128
-    let small_count: u32 = 64;
-    let large_count: u32 = 128;
+    let large_count = ERASE_COUNT_GROW;
     env.config.block_count = small_count;
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
@@ -729,9 +739,14 @@ fn test_superblocks_grow() {
     assert_ok(lfs_fs_grow(lfs.as_mut_ptr(), large_count));
     assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 
-    // Mount with full block_count and verify
+    // Mount with full block_count and verify (or block_count=0 when known_block_count is false)
+    let mount_block_count = if known_block_count { large_count } else { 0 };
+    let mount_cfg = clone_config_with_block_count(&env, mount_block_count);
     env.config.block_count = large_count;
-    assert_ok(lfs_mount(lfs.as_mut_ptr(), cfg));
+    assert_ok(lfs_mount(
+        lfs.as_mut_ptr(),
+        &mount_cfg.config as *const LfsConfig,
+    ));
     let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
     assert_ok(lfs_file_open(
         lfs.as_mut_ptr(),
@@ -761,9 +776,13 @@ fn test_superblocks_shrink() {
 }
 
 /// Upstream: [cases.test_superblocks_metadata_max]
-/// defines.METADATA_MAX, N = [10, 100, 1000]. Set metadata_max in config during superblock compaction.
-#[test]
+/// defines.METADATA_MAX = [lfs_max(512, PROG_SIZE), lfs_max(BLOCK_SIZE/2, PROG_SIZE), BLOCK_SIZE]
+/// defines.N = [10, 100, 1000]. Set metadata_max in config during superblock compaction.
+#[rstest]
 #[ignore = "requires metadata_max in config during compaction cycles"]
-fn test_superblocks_metadata_max() {
+fn test_superblocks_metadata_max(
+    #[values(512, 256, 512)] _metadata_max: u32,
+    #[values(10, 100, 1000)] _n: u32,
+) {
     todo!("implement when metadata_max compaction test is wired")
 }
