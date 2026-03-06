@@ -1385,6 +1385,26 @@ pub fn lfs_file_write_(
         if (*file).pos + size > (*lfs).file_max {
             return crate::error::LFS_ERR_FBIG as crate::types::lfs_ssize_t;
         }
+
+        // C: lfs.c:3677-3688 — zero-fill gap when writing past end of file
+        if ((*file).flags as i32 & LFS_F_WRITING) == 0 && (*file).pos > (*file).ctz.size {
+            let pos = (*file).pos;
+            (*file).pos = (*file).ctz.size;
+            let zero: u8 = 0;
+            #[allow(clippy::while_immutable_condition)] // pos mutated via raw ptr in flushedwrite
+            while (*file).pos < pos {
+                let res = lfs_file_flushedwrite(
+                    lfs,
+                    file,
+                    &zero as *const u8 as *const core::ffi::c_void,
+                    1,
+                );
+                if res < 0 {
+                    return res;
+                }
+            }
+        }
+
         let nsize = lfs_file_flushedwrite(lfs, file, buffer, size);
         if nsize >= 0 {
             (*file).flags &= !0x080000;

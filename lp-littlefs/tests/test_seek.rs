@@ -811,10 +811,6 @@ fn test_seek_boundary_write() {
 #[case(4, 2)]
 #[case(4, 3)]
 fn test_seek_out_of_bounds(#[case] count: u32, #[case] skip: u32) {
-    if (count, skip) == (132, 128) || (count, skip) == (200, 100) {
-        // Sparse hole read returns LFS_ERR_CORRUPT or wrong content; skip until fixed
-        return;
-    }
     let mut env = default_config(256);
     init_context(&mut env);
 
