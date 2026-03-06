@@ -1769,21 +1769,21 @@ pub fn lfs_dir_relocatingcommit(
             }
         }
 
+        // C: lfs.c:2257-2268
         if hasdelete && dir_ref.count == 0 {
             crate::lfs_assert!(!pdir.is_null());
             let err = crate::fs::parent::lfs_fs_pred(lfs, &dir_ref.pair, pdir);
             if err != 0 && err != crate::error::LFS_ERR_NOENT {
                 return crate::lfs_pass_err!(err);
             }
-            if err != crate::error::LFS_ERR_NOENT {
-                let pdir_ref = &*pdir;
-                if pdir_ref.split {
-                    state = crate::error::LFS_OK_DROPPED;
-                    // goto fixmlist
-                } else {
-                    // fall through
-                }
+            if err != crate::error::LFS_ERR_NOENT && (*pdir).split {
+                state = crate::error::LFS_OK_DROPPED;
             }
+        }
+
+        // C: goto fixmlist skips the commit/compact section when DROPPED
+        if state == crate::error::LFS_OK_DROPPED {
+            return relocatingcommit_fixmlist(lfs, dir, pair, attrs, attrcount, state);
         }
 
         let mut do_compact = true;

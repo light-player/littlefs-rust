@@ -1,0 +1,35 @@
+Created 26 files OK
+  removed 'a'
+  removed 'b'
+  removed 'c'
+  removed 'd'
+  removed 'e'
+  removed 'f'
+  removed 'g'
+  removed 'h'
+  removed 'i'
+  removed 'j'
+  removed 'k'
+  removed 'l'
+  removed 'm'
+  removed 'n'
+  removed 'o'
+  removed 'p'
+  removed 'q'
+  removed 'r'
+  removed 's'
+  removed 't'
+  removed 'u'
+  removed 'v'
+  removed 'w'
+  removed 'x'
+  removed 'y'
+  removed 'z'
+
+=== Directory listing ===
+  [0] type=2 size=0 name="."
+  [1] type=2 size=0 name=".."
+  [2] type=1 size=26 name="zzz"
+=== Total: 3 entries ===
+
+PASS
