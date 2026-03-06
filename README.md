@@ -1,8 +1,14 @@
 # lp-littlefs
 
+[![CI](https://github.com/light-player/lp-littlefs/actions/workflows/ci.yml/badge.svg)](https://github.com/light-player/lp-littlefs/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+
 Pure Rust port of the [LittleFS](https://github.com/littlefs-project/littlefs) embedded filesystem.
 On-disk format compatible with upstream LittleFS for interoperability. No C dependencies, no
 bindgen — builds on any Rust target.
+
+> **Not yet on crates.io.** Use git dependencies for now (see [Getting started](#getting-started)).
+> A crates.io release is planned after validation on real hardware.
 
 ### Basic example
 
@@ -13,7 +19,7 @@ fn main() {
     let mut storage = RamStorage::new(512, 128);
     let config = Config::new(512, 128);
 
-    Filesystem::format(&mut storage, &config)?;
+    Filesystem::format(&mut storage, &config).unwrap();
     let fs = Filesystem::mount(storage, config).unwrap();
 
     fs.write_file("/hello.txt", b"Hello, littlefs!").unwrap();

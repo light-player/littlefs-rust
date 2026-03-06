@@ -2,10 +2,13 @@
 name = "lp-littlefs"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.87"
 description = "Safe Rust API for the LittleFS embedded filesystem"
 license = "BSD-3-Clause"
 repository = "https://github.com/light-player/lp-littlefs"
 readme = "README.md"
+keywords = ["littlefs", "filesystem", "embedded", "no-std", "flash"]
+categories = ["embedded", "filesystem", "no-std"]
 
 [lib]
 name = "lp_littlefs"

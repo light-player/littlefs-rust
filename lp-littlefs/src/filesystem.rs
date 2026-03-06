@@ -33,6 +33,10 @@ pub(crate) struct FsInner<S: Storage> {
 /// Use [`Filesystem::format`] to initialize storage, then [`Filesystem::mount`]
 /// to obtain a `Filesystem`. Call [`Filesystem::unmount`] to cleanly unmount
 /// and recover the storage, or let [`Drop`] handle it automatically.
+///
+/// `Filesystem` is `!Send` and `!Sync` (due to interior `RefCell`). This is
+/// appropriate for single-threaded embedded use. If you need cross-thread
+/// access, wrap it in a `Mutex`.
 pub struct Filesystem<S: Storage> {
     pub(crate) inner: RefCell<Box<FsInner<S>>>,
 }
