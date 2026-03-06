@@ -54,7 +54,30 @@ pub use crate::fs::format::{
     test_traverse_format_attrs,
 };
 pub use crate::lfs_info::LfsFsinfo;
+
+// Internal APIs exposed for evil/corruption tests that need to manipulate
+// metadata directly (lfs_init, lfs_dir_fetch, lfs_dir_commit, etc.).
+#[doc(hidden)]
+pub use crate::dir::commit::lfs_dir_commit;
+#[doc(hidden)]
+pub use crate::dir::fetch::lfs_dir_fetch;
+#[doc(hidden)]
+pub use crate::dir::traverse::lfs_dir_get;
+#[doc(hidden)]
+pub use crate::dir::LfsMdir;
+#[doc(hidden)]
+pub use crate::file::lfs_ctz::lfs_ctz_fromle32;
+#[doc(hidden)]
+pub use crate::file::lfs_ctz::LfsCtz;
+#[doc(hidden)]
+pub use crate::fs::init::{lfs_deinit, lfs_init};
+#[doc(hidden)]
+pub use crate::fs::superblock::lfs_fs_prepmove;
+#[doc(hidden)]
+pub use crate::tag::{lfs_mattr, lfs_mktag};
 use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t, lfs_soff_t, lfs_ssize_t};
+#[doc(hidden)]
+pub use crate::util::{lfs_pair_fromle32, lfs_pair_tole32, lfs_tole32};
 
 /// Format a block device with littlefs.
 /// Per lfs.h lfs_format. Calls lfs_format_ (lfs.c:4391).

@@ -43,6 +43,7 @@ pub fn lfs_fs_preporphans(lfs: *mut super::lfs::Lfs, orphans: i8) -> i32 {
 /// Translation docs: Record a pending move (or clear it when id=0x3ff) in gstate.
 ///
 /// C: lfs.c:4906-4914
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn lfs_fs_prepmove(lfs: *mut super::lfs::Lfs, id: u16, pair: *const [lfs_block_t; 2]) {
     use crate::lfs_type::lfs_type::LFS_TYPE_DELETE;
     use crate::tag::lfs_mktag;

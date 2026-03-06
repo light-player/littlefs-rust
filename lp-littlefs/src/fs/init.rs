@@ -181,6 +181,7 @@ use crate::util::{lfs_min, lfs_npw2};
 ///     return err;
 /// }
 /// ```
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn lfs_init(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::LfsConfig) -> i32 {
     unsafe {
         let lfs = &mut *lfs;

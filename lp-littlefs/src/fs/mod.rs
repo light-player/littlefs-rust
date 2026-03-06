@@ -4,7 +4,7 @@ pub(crate) mod attr;
 pub(crate) mod consistent;
 pub(crate) mod format;
 mod grow;
-mod init;
+pub(crate) mod init;
 #[cfg(test)]
 pub(crate) use init::lfs_init;
 mod lfs;

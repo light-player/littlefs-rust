@@ -522,6 +522,17 @@ pub fn write_block_raw(config: *const LfsConfig, block: u32, off: u32, data: &[u
     }
 }
 
+/// Invoke config erase callback for raw block erase, bypassing the FS.
+/// Used for corruption injection (test_evil_invalid_ctz_pointer).
+///
+/// C: cfg->erase(cfg, block)
+pub fn erase_block_raw(config: *const LfsConfig, block: u32) -> i32 {
+    unsafe {
+        let erase = (*config).erase.expect("erase callback");
+        erase(config, block)
+    }
+}
+
 /// Pretty-print first `len` bytes of block for inspection. Used when debugging layout.
 pub fn dump_block_hex(block: &[u8], label: &str, len: usize) {
     let len = len.min(block.len());
