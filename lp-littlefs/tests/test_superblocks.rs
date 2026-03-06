@@ -594,7 +594,6 @@ fn test_superblocks_unknown_blocks() {
 /// Upstream: [cases.test_superblocks_fewer_blocks]
 /// Format with BLOCK_COUNT blocks; mount with ERASE_COUNT blocks => LFS_ERR_INVAL.
 #[test]
-#[ignore = "mount with block_count > superblock.block_count does not return INVAL"]
 fn test_superblocks_fewer_blocks() {
     const ERASE_COUNT: u32 = 128;
     for &block_count in &[ERASE_COUNT / 2, ERASE_COUNT / 4, 2u32] {
@@ -635,12 +634,15 @@ fn test_superblocks_fewer_blocks() {
             test_path.as_ptr(),
             LFS_O_CREAT | LFS_O_EXCL | LFS_O_WRONLY,
         ));
-        assert_ok(lfs_file_write(
-            lfs.as_mut_ptr(),
-            file.as_mut_ptr(),
-            b"hello!".as_ptr() as *const core::ffi::c_void,
-            6,
-        ));
+        assert_eq!(
+            lfs_file_write(
+                lfs.as_mut_ptr(),
+                file.as_mut_ptr(),
+                b"hello!".as_ptr() as *const core::ffi::c_void,
+                6,
+            ),
+            6
+        );
         assert_ok(lfs_file_close(lfs.as_mut_ptr(), file.as_mut_ptr()));
         assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 

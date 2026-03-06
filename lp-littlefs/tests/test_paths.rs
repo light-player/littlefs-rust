@@ -1903,7 +1903,6 @@ fn test_paths_utf8_ipa(#[case] dir_mode: bool) {
 #[rstest]
 #[case::dirs(true)]
 #[case::files(false)]
-#[ignore = "oopsallspaces layout may fail; fix bug later"]
 fn test_paths_oopsallspaces(#[case] dir_mode: bool) {
     init_logger();
     let mut env = default_config(128);
@@ -1916,7 +1915,7 @@ fn test_paths_oopsallspaces(#[case] dir_mode: bool) {
     assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
     let lfs = unsafe { lfs.assume_init_mut() };
     let root = " ";
-    let children = [" / ", " /  ", " /   ", " /    ", " /     ", " /      "];
+    let children = [" ", "  ", "   ", "    ", "     ", "      "];
     assert_ok(lfs_mkdir(lfs, path_bytes(root).as_ptr()));
     for name in children {
         let path = path_bytes(&format!("{root}/{name}"));
@@ -1996,8 +1995,8 @@ fn test_paths_oopsallspaces(#[case] dir_mode: bool) {
         (" /      ", "  / "),
     ];
     for (old, new) in renames {
-        let old_path = path_bytes(&format!("{root}/{old}"));
-        let new_path = path_bytes(&new.to_string());
+        let old_path = path_bytes(old);
+        let new_path = path_bytes(new);
         assert_ok(lfs_rename(lfs, old_path.as_ptr(), new_path.as_ptr()));
     }
     for (_, new) in renames {
