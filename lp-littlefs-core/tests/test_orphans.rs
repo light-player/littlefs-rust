@@ -9,12 +9,18 @@ mod common;
 use common::powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear};
 #[cfg(feature = "slow_tests")]
 use common::test_prng;
-use common::{assert_ok, default_config, init_context, init_logger, path_bytes};
+use common::{
+    assert_ok, default_config, dir_block, erase_block_raw, init_context, init_logger, path_bytes,
+    read_block_raw, write_block_raw,
+};
 #[cfg(feature = "slow_tests")]
 use lp_littlefs_core::lfs_type::lfs_type::LFS_TYPE_DIR;
+use lp_littlefs_core::lfs_type::lfs_type::LFS_TYPE_SOFTTAIL;
 use lp_littlefs_core::{
-    lfs_format, lfs_fs_hasorphans, lfs_fs_mkconsistent, lfs_fs_preporphans, lfs_mkdir, lfs_mount,
-    lfs_remove, lfs_unmount, Lfs, LfsConfig,
+    lfs_alloc_ckpoint, lfs_dir_alloc, lfs_dir_commit, lfs_dir_fetch, lfs_format,
+    lfs_fs_forceconsistency, lfs_fs_hasorphans, lfs_fs_mkconsistent, lfs_fs_preporphans,
+    lfs_fs_size, lfs_mattr, lfs_mkdir, lfs_mktag, lfs_mount, lfs_pair_tole32, lfs_remove, lfs_stat,
+    lfs_unmount, Lfs, LfsConfig, LfsMdir, LFS_ERR_NOENT,
 };
 #[cfg(feature = "slow_tests")]
 use lp_littlefs_core::{lfs_stat, LfsInfo, LFS_ERR_EXIST, LFS_ERR_NOENT, LFS_ERR_NOTEMPTY};
@@ -143,25 +149,241 @@ fn test_orphans_nonreentrant() {
 /// Upstream: [cases.test_orphans_normal]
 /// if = 'PROG_SIZE <= 0x3fe'. Corrupt child's commit to create orphan, mkdir triggers deorphan, check lfs_fs_size.
 #[test]
-#[ignore = "requires raw block corruption to create orphan; needs write_block_raw on child dir block"]
 fn test_orphans_normal() {
-    todo!("implement when orphan corruption pattern is wired")
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+    let cfg = &env.config as *const LfsConfig;
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(lfs.as_mut_ptr(), cfg));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), cfg));
+
+    let lfs_ptr = lfs.as_mut_ptr();
+    assert_ok(lfs_mkdir(lfs_ptr, path_bytes("parent").as_ptr()));
+    assert_ok(lfs_mkdir(lfs_ptr, path_bytes("parent/orphan").as_ptr()));
+    assert_ok(lfs_mkdir(lfs_ptr, path_bytes("parent/child").as_ptr()));
+    assert_ok(lfs_remove(lfs_ptr, path_bytes("parent/orphan").as_ptr()));
+    assert_ok(lfs_unmount(lfs_ptr));
+
+    // Mount to get child dir block, then corrupt it
+    assert_ok(lfs_mount(lfs_ptr, cfg));
+    let block = dir_block(lfs_ptr, "parent/child");
+    assert_ok(lfs_unmount(lfs_ptr));
+
+    let block_size = env.config.block_size as usize;
+    let mut buffer = vec![0u8; block_size];
+    assert_eq!(read_block_raw(cfg, block, 0, &mut buffer), 0);
+
+    let mut off = block_size as i32 - 1;
+    while off >= 0 && buffer[off as usize] == 0xff {
+        off -= 1;
+    }
+    assert!(off >= 3, "block {block} has fewer than 4 written bytes");
+    let start = (off - 3) as usize;
+    buffer[start..start + 3].fill(env.config.block_size as u8);
+
+    assert_eq!(erase_block_raw(cfg, block), 0);
+    assert_eq!(write_block_raw(cfg, block, 0, &buffer), 0);
+
+    // Mount and verify orphan is gone, child exists, size is 8
+    assert_ok(lfs_mount(lfs_ptr, cfg));
+    let mut info = core::mem::MaybeUninit::<lp_littlefs_core::LfsInfo>::zeroed();
+    assert_eq!(
+        lfs_stat(
+            lfs_ptr,
+            path_bytes("parent/orphan").as_ptr(),
+            info.as_mut_ptr()
+        ),
+        LFS_ERR_NOENT
+    );
+    assert_ok(lfs_stat(
+        lfs_ptr,
+        path_bytes("parent/child").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_eq!(lfs_fs_size(lfs_ptr), 8);
+    assert_ok(lfs_unmount(lfs_ptr));
+
+    // mkdir parent/otherchild triggers deorphan, size still 8
+    assert_ok(lfs_mount(lfs_ptr, cfg));
+    assert_ok(lfs_mkdir(lfs_ptr, path_bytes("parent/otherchild").as_ptr()));
+    assert_eq!(
+        lfs_stat(
+            lfs_ptr,
+            path_bytes("parent/orphan").as_ptr(),
+            info.as_mut_ptr()
+        ),
+        LFS_ERR_NOENT
+    );
+    assert_ok(lfs_stat(
+        lfs_ptr,
+        path_bytes("parent/child").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_ok(lfs_stat(
+        lfs_ptr,
+        path_bytes("parent/otherchild").as_ptr(),
+        info.as_mut_ptr(),
+    ));
+    assert_eq!(lfs_fs_size(lfs_ptr), 8);
+    assert_ok(lfs_unmount(lfs_ptr));
 }
 
 /// Upstream: [cases.test_orphans_one_orphan]
 /// Create orphan via internal APIs (lfs_dir_alloc + SOFTTAIL commit + lfs_fs_preporphans). Run lfs_fs_forceconsistency.
 #[test]
-#[ignore = "requires internal APIs: lfs_dir_alloc, lfs_dir_commit with SOFTTAIL"]
 fn test_orphans_one_orphan() {
-    todo!("implement when internal dir APIs are exposed")
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    let lfs_ptr = lfs.as_mut_ptr();
+
+    // Create an orphan mdir
+    let mut orphan = LfsMdir {
+        pair: [0, 0],
+        rev: 0,
+        off: 0,
+        etag: 0,
+        count: 0,
+        erased: false,
+        split: false,
+        tail: [0, 0],
+    };
+    lfs_alloc_ckpoint(lfs_ptr);
+    assert_ok(lfs_dir_alloc(lfs_ptr, &mut orphan));
+    assert_ok(lfs_dir_commit(lfs_ptr, &mut orphan, core::ptr::null(), 0));
+
+    // Append orphan to root and mark FS as having orphans
+    assert_ok(lfs_fs_preporphans(lfs_ptr, 1));
+    let mut mdir = LfsMdir {
+        pair: [0, 0],
+        rev: 0,
+        off: 0,
+        etag: 0,
+        count: 0,
+        erased: false,
+        split: false,
+        tail: [0, 0],
+    };
+    let root_pair: [u32; 2] = [0, 1];
+    assert_ok(lfs_dir_fetch(lfs_ptr, &mut mdir, &root_pair));
+    lfs_pair_tole32(&mut orphan.pair);
+    let attrs = [lfs_mattr {
+        tag: lfs_mktag(LFS_TYPE_SOFTTAIL, 0x3ff, 8),
+        buffer: orphan.pair.as_ptr() as *const core::ffi::c_void,
+    }];
+    assert_ok(lfs_dir_commit(
+        lfs_ptr,
+        &mut mdir,
+        attrs.as_ptr() as *const core::ffi::c_void,
+        1,
+    ));
+
+    assert!(unsafe { lfs_fs_hasorphans(lfs_ptr) }, "should have orphans");
+    assert_ok(lfs_unmount(lfs_ptr));
+
+    assert_ok(lfs_mount(lfs_ptr, &env.config as *const LfsConfig));
+    assert!(
+        unsafe { lfs_fs_hasorphans(lfs_ptr) },
+        "orphans should persist"
+    );
+    assert_ok(lfs_fs_forceconsistency(lfs_ptr));
+    assert!(
+        !unsafe { lfs_fs_hasorphans(lfs_ptr) },
+        "forceconsistency should clear orphans"
+    );
+    assert_ok(lfs_unmount(lfs_ptr));
 }
 
 /// Upstream: [cases.test_orphans_mkconsistent_one_orphan]
 /// Same orphan creation as one_orphan. Use lfs_fs_mkconsistent + remount. Verify cleanup.
 #[test]
-#[ignore = "requires internal APIs: lfs_dir_alloc, lfs_dir_commit with SOFTTAIL"]
 fn test_orphans_mkconsistent_one_orphan() {
-    todo!("implement when internal dir APIs are exposed")
+    init_logger();
+    let mut env = default_config(128);
+    init_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok(lfs_format(
+        lfs.as_mut_ptr(),
+        &env.config as *const LfsConfig,
+    ));
+    assert_ok(lfs_mount(lfs.as_mut_ptr(), &env.config as *const LfsConfig));
+
+    let lfs_ptr = lfs.as_mut_ptr();
+
+    // Create an orphan mdir
+    let mut orphan = LfsMdir {
+        pair: [0, 0],
+        rev: 0,
+        off: 0,
+        etag: 0,
+        count: 0,
+        erased: false,
+        split: false,
+        tail: [0, 0],
+    };
+    lfs_alloc_ckpoint(lfs_ptr);
+    assert_ok(lfs_dir_alloc(lfs_ptr, &mut orphan));
+    assert_ok(lfs_dir_commit(lfs_ptr, &mut orphan, core::ptr::null(), 0));
+
+    // Append orphan to root and mark FS as having orphans
+    assert_ok(lfs_fs_preporphans(lfs_ptr, 1));
+    let mut mdir = LfsMdir {
+        pair: [0, 0],
+        rev: 0,
+        off: 0,
+        etag: 0,
+        count: 0,
+        erased: false,
+        split: false,
+        tail: [0, 0],
+    };
+    let root_pair: [u32; 2] = [0, 1];
+    assert_ok(lfs_dir_fetch(lfs_ptr, &mut mdir, &root_pair));
+    lfs_pair_tole32(&mut orphan.pair);
+    let attrs = [lfs_mattr {
+        tag: lfs_mktag(LFS_TYPE_SOFTTAIL, 0x3ff, 8),
+        buffer: orphan.pair.as_ptr() as *const core::ffi::c_void,
+    }];
+    assert_ok(lfs_dir_commit(
+        lfs_ptr,
+        &mut mdir,
+        attrs.as_ptr() as *const core::ffi::c_void,
+        1,
+    ));
+
+    assert!(unsafe { lfs_fs_hasorphans(lfs_ptr) }, "should have orphans");
+    assert_ok(lfs_unmount(lfs_ptr));
+
+    assert_ok(lfs_mount(lfs_ptr, &env.config as *const LfsConfig));
+    assert!(
+        unsafe { lfs_fs_hasorphans(lfs_ptr) },
+        "orphans should persist"
+    );
+    assert_ok(lfs_fs_mkconsistent(lfs_ptr));
+    assert!(
+        !unsafe { lfs_fs_hasorphans(lfs_ptr) },
+        "mkconsistent should clear orphans"
+    );
+    assert_ok(lfs_unmount(lfs_ptr));
+
+    // Remount and verify orphans are still gone
+    assert_ok(lfs_mount(lfs_ptr, &env.config as *const LfsConfig));
+    assert!(
+        !unsafe { lfs_fs_hasorphans(lfs_ptr) },
+        "after remount, orphans should still be gone"
+    );
+    assert_ok(lfs_unmount(lfs_ptr));
 }
 
 /// Upstream: [cases.test_orphans_reentrant]

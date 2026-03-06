@@ -54,11 +54,15 @@ pub use crate::fs::format::{
     test_traverse_format_attrs,
 };
 pub use crate::lfs_info::LfsFsinfo;
+#[doc(hidden)]
+pub use crate::types::LFS_DISK_VERSION;
 
 // Internal APIs exposed for evil/corruption tests that need to manipulate
 // metadata directly (lfs_init, lfs_dir_fetch, lfs_dir_commit, etc.).
 #[doc(hidden)]
-pub use crate::dir::commit::lfs_dir_commit;
+pub use crate::block_alloc::alloc::lfs_alloc_ckpoint;
+#[doc(hidden)]
+pub use crate::dir::commit::{lfs_dir_alloc, lfs_dir_commit};
 #[doc(hidden)]
 pub use crate::dir::fetch::lfs_dir_fetch;
 #[doc(hidden)]
@@ -73,6 +77,8 @@ pub use crate::file::lfs_ctz::LfsCtz;
 pub use crate::fs::init::{lfs_deinit, lfs_init};
 #[doc(hidden)]
 pub use crate::fs::superblock::lfs_fs_prepmove;
+#[doc(hidden)]
+pub use crate::lfs_superblock::{lfs_superblock_tole32, LfsSuperblock};
 #[doc(hidden)]
 pub use crate::tag::{lfs_mattr, lfs_mktag};
 use crate::types::{lfs_block_t, lfs_off_t, lfs_size_t, lfs_soff_t, lfs_ssize_t};

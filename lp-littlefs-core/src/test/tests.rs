@@ -1,8 +1,6 @@
 //! Unit tests using TestContext.
 
 use super::*;
-use crate::dir::traverse::TraverseTestOut;
-use crate::fs::format::{test_format_minimal_superblock, test_traverse_format_attrs};
 
 /// Minimal: construct TestContext and verify config/ram. No lfs calls.
 #[test]
@@ -83,54 +81,4 @@ fn test_context_buffers_writable() {
     if !cfg.lookahead_buffer.is_null() {
         unsafe { core::ptr::write_bytes(cfg.lookahead_buffer as *mut u8, 0, block_size) };
     }
-}
-
-/// Full format. Crashes (SIGSEGV) when run as unit test; integration tests cover this.
-#[test]
-#[ignore = "SIGSEGV in lfs_dir_commit when TestContext runs as lib unit test; use integration tests"]
-fn test_context_format() {
-    let mut ctx = TestContext::default_blocks();
-    let mut lfs = core::mem::MaybeUninit::<crate::Lfs>::zeroed();
-    let err = crate::lfs_format(lfs.as_mut_ptr(), ctx.config());
-    assert_eq!(err, 0);
-    assert_blocks_0_and_1_have_magic(ctx.config());
-}
-
-#[test]
-#[ignore = "same as test_context_format"]
-fn test_context_bypass() {
-    let mut ctx = TestContext::default_blocks();
-    let mut lfs = core::mem::MaybeUninit::<crate::Lfs>::zeroed();
-    let err = unsafe { test_format_minimal_superblock(lfs.as_mut_ptr(), ctx.config()) };
-    assert_eq!(err, 0);
-    let mut has_magic = false;
-    let mut buf = [0u8; 24];
-    unsafe {
-        let read = (*ctx.config()).read.expect("read");
-        if read(ctx.config(), 0, 0, buf.as_mut_ptr(), 24) == 0
-            && buf[MAGIC_OFFSET as usize..][..8] == *MAGIC
-        {
-            has_magic = true;
-        }
-        if read(ctx.config(), 1, 0, buf.as_mut_ptr(), 24) == 0
-            && buf[MAGIC_OFFSET as usize..][..8] == *MAGIC
-        {
-            has_magic = true;
-        }
-    }
-    assert!(has_magic);
-}
-
-#[test]
-#[ignore = "same as test_context_format"]
-fn test_context_traverse() {
-    let mut ctx = TestContext::default_blocks();
-    let mut lfs = core::mem::MaybeUninit::<crate::Lfs>::zeroed();
-    let mut out = TraverseTestOut::default();
-    let err =
-        unsafe { test_traverse_format_attrs(lfs.as_mut_ptr(), ctx.config(), &mut out as *mut _) };
-    assert_eq!(err, 0);
-    assert_eq!(out.call_count, 3);
-    assert_eq!(out.tags[1], 0x0ff);
-    assert_eq!(out.first_bytes[1], b'l');
 }
