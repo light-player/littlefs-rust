@@ -10,7 +10,7 @@ use crate::lfs_info::LfsInfo;
 use crate::lfs_type::lfs_type::LFS_TYPE_DIR;
 use crate::tag::{lfs_mktag, lfs_tag_id, lfs_tag_type3};
 use crate::types::lfs_off_t;
-use crate::util::lfs_pair_fromle32;
+use crate::util::{lfs_min, lfs_pair_cmp, lfs_pair_fromle32};
 
 /// Per lfs.c lfs_dir_open_ (lines 2721-2763)
 ///
@@ -295,8 +295,44 @@ pub fn lfs_dir_read_(lfs: *mut crate::fs::Lfs, dir: *mut LfsDir, info: *mut LfsI
 ///     return 0;
 /// }
 /// ```
-pub fn lfs_dir_seek_(_lfs: *const core::ffi::c_void, _dir: *mut LfsDir, _off: lfs_off_t) -> i32 {
-    todo!("lfs_dir_seek_")
+pub fn lfs_dir_seek_(lfs: *mut crate::fs::Lfs, dir: *mut LfsDir, off: lfs_off_t) -> i32 {
+    unsafe {
+        let err = lfs_dir_rewind_(lfs, dir);
+        if err != 0 {
+            return err;
+        }
+
+        let dir_ref = &mut *dir;
+
+        dir_ref.pos = lfs_min(2, off);
+        let mut off = off - dir_ref.pos;
+
+        // skip superblock entry
+        dir_ref.id = if off > 0 && lfs_pair_cmp(&dir_ref.head, &(*lfs).root) == 0 {
+            1
+        } else {
+            0
+        };
+
+        while off > 0 {
+            if dir_ref.id == dir_ref.m.count {
+                if !dir_ref.m.split {
+                    return crate::error::LFS_ERR_INVAL;
+                }
+                let err = lfs_dir_fetch(lfs, &mut dir_ref.m, &dir_ref.m.tail);
+                if err != 0 {
+                    return err;
+                }
+                dir_ref.id = 0;
+            }
+            let diff = lfs_min((dir_ref.m.count - dir_ref.id) as u32, off);
+            dir_ref.id += diff as u16;
+            dir_ref.pos += diff;
+            off -= diff;
+        }
+
+        0
+    }
 }
 
 /// Per lfs.c lfs_dir_tell_ (lines 2854-2857)
@@ -308,11 +344,8 @@ pub fn lfs_dir_seek_(_lfs: *const core::ffi::c_void, _dir: *mut LfsDir, _off: lf
 ///     return dir->pos;
 /// }
 /// ```
-pub fn lfs_dir_tell_(
-    _lfs: *const core::ffi::c_void,
-    _dir: *const LfsDir,
-) -> crate::types::lfs_soff_t {
-    todo!("lfs_dir_tell_")
+pub fn lfs_dir_tell_(_lfs: *mut crate::fs::Lfs, dir: *const LfsDir) -> crate::types::lfs_soff_t {
+    unsafe { (*dir).pos as crate::types::lfs_soff_t }
 }
 
 /// Per lfs.c lfs_dir_rewind_ (lines 2859-2869)
@@ -331,6 +364,15 @@ pub fn lfs_dir_tell_(
 ///     return 0;
 /// }
 /// ```
-pub fn lfs_dir_rewind_(_lfs: *const core::ffi::c_void, _dir: *mut LfsDir) -> i32 {
-    todo!("lfs_dir_rewind_")
+pub fn lfs_dir_rewind_(lfs: *mut crate::fs::Lfs, dir: *mut LfsDir) -> i32 {
+    unsafe {
+        let dir_ref = &mut *dir;
+        let err = lfs_dir_fetch(lfs, &mut dir_ref.m, &dir_ref.head);
+        if err != 0 {
+            return err;
+        }
+        dir_ref.id = 0;
+        dir_ref.pos = 0;
+        0
+    }
 }

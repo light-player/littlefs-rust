@@ -266,19 +266,19 @@ pub fn lfs_dir_read(lfs: *mut Lfs, dir: *mut LfsDir, info: *mut LfsInfo) -> i32 
 /// Change the position of the directory. Per lfs.h lfs_dir_seek.
 #[inline(never)]
 pub fn lfs_dir_seek(lfs: *mut Lfs, dir: *mut LfsDir, off: lfs_off_t) -> i32 {
-    todo!("lfs_dir_seek")
+    crate::dir::open::lfs_dir_seek_(lfs, dir, off)
 }
 
 /// Return the position of the directory. Per lfs.h lfs_dir_tell (lfs.c:6400-6412).
 #[inline(never)]
 pub fn lfs_dir_tell(lfs: *mut Lfs, dir: *mut LfsDir) -> lfs_soff_t {
-    todo!("lfs_dir_tell")
+    crate::dir::open::lfs_dir_tell_(lfs, dir)
 }
 
 /// Change the position to the beginning of the directory. Per lfs.h lfs_dir_rewind.
 #[inline(never)]
 pub fn lfs_dir_rewind(lfs: *mut Lfs, dir: *mut LfsDir) -> i32 {
-    todo!("lfs_dir_rewind")
+    crate::dir::open::lfs_dir_rewind_(lfs, dir)
 }
 
 /// Find on-disk info about the filesystem. Per lfs.h lfs_fs_stat (lfs.c:6449-6453).

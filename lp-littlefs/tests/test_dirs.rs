@@ -1019,7 +1019,6 @@ fn test_dirs_recursive_remove() {
 /// Create N dirs under prickly-pear/. Nested loop: open dir, iterate to j, remove dir k, iterate rest,
 /// close, recreate k, unmount. Requires lfs_dir_seek.
 #[test]
-#[ignore = "requires lfs_dir_seek"]
 fn test_dirs_remove_read() {
     init_logger();
     const N: usize = 10;
@@ -1290,7 +1289,6 @@ fn test_dirs_other_errors() {
 /// defines.COUNT = [4, 128, 132], if = 'COUNT < BLOCK_COUNT/2'
 /// Create COUNT entries in a child dir. Exercise lfs_dir_seek, lfs_dir_tell, lfs_dir_rewind.
 #[test]
-#[ignore = "requires lfs_dir_seek/tell/rewind"]
 fn test_dirs_seek() {
     init_logger();
     for count in [4usize, 128, 132] {
@@ -1357,7 +1355,6 @@ fn test_dirs_seek() {
 /// defines.COUNT = [4, 128, 132]
 /// Same as seek but on root directory.
 #[test]
-#[ignore = "requires lfs_dir_seek/tell/rewind"]
 fn test_dirs_toot_seek() {
     init_logger();
     for count in [4usize, 128, 132] {
