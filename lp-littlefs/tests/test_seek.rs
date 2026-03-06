@@ -962,7 +962,6 @@ fn test_seek_out_of_bounds(#[case] count: u32, #[case] skip: u32) {
 #[case(4)]
 #[case(128)]
 #[case(132)]
-#[ignore = "inline overwrite: first write in second loop returns 0; upstream parity pending"]
 fn test_seek_inline_write(#[case] size: u32) {
     let mut env = default_config(256);
     init_context(&mut env);
