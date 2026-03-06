@@ -1915,7 +1915,7 @@ fn test_move_fix_relocation_predecessor() {
             1
         );
         let expect_child = ["0.before", "1.move_me", "2.after"];
-        for (_i, name) in expect_child.iter().enumerate() {
+        for name in expect_child.iter() {
             assert_eq!(
                 lfs_dir_read(lfs.as_mut_ptr(), dir.as_mut_ptr(), info.as_mut_ptr()),
                 1

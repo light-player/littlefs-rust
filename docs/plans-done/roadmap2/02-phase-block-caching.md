@@ -4,7 +4,7 @@
 
 Add read and program caches to the block device layer. All format/mount/file/dir operations use cached reads and program-through-cache where applicable. Matches upstream `lfs_bd_read`, `lfs_bd_prog`, `lfs_bd_cmp`, `lfs_bd_crc` behavior.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2).
 
 ---
 

@@ -2,7 +2,7 @@
 
 Phased roadmap for the new lp-littlefs implementation (`lp-littlefs/`). Test-driven: port targeted tests from the reference code, then implement until they pass. Bring over all relevant tests from reference; no test left behind.
 
-**Reference**: [docs/rules.md](../rules.md) — translation rules, test porting, call-graph order.
+**Reference**: [docs/rules.md](../../rules.md) — translation rules, test porting, call-graph order.
 
 **Upstream**: littlefs at commit in [docs/reference.md](../reference.md). Tests in `tests/test_*.toml`; reference implementation in lp-littlefs-old and upstream C.
 
@@ -12,9 +12,9 @@ Phased roadmap for the new lp-littlefs implementation (`lp-littlefs/`). Test-dri
 
 | Principle | Application |
 |-----------|-------------|
-| **Test-driven** | Port tests first; implement callees until tests pass ([rules.md §0](../rules.md)) |
-| **Reference in file** | Include original C source as comments beside each function ([rules.md §3](../rules.md)) |
-| **Call graph order** | Translate callees first; `todo!()` panic guides next step ([rules.md §8](../rules.md)) |
+| **Test-driven** | Port tests first; implement callees until tests pass ([rules.md §0](../../rules.md)) |
+| **Reference in file** | Include original C source as comments beside each function ([rules.md §3](../../rules.md)) |
+| **Call graph order** | Translate callees first; `todo!()` panic guides next step ([rules.md §8](../../rules.md)) |
 | **All tests** | Each phase targets specific tests; final phases bring over remaining reference tests |
 | **Validation** | Every phase has explicit validation steps before sign-off |
 
@@ -61,8 +61,8 @@ Phase 07 has subphases: [07a](07a-phase-paths-move.md), [07b](07b-phase-entries.
 ## Per-Phase Workflow
 
 1. **Select tests** — Minimal set from phase doc; port from lp-littlefs-old or upstream TOML.
-2. **Port** — Same names, upstream reference in header ([rules.md §10](../rules.md)).
+2. **Port** — Same names, upstream reference in header ([rules.md §10](../../rules.md)).
 3. **Run** — Test fails on `todo!()` or wrong behavior.
-4. **Implement** — Callees first; C source comments; match logic ([rules.md §0, §2, §3](../rules.md)).
+4. **Implement** — Callees first; C source comments; match logic ([rules.md §0, §2, §3](../../rules.md)).
 5. **Validate** — Phase-specific checks + `cargo fmt`, `cargo test`, no warnings.
-6. **Expand** — Broaden parameter ranges once stable ([rules.md §10](../rules.md)).
+6. **Expand** — Broaden parameter ranges once stable ([rules.md §10](../../rules.md)).

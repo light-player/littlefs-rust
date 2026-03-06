@@ -4,7 +4,7 @@
 
 Port block allocator tests. Validates `lfs_alloc`, `lfs_alloc_lookahead`, `lfs_alloc_scan` (reference/lfs.c:614–791) under parallel, serial, reuse, and exhaustion scenarios.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
 
 ---
 

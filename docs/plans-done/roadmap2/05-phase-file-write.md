@@ -4,7 +4,7 @@
 
 Implement file creation, writing, sync, truncate, append. Handles inline ↔ CTZ migration when file grows/shrinks. Depends on Phase 03 (directory commits) and Phase 04 (CTZ read).
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Preserve call graph (§8).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Preserve call graph (§8).
 
 ---
 
@@ -23,7 +23,7 @@ Open flags: WRONLY, RDWR, CREAT, EXCL, TRUNC, APPEND. Upstream `lfs_open_flags`.
 
 ## Tests to Port (All Relevant)
 
-From lp-littlefs-old/test_files.rs. Same names per [rules.md §10](../rules.md).
+From lp-littlefs-old/test_files.rs. Same names per [rules.md §10](../../rules.md).
 
 | Source | Test | Validates |
 |--------|------|-----------|

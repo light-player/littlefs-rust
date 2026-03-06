@@ -145,7 +145,7 @@ pub fn lfs_mkdir_(lfs: *mut super::lfs::Lfs, path: *const u8) -> i32 {
             return crate::lfs_err!(LFS_ERR_NAMETOOLONG);
         }
 
-        lfs_alloc_ckpoint(lfs);
+        unsafe { lfs_alloc_ckpoint(lfs) };
         let mut dir = core::mem::zeroed();
         let err = lfs_dir_alloc(lfs, &mut dir);
         if err != 0 {

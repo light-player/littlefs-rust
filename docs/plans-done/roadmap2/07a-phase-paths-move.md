@@ -4,7 +4,7 @@
 
 Port remaining path tests and all move/rename tests. Path resolution and absolute-path handling may overlap with Phases 03 and 05; verify coverage and add missing tests. Cross-dir rename requires `lfs_rename_` (reference/lfs.c:3961–4138) to handle `!samepair` and FROM_MOVE gstate.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
 
 ---
 
@@ -21,7 +21,7 @@ Port remaining path tests and all move/rename tests. Path resolution and absolut
 | `test_paths_noent` | NOENT on bad names | |
 | `test_paths_root` | `stat("/")`, `dir_open("/")` | |
 
-**Deferred** (may need `#[ignore]` initially): `test_paths_redundant_slashes`, `test_paths_trailing_slashes`, `test_paths_dots`, `test_paths_dotdots`, `test_paths_leading_dots`, `test_paths_root_dotdots`, `test_paths_noent_parent`, `test_paths_notdir_parent`, `test_paths_empty`, `test_paths_root_aliases`, `test_paths_magic_noent`, `test_paths_magic_conflict`, `test_paths_nametoolong`, `test_paths_namejustlongenough`, `test_paths_utf8`, `test_paths_spaces`, `test_paths_nonprintable`, `test_paths_nonutf8`, etc. Per [rules.md §10](../rules.md): port with `#[ignore]` if edge-case behavior unclear.
+**Deferred** (may need `#[ignore]` initially): `test_paths_redundant_slashes`, `test_paths_trailing_slashes`, `test_paths_dots`, `test_paths_dotdots`, `test_paths_leading_dots`, `test_paths_root_dotdots`, `test_paths_noent_parent`, `test_paths_notdir_parent`, `test_paths_empty`, `test_paths_root_aliases`, `test_paths_magic_noent`, `test_paths_magic_conflict`, `test_paths_nametoolong`, `test_paths_namejustlongenough`, `test_paths_utf8`, `test_paths_spaces`, `test_paths_nonprintable`, `test_paths_nonutf8`, etc. Per [rules.md §10](../../rules.md): port with `#[ignore]` if edge-case behavior unclear.
 
 ### test_move
 

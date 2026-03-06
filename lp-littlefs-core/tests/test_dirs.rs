@@ -457,7 +457,7 @@ fn test_dirs_many_reentrant() {
             },
             |_, _| Ok(()),
         );
-        result.expect(&format!("test_dirs_many_reentrant N={n} should complete"));
+        result.unwrap_or_else(|_| panic!("test_dirs_many_reentrant N={n} should complete"));
     }
 }
 
@@ -793,7 +793,7 @@ fn test_dirs_file_reentrant() {
             },
             |_, _| Ok(()),
         );
-        result.expect(&format!("test_dirs_file_reentrant N={n} should complete"));
+        result.unwrap_or_else(|_| panic!("test_dirs_file_reentrant N={n} should complete"));
     }
 }
 

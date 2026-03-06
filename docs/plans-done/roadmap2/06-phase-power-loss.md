@@ -4,7 +4,7 @@
 
 Implement global state (MOVESTATE), deorphan on mount, force-consistency, and fs_gc. Required for safe operation when device can power-cycle mid-write. Includes FCRC in commits for partial-program detection.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Preserve control flow (§9).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Preserve control flow (§9).
 
 ---
 
@@ -23,7 +23,7 @@ Internal: Global state XOR deltas (gstate, gdisk, gdelta); MOVESTATE tag; deorph
 
 ## Tests to Port (All Relevant)
 
-From lp-littlefs-old/test_orphans.rs, test_powerloss.rs. Same names per [rules.md §10](../rules.md).
+From lp-littlefs-old/test_orphans.rs, test_powerloss.rs. Same names per [rules.md §10](../../rules.md).
 
 | Source | Test | Validates |
 |--------|------|-----------|

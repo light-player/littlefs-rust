@@ -4,7 +4,7 @@
 
 Implement read-only metadata traversal: parse commits and tags, resolve paths, expose `lfs_stat`, `lfs_dir_open` / `lfs_dir_read` / `lfs_dir_close`, and `lfs_fs_stat` (already present). No writes. Foundation for all subsequent phases.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic and control flow (§2).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic and control flow (§2).
 
 ---
 
@@ -24,7 +24,7 @@ Types: `lfs_info` (type, size, name), `lfs_fsinfo`. Upstream lfs.h.
 
 ## Tests to Port (All Relevant)
 
-Port from lp-littlefs-old and upstream. Keep same names per [rules.md §10](../rules.md).
+Port from lp-littlefs-old and upstream. Keep same names per [rules.md §10](../../rules.md).
 
 | Source | Test | Validates |
 |--------|------|-----------|

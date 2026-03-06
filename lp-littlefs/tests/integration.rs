@@ -263,7 +263,7 @@ fn test_read_dir_iterator() {
     let names: Vec<String> = {
         let mut dir = fs.read_dir("/").unwrap();
         let mut names = Vec::new();
-        while let Some(entry) = dir.next() {
+        for entry in dir {
             names.push(entry.unwrap().name);
         }
         names
@@ -287,7 +287,7 @@ fn test_read_dir_interleaved_with_file_ops() {
 
     {
         let mut dir = fs.read_dir("/").unwrap();
-        while let Some(entry) = dir.next() {
+        for entry in dir {
             let entry = entry.unwrap();
             if entry.file_type == FileType::File {
                 let data = fs.read_to_vec(&format!("/{}", entry.name)).unwrap();

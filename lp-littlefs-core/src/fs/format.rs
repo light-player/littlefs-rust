@@ -34,7 +34,7 @@ use crate::util::lfs_min;
 ///         lfs->lookahead.size = lfs_min(8*lfs->cfg->lookahead_size,
 ///                 lfs->block_count);
 ///         lfs->lookahead.next = 0;
-///         lfs_alloc_ckpoint(lfs);
+///         unsafe { lfs_alloc_ckpoint(lfs as *mut _) };
 ///
 ///         // create root dir
 ///         lfs_mdir_t root;
@@ -110,7 +110,7 @@ pub fn lfs_format_(lfs: *mut super::lfs::Lfs, cfg: *const crate::lfs_config::Lfs
         lfs.lookahead.start = 0;
         lfs.lookahead.size = lfs_min(8 * cfg.lookahead_size, lfs.block_count);
         lfs.lookahead.next = 0;
-        lfs_alloc_ckpoint(lfs);
+        unsafe { lfs_alloc_ckpoint(lfs as *mut _) };
 
         // create root dir
         let mut root = LfsMdir {
@@ -239,7 +239,7 @@ pub unsafe fn test_traverse_format_attrs(
         lfs.lookahead.start = 0;
         lfs.lookahead.size = lfs_min(8 * cfg_ref.lookahead_size, lfs.block_count);
         lfs.lookahead.next = 0;
-        lfs_alloc_ckpoint(lfs);
+        unsafe { lfs_alloc_ckpoint(lfs as *mut _) };
 
         let mut root = LfsMdir {
             pair: [0, 0],
@@ -348,7 +348,7 @@ pub unsafe fn test_traverse_filter_gets_superblock_after_push(
         lfs.lookahead.start = 0;
         lfs.lookahead.size = lfs_min(8 * cfg_ref.lookahead_size, lfs.block_count);
         lfs.lookahead.next = 0;
-        lfs_alloc_ckpoint(lfs);
+        unsafe { lfs_alloc_ckpoint(lfs as *mut _) };
 
         let mut root = crate::dir::LfsMdir {
             pair: [0, 0],
@@ -459,7 +459,7 @@ pub unsafe fn test_format_minimal_superblock(
         lfs.lookahead.start = 0;
         lfs.lookahead.size = lfs_min(8 * cfg_ref.lookahead_size, lfs.block_count);
         lfs.lookahead.next = 0;
-        lfs_alloc_ckpoint(lfs);
+        unsafe { lfs_alloc_ckpoint(lfs as *mut _) };
 
         let mut root = LfsMdir {
             pair: [0, 0],

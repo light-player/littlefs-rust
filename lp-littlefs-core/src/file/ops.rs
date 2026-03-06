@@ -259,7 +259,7 @@ pub fn lfs_file_opencfg_(
                 lfs_file_close_(lfs, file);
                 return crate::lfs_err!(LFS_ERR_NAMETOOLONG);
             }
-            lfs_alloc_ckpoint(lfs);
+            unsafe { lfs_alloc_ckpoint(lfs) };
             let attrs = [
                 crate::tag::lfs_mattr {
                     tag: lfs_mktag(LFS_TYPE_CREATE, file_ref.id as u32, 0),
@@ -650,7 +650,7 @@ pub fn lfs_file_relocate(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
 /// ```c
 /// static int lfs_file_outline(lfs_t *lfs, lfs_file_t *file) {
 ///     file->off = file->pos;
-///     lfs_alloc_ckpoint(lfs);
+///     unsafe { lfs_alloc_ckpoint(lfs) };
 ///     int err = lfs_file_relocate(lfs, file);
 ///     if (err) {
 ///         return err;
@@ -667,7 +667,7 @@ pub fn lfs_file_outline(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
         let file_ref = &mut *file;
         file_ref.off = file_ref.pos;
     }
-    lfs_alloc_ckpoint(lfs);
+    unsafe { lfs_alloc_ckpoint(lfs) };
     let err = lfs_file_relocate(lfs, file);
     if err != 0 {
         return crate::lfs_pass_err!(err);
@@ -1156,7 +1156,7 @@ pub fn lfs_file_read_(
 ///                 }
 ///
 ///                 // extend file with new blocks
-///                 lfs_alloc_ckpoint(lfs);
+///                 unsafe { lfs_alloc_ckpoint(lfs) };
 ///                 int err = lfs_ctz_extend(lfs, &file->cache, &lfs->rcache,
 ///                         file->block, file->pos,
 ///                         &file->block, &file->off);
@@ -1199,7 +1199,7 @@ pub fn lfs_file_read_(
 ///         data += diff;
 ///         nsize -= diff;
 ///
-///         lfs_alloc_ckpoint(lfs);
+///         unsafe { lfs_alloc_ckpoint(lfs) };
 ///     }
 ///
 ///     return size;
@@ -1263,7 +1263,7 @@ pub fn lfs_file_flushedwrite(
                         }
                         lfs_cache_zero(lfs, &mut file_ref.cache as *mut _);
                     }
-                    lfs_alloc_ckpoint(lfs);
+                    unsafe { lfs_alloc_ckpoint(lfs) };
                     let err = lfs_ctz_extend(
                         lfs,
                         &mut (*file).cache,
@@ -1313,7 +1313,7 @@ pub fn lfs_file_flushedwrite(
             data = data.add(diff as usize);
             nsize -= diff;
 
-            lfs_alloc_ckpoint(lfs);
+            unsafe { lfs_alloc_ckpoint(lfs) };
         }
         size as crate::types::lfs_ssize_t
     }

@@ -4,7 +4,7 @@
 
 Port relocation tests that validate `dir_compact`, `dir_split`, and `orphaningcommit` under specific metadata patterns. Exercises dangling split dirs, outdated head, and non-reentrant mkdir/remove/rename cycles.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
 
 ---
 

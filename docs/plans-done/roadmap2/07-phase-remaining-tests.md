@@ -6,7 +6,7 @@ Bring over all remaining relevant tests from the reference code that are not cov
 
 Phase 07 is split into subphases to isolate dependencies and enable incremental progress. Each subphase has its own validation.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
 
 ---
 

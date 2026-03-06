@@ -4,7 +4,7 @@
 
 Bring over robustness and stress tests. Many require block-level corruption simulation, bad-block BD, or power-loss runner. Port all relevant tests; implement infrastructure where feasible; document deferred items.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Never relax a test to accommodate a bug (§6).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Never relax a test to accommodate a bug (§6).
 
 ---
 

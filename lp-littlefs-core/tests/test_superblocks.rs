@@ -497,9 +497,9 @@ fn test_superblocks_reentrant_expand() {
             },
             |_, _| Ok(()),
         );
-        result.expect(&format!(
-            "test_superblocks_reentrant_expand block_cycles={block_cycles} should complete"
-        ));
+        result.unwrap_or_else(|_| {
+            panic!("test_superblocks_reentrant_expand block_cycles={block_cycles} should complete")
+        });
     }
 }
 

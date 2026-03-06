@@ -4,7 +4,7 @@
 
 Port attribute tests. Implement `lfs_getattr_`, `lfs_setattr_`, `lfs_removeattr_`, and `lfs_commitattr` (reference/lfs.c:4107–4196, 4141–4163) if in scope. Per [00-overview](00-overview.md): "Phase 07 brings tests; implementation TBD." Port tests first; implement attr API if needed.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Keep test names (§10).
 
 ---
 

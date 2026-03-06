@@ -4,7 +4,7 @@
 
 Implement directory creation, removal, and rename. Requires block allocation (lookahead), directory commit machinery (CREATE, DELETE, NAME, DIRSTRUCT, TAIL tags), and path resolution for writes.
 
-**Translation rules**: [docs/rules.md](../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Preserve call graph (§8).
+**Translation rules**: [docs/rules.md](../../rules.md). Translate callees first (§0); include C source comments (§3); match logic (§2). Preserve call graph (§8).
 
 ---
 
@@ -22,7 +22,7 @@ Config additions: `block_cycles`, `lookahead_size`, `lookahead_buffer` (optional
 
 ## Tests to Port (All Relevant)
 
-From lp-littlefs-old/test_dirs.rs, test_paths.rs. Same names per [rules.md §10](../rules.md).
+From lp-littlefs-old/test_dirs.rs, test_paths.rs. Same names per [rules.md §10](../../rules.md).
 
 | Source | Test | Validates |
 |--------|------|-----------|

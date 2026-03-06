@@ -23,7 +23,7 @@ use lp_littlefs_core::{
     lfs_unmount, Lfs, LfsConfig, LfsMdir, LFS_ERR_NOENT,
 };
 #[cfg(feature = "slow_tests")]
-use lp_littlefs_core::{lfs_stat, LfsInfo, LFS_ERR_EXIST, LFS_ERR_NOENT, LFS_ERR_NOTEMPTY};
+use lp_littlefs_core::{LfsInfo, LFS_ERR_EXIST, LFS_ERR_NOTEMPTY};
 
 // --- test_orphans_mkconsistent_fresh ---
 // Minimal: format, mount, mkconsistent. No mkdir/remove. Sanity check.
@@ -258,7 +258,7 @@ fn test_orphans_one_orphan() {
         split: false,
         tail: [0, 0],
     };
-    lfs_alloc_ckpoint(lfs_ptr);
+    unsafe { lfs_alloc_ckpoint(lfs_ptr) };
     assert_ok(lfs_dir_alloc(lfs_ptr, &mut orphan));
     assert_ok(lfs_dir_commit(lfs_ptr, &mut orphan, core::ptr::null(), 0));
 
@@ -332,7 +332,7 @@ fn test_orphans_mkconsistent_one_orphan() {
         split: false,
         tail: [0, 0],
     };
-    lfs_alloc_ckpoint(lfs_ptr);
+    unsafe { lfs_alloc_ckpoint(lfs_ptr) };
     assert_ok(lfs_dir_alloc(lfs_ptr, &mut orphan));
     assert_ok(lfs_dir_commit(lfs_ptr, &mut orphan, core::ptr::null(), 0));
 
@@ -488,8 +488,8 @@ fn test_orphans_reentrant() {
             },
             |_, _| Ok(()),
         );
-        result.expect(&format!(
-            "test_orphans_reentrant FILES={files} DEPTH={depth} should complete"
-        ));
+        result.unwrap_or_else(|_| {
+            panic!("test_orphans_reentrant FILES={files} DEPTH={depth} should complete")
+        });
     }
 }

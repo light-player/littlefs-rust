@@ -11,11 +11,12 @@ use crate::types::lfs_block_t;
 ///     lfs->lookahead.ckpoint = lfs->block_count;
 /// }
 /// ```
-pub fn lfs_alloc_ckpoint(lfs: *mut Lfs) {
-    unsafe {
-        let lfs = &mut *lfs;
-        lfs.lookahead.ckpoint = lfs.block_count;
-    }
+///
+/// # Safety
+/// `lfs` must point to a valid, initialized `Lfs` instance.
+pub unsafe fn lfs_alloc_ckpoint(lfs: *mut Lfs) {
+    let lfs = &mut *lfs;
+    lfs.lookahead.ckpoint = lfs.block_count;
 }
 
 /// Per lfs.c lfs_alloc_drop (lines 620-624)
@@ -32,7 +33,7 @@ pub fn lfs_alloc_drop(lfs: *mut Lfs) {
     unsafe {
         (*lfs).lookahead.size = 0;
         (*lfs).lookahead.next = 0;
-        lfs_alloc_ckpoint(lfs);
+        unsafe { lfs_alloc_ckpoint(lfs) };
     }
 }
 

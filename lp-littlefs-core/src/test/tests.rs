@@ -49,7 +49,7 @@ fn test_context_format_to_alloc() {
     lfs.lookahead.start = 0;
     lfs.lookahead.size = lfs_min(8 * cfg.lookahead_size, lfs.block_count);
     lfs.lookahead.next = 0;
-    lfs_alloc_ckpoint(lfs);
+    unsafe { lfs_alloc_ckpoint(lfs as *mut _) };
 
     let mut root = crate::dir::LfsMdir {
         pair: [0, 0],
@@ -61,7 +61,7 @@ fn test_context_format_to_alloc() {
         split: false,
         tail: [0, 0],
     };
-    let err = lfs_dir_alloc(lfs as *mut _, &mut root);
+    let err = unsafe { lfs_dir_alloc(lfs as *mut _, &mut root) };
     assert_eq!(err, 0);
 }
 
