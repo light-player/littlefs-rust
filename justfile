@@ -22,19 +22,30 @@ install-tools:
 lint:
     cargo fmt --all -- --check
 
-# Build and test
+# Build and test (default members only; excludes lp-littlefs-compat)
 build:
     cargo build
-    cargo test --all --all-features --verbose
+    cargo test --all-features --verbose
+
+# Build and test lp-littlefs-compat (C ↔ Rust interop).
+# On macOS arm64, sets BINDGEN_EXTRA_CLANG_ARGS for bindgen.
+compat:
+    #!/usr/bin/env bash
+    set -e
+    if [[ "$(uname -s)" == "Darwin" ]] && [[ "$(uname -m)" == "arm64" ]]; then
+        export BINDGEN_EXTRA_CLANG_ARGS="--target=arm64-apple-darwin"
+    fi
+    cargo build -p lp-littlefs-compat
+    cargo test -p lp-littlefs-compat
 
 # Check with all features enabled
 features:
     cargo check --all-features
 
-# Check no_std build (embeddable target)
+# Check no_std build (embeddable target; core only — wrapper needs alloc)
 no_std:
     rustup target add thumbv6m-none-eabi
-    cargo check --target thumbv6m-none-eabi --no-default-features
+    cargo check -p lp-littlefs-core --target thumbv6m-none-eabi --no-default-features
 
 # Cargo deny: license and advisory checks (run dev-init.sh first if needed)
 deny:

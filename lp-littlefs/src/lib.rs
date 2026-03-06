@@ -33,7 +33,7 @@
 //! [`File`] and [`ReadDir`] hold a shared reference to the [`Filesystem`] and implement
 //! [`Drop`] for RAII close.
 
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

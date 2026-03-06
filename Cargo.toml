@@ -1,3 +1,4 @@
 [workspace]
 resolver = "2"
 members = ["lp-littlefs-core", "lp-littlefs", "lp-littlefs-compat"]
+default-members = ["lp-littlefs-core", "lp-littlefs"]

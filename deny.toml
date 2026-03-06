@@ -4,7 +4,11 @@ ignore = []
 
 [licenses]
 allow = [
+    "Apache-2.0",
     "BSD-3-Clause",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
 ]
 
 [bans]

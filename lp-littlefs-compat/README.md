@@ -74,10 +74,29 @@ file sizes (4, 32, 512, 8192 bytes) and chunk counts:
 
 ## Build requirements
 
-Requires a C compiler and clang (for bindgen) to build `littlefs2-sys`. On macOS arm64, the existing
-`.cargo/config.toml` handles the bindgen workaround.
+Requires a C compiler and clang (for bindgen) to build `littlefs2-sys`:
+
+- **Ubuntu**: `sudo apt-get install build-essential libclang-dev`
+- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
+
+### macOS arm64
+
+On macOS arm64, libclang can default to the wrong target, causing "Unsupported architecture" or size_t assertion failures. Use `just compat` from the repo root — it sets `BINDGEN_EXTRA_CLANG_ARGS` automatically. Or manually:
+
+```bash
+export BINDGEN_EXTRA_CLANG_ARGS="--target=arm64-apple-darwin"
+cargo build -p lp-littlefs-compat
+```
 
 ## Running
+
+From the repo root:
+
+```bash
+just compat
+```
+
+Or directly:
 
 ```bash
 cargo test -p lp-littlefs-compat

@@ -1,5 +1,0 @@
-# Work around bindgen/littlefs2-sys arm64 macOS issue: libclang can default to
-# wrong target, causing "Unsupported architecture" and size_t assertion failure.
-# Explicit --target aligns clang with Rust's aarch64-apple-darwin (arm64).
-[env]
-BINDGEN_EXTRA_CLANG_ARGS = "--target=arm64-apple-darwin"

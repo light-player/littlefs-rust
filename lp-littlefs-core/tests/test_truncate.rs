@@ -14,6 +14,7 @@ use rstest::rstest;
 
 const HAIR: &[u8] = b"hair";
 const BALD: &[u8] = b"bald";
+const COMB: &[u8] = b"comb";
 
 fn lfs_min(a: u32, b: u32) -> u32 {
     if a < b {
