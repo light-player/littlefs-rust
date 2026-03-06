@@ -1,4 +1,6 @@
-# test_alloc_bad_blocks: Pacman Metadata Corruption (unfixed)
+# test_alloc_bad_blocks: Pacman Metadata Corruption (fixed)
+
+**Fix report**: [../2026-03-05-bad-blocks-ctzstruct/FIX_REPORT.md](../2026-03-05-bad-blocks-ctzstruct/FIX_REPORT.md). The `disk_override` mechanism in traverse.rs addresses this bug.
 
 ## Symptom
 

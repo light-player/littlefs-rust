@@ -1,0 +1,270 @@
+--- step: format ---
+bd_read block=1 off=0 size=16
+bd_erase block=0
+bd_read block=0 off=64 size=16
+bd_prog block=0 off=0 size=64
+bd_read block=0 off=0 size=64
+bd_erase block=1
+bd_read block=1 off=64 size=16
+bd_prog block=1 off=0 size=64
+bd_read block=1 off=0 size=64
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_read block=1 off=0 size=16
+--- step: pacman_fill ---
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=512
+bd_prog block=1 off=64 size=48
+bd_read block=1 off=64 size=112
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_erase block=15
+bd_prog block=15 off=0 size=512
+bd_read block=15 off=0 size=512
+bd_erase block=2
+bd_prog block=2 off=0 size=512
+bd_read block=2 off=0 size=512
+bd_erase block=3
+bd_prog block=3 off=0 size=512
+bd_read block=3 off=0 size=512
+bd_erase block=4
+bd_prog block=4 off=0 size=512
+bd_read block=4 off=0 size=512
+bd_erase block=5
+bd_read block=3 off=0 size=16
+bd_prog block=5 off=0 size=512
+bd_read block=5 off=0 size=512
+bd_erase block=6
+bd_prog block=6 off=0 size=512
+bd_read block=6 off=0 size=512
+bd_erase block=7
+bd_prog block=7 off=0 size=512
+bd_read block=7 off=0 size=512
+bd_erase block=8
+bd_prog block=8 off=0 size=512
+bd_read block=8 off=0 size=512
+bd_erase block=9
+bd_read block=7 off=0 size=16
+bd_read block=5 off=0 size=16
+bd_prog block=9 off=0 size=512
+bd_read block=9 off=0 size=512
+bd_erase block=10
+bd_prog block=10 off=0 size=512
+bd_read block=10 off=0 size=512
+bd_erase block=11
+bd_prog block=11 off=0 size=512
+bd_read block=11 off=0 size=512
+bd_erase block=12
+bd_prog block=12 off=0 size=512
+bd_read block=12 off=0 size=512
+bd_erase block=13
+bd_read block=11 off=0 size=16
+bd_prog block=13 off=0 size=512
+bd_read block=13 off=0 size=512
+bd_erase block=14
+bd_prog block=14 off=0 size=512
+bd_read block=14 off=0 size=512
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_read block=14 off=0 size=16
+bd_read block=13 off=0 size=16
+bd_read block=11 off=0 size=16
+bd_read block=9 off=0 size=16
+bd_read block=7 off=0 size=16
+bd_read block=5 off=0 size=16
+bd_read block=3 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=512
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_erase block=15
+bd_prog block=15 off=0 size=512
+bd_read block=15 off=0 size=512
+bd_read block=1 off=144 size=16
+bd_prog block=1 off=112 size=32
+bd_read block=1 off=112 size=144
+pacman ctz.head = 15 (fileblock)
+--- step: ghost_fill_corrupt ---
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_read block=1 off=0 size=16
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=512
+bd_prog block=1 off=144 size=48
+bd_read block=1 off=144 size=192
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_erase block=2
+bd_prog block=2 off=0 size=512
+bd_read block=2 off=0 size=512
+bd_erase block=3
+bd_prog block=3 off=0 size=512
+bd_read block=3 off=0 size=512
+bd_erase block=4
+bd_prog block=4 off=0 size=512
+bd_read block=4 off=0 size=512
+bd_erase block=5
+bd_prog block=5 off=0 size=512
+bd_read block=5 off=0 size=512
+bd_erase block=6
+bd_read block=4 off=0 size=16
+bd_prog block=6 off=0 size=512
+bd_read block=6 off=0 size=512
+bd_erase block=7
+bd_prog block=7 off=0 size=512
+bd_read block=7 off=0 size=512
+bd_erase block=8
+bd_prog block=8 off=0 size=512
+bd_read block=8 off=0 size=512
+bd_erase block=9
+bd_prog block=9 off=0 size=512
+bd_read block=9 off=0 size=512
+bd_erase block=10
+bd_read block=8 off=0 size=16
+bd_read block=6 off=0 size=16
+bd_prog block=10 off=0 size=512
+bd_read block=10 off=0 size=512
+bd_erase block=11
+bd_prog block=11 off=0 size=512
+bd_read block=11 off=0 size=512
+bd_erase block=12
+bd_prog block=12 off=0 size=512
+bd_read block=12 off=0 size=512
+bd_erase block=13
+bd_prog block=13 off=0 size=512
+bd_read block=13 off=0 size=512
+bd_erase block=14
+bd_read block=12 off=0 size=16
+bd_prog block=14 off=0 size=512
+bd_read block=14 off=0 size=512
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_read block=14 off=0 size=16
+bd_read block=12 off=0 size=16
+bd_read block=10 off=0 size=16
+bd_read block=8 off=0 size=16
+bd_read block=6 off=0 size=16
+bd_read block=4 off=0 size=16
+--- step: ghost_to_nospc_gc ---
+bd_read block=1 off=0 size=16
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=512
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_erase block=2
+bd_prog block=2 off=0 size=512
+bd_read block=2 off=0 size=512
+bd_erase block=3
+bd_prog block=3 off=0 size=512
+bd_read block=3 off=0 size=512
+bd_erase block=4
+bd_prog block=4 off=0 size=512
+bd_read block=4 off=0 size=512
+bd_erase block=5
+bd_prog block=5 off=0 size=512
+bd_read block=5 off=0 size=512
+bd_erase block=6
+bd_read block=4 off=0 size=16
+bd_prog block=6 off=0 size=512
+bd_read block=6 off=0 size=512
+bd_erase block=7
+bd_prog block=7 off=0 size=512
+bd_read block=7 off=0 size=512
+bd_erase block=8
+bd_prog block=8 off=0 size=512
+bd_read block=8 off=0 size=512
+bd_erase block=9
+bd_prog block=9 off=0 size=512
+bd_read block=9 off=0 size=512
+bd_erase block=10
+bd_read block=8 off=0 size=16
+bd_read block=6 off=0 size=16
+bd_prog block=10 off=0 size=512
+bd_read block=10 off=0 size=512
+bd_erase block=11
+bd_prog block=11 off=0 size=512
+bd_read block=11 off=0 size=512
+bd_erase block=12
+bd_prog block=12 off=0 size=512
+bd_read block=12 off=0 size=512
+bd_erase block=13
+bd_prog block=13 off=0 size=512
+bd_read block=13 off=0 size=512
+bd_erase block=14
+bd_read block=12 off=0 size=16
+bd_prog block=14 off=0 size=512
+bd_read block=14 off=0 size=512
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_read block=14 off=0 size=16
+bd_read block=12 off=0 size=16
+bd_read block=10 off=0 size=16
+bd_read block=8 off=0 size=16
+bd_read block=6 off=0 size=16
+bd_read block=4 off=0 size=16
+--- step: read_pacman ---
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=16
+bd_read block=1 off=16 size=496
+bd_read block=1 off=0 size=16
+bd_read block=0 off=0 size=16
+bd_read block=1 off=0 size=512
+bd_read block=15 off=0 size=512
+--- step: success (read 512 bytes) ---
+=== block 0 (first 64 bytes) ===
+0000  01 00 00 00 f0 0f ff f7 6c 69 74 74 6c 65 66 73  |........littlefs|
+0010  2f e0 00 10 01 00 02 00 00 02 00 00 10 00 00 00  |/...............|
+0020  ff 00 00 00 ff ff ff 7f fe 03 00 00 7f ef fc 10  |................|
+0030  10 00 00 00 e5 39 4c c0 0f f0 00 0c b0 46 18 ab  |.....9L......F..|
+=== block 1 (first 64 bytes) ===
+0000  02 00 00 00 f0 0f ff f7 6c 69 74 74 6c 65 66 73  |........littlefs|
+0010  2f e0 00 10 01 00 02 00 00 02 00 00 10 00 00 00  |/...............|
+0020  ff 00 00 00 ff ff ff 7f fe 03 00 00 7f ef fc 10  |................|
+0030  10 00 00 00 e5 39 4c c0 0f f0 00 0c 60 d3 1d 2f  |.....9L.....`../|
+=== block 2 (first 64 bytes) ===
+0000  63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63  |chompchompchompc|
+0010  68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68  |hompchompchompch|
+0020  6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f  |ompchompchompcho|
+0030  6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d  |mpchompchompchom|
+=== block 3 (first 64 bytes) ===
+0000  02 00 00 00 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d  |....ompchompchom|
+0010  70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70  |pchompchompchomp|
+0020  63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63  |chompchompchompc|
+0030  68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68  |hompchompchompch|
+=== block 4 (first 64 bytes) ===
+0000  03 00 00 00 02 00 00 00 63 68 6f 6d 70 63 68 6f  |........chompcho|
+0010  6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d  |mpchompchompchom|
+0020  70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70  |pchompchompchomp|
+0030  63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63  |chompchompchompc|
+=== block 5 (first 64 bytes) ===
+0000  04 00 00 00 70 63 68 6f 6d 70 63 68 6f 6d 70 63  |....pchompchompc|
+0010  68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68  |hompchompchompch|
+0020  6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f  |ompchompchompcho|
+0030  6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d  |mpchompchompchom|
+=== block 6 (first 64 bytes) ===
+0000  05 00 00 00 04 00 00 00 02 00 00 00 6f 6d 70 63  |............ompc|
+0010  68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68  |hompchompchompch|
+0020  6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f  |ompchompchompcho|
+0030  6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d  |mpchompchompchom|
+=== block 7 (first 64 bytes) ===
+0000  06 00 00 00 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d  |....ompchompchom|
+0010  70 63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70  |pchompchompchomp|
+0020  63 68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63  |chompchompchompc|
+0030  68 6f 6d 70 63 68 6f 6d 70 63 68 6f 6d 70 63 68  |hompchompchompch|
+../../reference/lfs.c:704:error: No more free space 0xf
+../../reference/lfs.c:704:error: No more free space 0x0
+../../reference/lfs.c:704:error: No more free space 0x0
+C badblock_and_dump: SUCCESS (read 512 bytes)

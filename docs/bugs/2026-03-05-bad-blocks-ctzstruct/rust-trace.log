@@ -1,0 +1,1277 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running unittests src/lib.rs (target/debug/deps/lp_littlefs-9057b12f11f6c373)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/test_alloc.rs (target/debug/deps/test_alloc-63d08bd993b26264)
+
+running 1 test
+[2026-03-06T00:09:06Z TRACE lp_littlefs] lfs_format(0x16d5bdfd0, 0x16d5bdf58)
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] splittingcompact: no split needed split==begin
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] lfs_dir_compact: traverse source=[1,0] begin=0 end=1 dir.pair=[1,0]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100000 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x0ff00008 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x0ff00008 type3=255 buffer=0x102ce4f30 attr_i=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100018 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100018 type3=513 buffer=0x16d5bd858
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100018 ft=0x0ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x0ff00008 type3=255 buffer=0x102ce4f30
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x0ff00008 type1=0 buffer=0x102ce4f30
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog superblock block=0 off=8 size=8 magic_region[4..8]=[108, 101, 102, 115]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100018 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x20100018 type3=513 buffer=0x16d5bd858 attr_i=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x20100018 type3=513 buffer=0x16d5bd858
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x20100018 type1=512 buffer=0x16d5bd858
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=64 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=0 off=0 size=64
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=64
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=1 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] splittingcompact: no split needed split==begin
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] lfs_dir_compact: traverse source=[0,1] begin=0 end=1 dir.pair=[0,1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x8ff00008 type3=255 buffer=0x16d5b9aa8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100018 type3=513 buffer=0x16d5b9aa8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100018 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=32 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc10 type3=1280 buffer=0x16d5b9aa8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc10 ft=0x8ff00008 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x8ff00008 type3=255 buffer=0x16d5b9aa8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x8ff00008 type1=0 buffer=0x16d5b9edc
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog superblock block=1 off=12 size=1 magic_region[0..1]=[108]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100018 type3=513 buffer=0x16d5b9aa8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=32 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc10 type3=1280 buffer=0x16d5b9aa8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc10 ft=0xa0100018 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0100018 type3=513 buffer=0x16d5b9aa8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0xa0100018 type1=512 buffer=0x16d5b9edc
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=32
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=64 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=1 off=0 size=64
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=64
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=16 size=496
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[1,0] count=1 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[1, 0]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[1,0] count=1 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs] lfs_format -> 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs] lfs_mount(0x16d5bdfd0, 0x16d5bdf58)
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: loop tail=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=16 size=496
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: FOUND besttag=0x0ff00008 pair=[1,0] count=1 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: before getgstate
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: after getgstate err=0 tail=[4294967295, 4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: no need, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after desuperblock err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: no move, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after demove err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: before deorphan
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] deorphan: start powerloss=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after deorphan err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::find] dir_find: iter=1 tag=3144704 split=false tail=[1,0] namelen=6
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[1, 0]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[1,0] count=1 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::find] lfs_err -2 at lp-littlefs/src/dir/find.rs:373
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x8ff00008 type3=255 buffer=0x16d5bb018 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100018 type3=513 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100018 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc10 type3=1280 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc10 ft=0x8ff00008 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100406 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100406 type3=1 buffer=0x1039e3510
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100406 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x8ff00008 type3=255 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100018 type3=513 buffer=0x16d5bb018 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc10 type3=1280 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc10 ft=0xa0100018 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100406 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100406 type3=1 buffer=0x1039e3510
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100406 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0100018 type3=513 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100406 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x00100406 type3=1 buffer=0x1039e3510 attr_i=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x00100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x00100406 type3=1 buffer=0x1039e3510
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x20100400 type3=513 buffer=0x0 attr_i=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] splittingcompact: split=0 end_val=2 size=54 max_space=472 half_block=256 break=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] splittingcompact: no split needed split==begin
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] lfs_dir_compact: traverse source=[1,0] begin=0 end=2 dir.pair=[1,0]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x8ff00008 type3=255 buffer=0x16d5b9718 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100018 type3=513 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100018 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc10 type3=1280 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc10 ft=0x8ff00008 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100406 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100406 type3=1 buffer=0x1039e3510
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100406 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x8ff00008 type3=255 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x8ff00008 type1=0 buffer=0x16d5b9b4c
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog superblock block=0 off=12 size=1 magic_region[0..1]=[108]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100018 type3=513 buffer=0x16d5b9718 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc10 type3=1280 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc10 ft=0xa0100018 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100406 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100406 type3=1 buffer=0x1039e3510
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100406 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0100018 type3=513 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0xa0100018 type1=512 buffer=0x16d5b9b4c
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100406 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x00100406 type3=1 buffer=0x1039e3510 attr_i=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x00100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x00100406 type3=1 buffer=0x1039e3510
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x00100406 type1=0 buffer=0x1039e3510
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x20100400 type3=513 buffer=0x0 attr_i=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x20100400 type1=512 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=80 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=0 off=0 size=80
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=80
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=2 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: tail loop start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: fetch tail=[0, 1] count=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=2 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: done
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=6
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=6 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=6 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=7
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=7 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=7 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=9
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=9 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=9 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=10
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=11
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=11 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=11 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=12
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=12 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=12 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=13
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=13 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=13 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=14
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=12 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=10 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=14 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=14 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=15
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=15 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=15 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=2 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=2 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=3 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=3 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=2 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=4 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=4 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=5
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: tail loop start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: fetch tail=[0, 1] count=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=2 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=4 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=2 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=14 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=12 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: done
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] No more free space 0x00000006 (ckpoint==0)
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] lfs_err -28 at lp-littlefs/src/block_alloc/alloc.rs:289
+[2026-03-06T00:09:06Z TRACE lp_littlefs::file::ctz] lfs_pass_err -28 at lp-littlefs/src/file/ctz.rs:464
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: no need, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after desuperblock err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: no move, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after demove err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: before deorphan
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] deorphan: start powerloss=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after deorphan err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::find] dir_find: iter=1 tag=3144704 split=false tail=[1,0] namelen=6
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[1, 0]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=496
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: FOUND besttag=0x00100406 pair=[0,1] count=2 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: tail loop start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: fetch tail=[0, 1] count=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=2 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: done
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=6
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=6 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=6 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x8ff00008 type3=255 buffer=0x16d5bb7a8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100018 type3=513 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100018 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=32 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x80100406 type3=1 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x80100406 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=48 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100400 type3=513 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc12 type3=1280 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc12 ft=0x8ff00008 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20200408 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x8ff00008 type3=255 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100018 type3=513 buffer=0x16d5bb7a8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=32 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x80100406 type3=1 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x80100406 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=48 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100400 type3=513 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc12 type3=1280 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc12 ft=0xa0100018 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20200408 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0100018 type3=513 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=32 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x80100406 type3=1 buffer=0x16d5bb7a8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=48 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100400 type3=513 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100400 ft=0x80100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc12 type3=1280 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc12 ft=0x80100406 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20200408 ft=0x80100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x80100406 type3=1 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100400 type3=513 buffer=0x16d5bb7a8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc12 type3=1280 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc12 ft=0xa0100400 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20200408 ft=0xa0100400 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: redundant tag=0x20200408 ft=0xa0100400 -> NOOP return 1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: res=1 storing redundant tag=0x20200408 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x00000000 type3=0 buffer=0x16d5bb7a8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x20200408 type3=514 buffer=0x16d5bdbc0 attr_i=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse LFS_FROM_USERATTRS: res=1 storing redundant tag=0x10200400
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess CTZSTRUCT: frame.tag=0x20200408 id=1 frame.disk=(0,62) frame.buffer=0x16d5bdbc0 disk_override=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x10200400 type3=258 buffer=0x0 attr_i=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] splittingcompact: split=0 end_val=2 size=62 max_space=472 half_block=256 break=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] splittingcompact: no split needed split==begin
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] lfs_dir_compact: traverse source=[0,1] begin=0 end=2 dir.pair=[0,1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x8ff00008 type3=255 buffer=0x16d5b9ea8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100018 type3=513 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100018 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=32 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x80100406 type3=1 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x80100406 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=48 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100400 type3=513 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc12 type3=1280 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc12 ft=0x8ff00008 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20200408 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x8ff00008 type3=255 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x8ff00008 type1=0 buffer=0x16d5ba2dc
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog superblock block=1 off=12 size=1 magic_region[0..1]=[108]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100018 type3=513 buffer=0x16d5b9ea8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=32 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x80100406 type3=1 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x80100406 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=48 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100400 type3=513 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc12 type3=1280 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc12 ft=0xa0100018 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20200408 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0100018 type3=513 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0xa0100018 type1=512 buffer=0x16d5ba2dc
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=32
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x80100406 type3=1 buffer=0x16d5b9ea8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=48 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100400 type3=513 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100400 ft=0x80100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc12 type3=1280 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc12 ft=0x80100406 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20200408 ft=0x80100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x80100406 type3=1 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x80100406 type1=0 buffer=0x16d5ba2dc
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100400 type3=513 buffer=0x16d5b9ea8 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc12 type3=1280 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc12 ft=0xa0100400 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20200408 ft=0xa0100400 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: redundant tag=0x20200408 ft=0xa0100400 -> NOOP return 1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: res=1 storing redundant tag=0x20200408 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x00000000 type3=0 buffer=0x16d5b9ea8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=0 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x20200408 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x20200408 type3=514 buffer=0x16d5bdbc0 attr_i=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse LFS_FROM_USERATTRS: res=1 storing redundant tag=0x10200400
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess CTZSTRUCT: frame.tag=0x20200408 id=1 frame.disk=(0,62) frame.buffer=0x16d5bdbc0 disk_override=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x20200408 type3=514 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x20200408 type1=512 buffer=0x16d5bdbc0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commitattr CTZSTRUCT: id=1 from_disk=false head=6 size=512 commit.block=1 commit.off=58
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x10200400 attrs_len=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x10200400 type3=258 buffer=0x0 attr_i=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x10200400 type3=258 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=32 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=96 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=1 off=0 size=80
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=80
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=16 size=496
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[1,0] count=2 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs] lfs_mount(0x16d5bdfd0, 0x16d5bdf58)
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: loop tail=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=16 size=496
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: FOUND besttag=0x0ff00008 pair=[1,0] count=2 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: before getgstate
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: after getgstate err=0 tail=[4294967295, 4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: no need, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after desuperblock err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: no move, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after demove err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: before deorphan
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] deorphan: start powerloss=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after deorphan err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::find] dir_find: iter=1 tag=3144704 split=false tail=[1,0] namelen=5
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[1, 0]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: NOENT pair=[1,0] count=2 besttag_id=1 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x8ff00008 type3=255 buffer=0x16d5bb018 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100018 type3=513 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100018 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x80100406 type3=1 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x80100406 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0200408 type3=514 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0200408 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc1a type3=1280 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc1a ft=0x8ff00008 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100405 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x8ff00008 type3=255 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100018 type3=513 buffer=0x16d5bb018 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x80100406 type3=1 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x80100406 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0200408 type3=514 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0200408 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc1a type3=1280 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc1a ft=0xa0100018 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100405 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0100018 type3=513 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x80100406 type3=1 buffer=0x16d5bb018 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0200408 type3=514 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0200408 ft=0x80100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc1a type3=1280 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc1a ft=0x80100406 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0x80100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100405 ft=0x80100806 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x80100806 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x80100806 type3=1 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0200408 type3=514 buffer=0x16d5bb018 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc1a type3=1280 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc1a ft=0xa0200408 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0xa0200408 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100405 ft=0xa0200808 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0xa0200808 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess CTZSTRUCT: frame.tag=0xa0200808 id=2 frame.disk=(1,58) frame.buffer=0x16d5bb018 disk_override=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0200808 type3=514 buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=2 disk_override=true buffer=0x16d5bb018
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x00100405 type3=1 buffer=0x1039e2ef0 attr_i=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x00100405 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x20100400 type3=513 buffer=0x0 attr_i=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] splittingcompact: split=0 end_val=3 size=75 max_space=472 half_block=256 break=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] splittingcompact: no split needed split==begin
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] lfs_dir_compact: traverse source=[1,0] begin=0 end=3 dir.pair=[1,0]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x8ff00008 type3=255 buffer=0x16d5b9718 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0100018 type3=513 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0100018 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x80100406 type3=1 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x80100406 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0200408 type3=514 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0200408 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc1a type3=1280 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc1a ft=0x8ff00008 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100405 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x8ff00008 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x8ff00008 type3=255 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x8ff00008 type1=0 buffer=0x16d5b9b4c
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog superblock block=0 off=12 size=1 magic_region[0..1]=[108]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0100018 type3=513 buffer=0x16d5b9718 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x80100406 type3=1 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x80100406 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0200408 type3=514 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0200408 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc1a type3=1280 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc1a ft=0xa0100018 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100405 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0xa0100018 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0100018 type3=513 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0xa0100018 type1=512 buffer=0x16d5b9b4c
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x80100406 type3=1 buffer=0x16d5b9718 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xa0200408 type3=514 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=1 disk_override=false buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xa0200408 ft=0x80100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc1a type3=1280 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc1a ft=0x80100406 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0x80100406 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100405 ft=0x80100806 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x80100806 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x80100806 type3=1 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x80100806 type1=0 buffer=0x16d5b9b4c
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=44
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0xa0200408 type3=514 buffer=0x16d5b9718 attr_i=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0xd00ffc1a type3=1280 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0xd00ffc1a ft=0xa0200408 mask_check tag&0x100=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x40100400 type3=1025 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x40100400 ft=0xa0200408 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x00100405 ft=0xa0200808 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0xa0200808 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess CTZSTRUCT: frame.tag=0xa0200808 id=2 frame.disk=(1,58) frame.buffer=0x16d5b9718 disk_override=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0xa0200808 type3=514 buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag CTZSTRUCT: id=2 disk_override=true buffer=0x16d5b9718
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0xa0200808 type1=512 buffer=0x16d5b9b4c
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commitattr CTZSTRUCT: id=2 from_disk=true disk.block=1 disk.off=58 commit.block=0 commit.off=58
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: reading from disk dir.pair[0]=1 off=54
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=0 tag=0x40100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=1 tag=0x00100405 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x00100405 type3=1 buffer=0x1039e2ef0 attr_i=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=1 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse_filter: tag=0x20100400 ft=0x00100405 mask_check tag&0x100=false
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x00100405 type3=1 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x00100405 type1=0 buffer=0x1039e2ef0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: from attrs attr_i=2 tag=0x20100400 attrs_len=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: push tag=0x20100400 type3=513 buffer=0x0 attr_i=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=1 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse PopAndProcess: sp=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse ProcessTag: sp=0 tag=0x20100400 type3=513 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::commit] commit_commit_raw: tag=0x20100400 type1=512 buffer=0x0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::traverse] traverse GetNextTag: sp=0 phase=GetNextTag
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=112 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=0 off=0 size=96
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=96
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=3 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: tail loop start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: fetch tail=[0, 1] count=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=3 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: done
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=11
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=11 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=11 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=12
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=12 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=12 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=13
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=13 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=13 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=14
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=14 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=14 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=15
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=13 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=15 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=15 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=2 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=2 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=3 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=3 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=4 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=4 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=5
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=3 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=15 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=7
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=7 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=7 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=9
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=9 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=9 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=10
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: tail loop start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: fetch tail=[0, 1] count=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=3 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=3 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=15 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=13 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: done
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] No more free space 0x0000000b (ckpoint==0)
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] lfs_err -28 at lp-littlefs/src/block_alloc/alloc.rs:289
+[2026-03-06T00:09:06Z TRACE lp_littlefs::file::ctz] lfs_pass_err -28 at lp-littlefs/src/file/ctz.rs:464
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: no need, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after desuperblock err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: no move, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after demove err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: before deorphan
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] deorphan: start powerloss=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after deorphan err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::find] dir_find: iter=1 tag=3144704 split=false tail=[1,0] namelen=5
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[1, 0]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=16 size=496
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: FOUND besttag=0x00100405 pair=[0,1] count=3 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: tail loop start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: fetch tail=[0, 1] count=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=3 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: done
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=11
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=11 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=11 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=12
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=12 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=12 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=13
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=13 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=13 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=14
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=14 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=14 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=15
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=13 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=15 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=15 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=2
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=2 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=2 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=3
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=3 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=3 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=4
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=4 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=4 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=5
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=3 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=15 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=7
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=7 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=7 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=8
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=9
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=9 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=9 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_erase block=10
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_prog block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: tail loop start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::traverse] fs_traverse: fetch tail=[0, 1] count=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: CONTINUE pair=[0,1] count=3 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=10 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=8 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=5 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=3 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=15 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=13 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] alloc_scan: done
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] No more free space 0x0000000b (ckpoint==0)
+[2026-03-06T00:09:06Z TRACE lp_littlefs::block_alloc::alloc] lfs_err -28 at lp-littlefs/src/block_alloc/alloc.rs:289
+[2026-03-06T00:09:06Z TRACE lp_littlefs::file::ctz] lfs_pass_err -28 at lp-littlefs/src/file/ctz.rs:464
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::consistent] lfs_fs_gc: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] desuperblock: no need, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after desuperblock err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: start
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] demove: no move, return 0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after demove err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: before deorphan
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] deorphan: start powerloss=true
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::superblock] forceconsistency: after deorphan err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::consistent] lfs_fs_gc: after forceconsistency err=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs] lfs_mount(0x16d5bdfd0, 0x16d5bdf58)
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: loop tail=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: FOUND besttag=0x0ff00008 pair=[0,1] count=3 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: before getgstate
+[2026-03-06T00:09:06Z TRACE lp_littlefs::fs::mount] mount: after getgstate err=0 tail=[4294967295, 4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::find] dir_find: iter=1 tag=3144704 split=false tail=[0,1] namelen=6
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: start pair=[0, 1]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[0]=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: reading rev for pair[1]=1
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=1 off=0 size=16
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: block_iter=0
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=0 off=0 size=512
+[2026-03-06T00:09:06Z TRACE lp_littlefs::dir::fetch] fetchmatch: FOUND besttag=0x00100806 pair=[0,1] count=3 split=false tail=[4294967295,4294967295]
+[2026-03-06T00:09:06Z TRACE lp_littlefs::bd::bd] bd_read block=6 off=0 size=512
+test test_bad_blocks_ctz_repro ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+     Running tests/test_attrs.rs (target/debug/deps/test_attrs-e9696a4a0cb0e625)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/test_dirs.rs (target/debug/deps/test_dirs-fd48985f39af3c9a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/test_entries.rs (target/debug/deps/test_entries-c278b9636c2ae4d2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/test_files.rs (target/debug/deps/test_files-4f3fe9c954c85cdf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/test_move.rs (target/debug/deps/test_move-8bbe4c54e5154450)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+     Running tests/test_orphans.rs (target/debug/deps/test_orphans-6a366f2eb9950add)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/test_paths.rs (target/debug/deps/test_paths-f9af1e5de389b650)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 41 filtered out; finished in 0.00s
+
+     Running tests/test_powerloss.rs (target/debug/deps/test_powerloss-777229306199b84a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/test_relocations.rs (target/debug/deps/test_relocations-5011d1a3c5680855)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/test_superblocks.rs (target/debug/deps/test_superblocks-988f1b075ae51d5b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+

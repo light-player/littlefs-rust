@@ -599,6 +599,16 @@ fn test_alloc_bad_blocks_minimal_body() {
     run_badblocks_minimal(16);
 }
 
+// Focused reproducer for bad-block CTZSTRUCT corruption. Fast timeout for debug iteration.
+// Same flow as test_alloc_bad_blocks_minimal; dump_fs runs on failure via run_badblocks_minimal.
+#[test]
+fn test_bad_blocks_ctz_repro() {
+    init_logger();
+    run_with_timeout(10, || {
+        run_badblocks_minimal(16);
+    });
+}
+
 /// Runs the bad-block scenario with given block count. Panics if pacman read fails (bug repro).
 fn run_badblocks_minimal(blocks: u32) {
     let mut env = config_badblock(blocks);
