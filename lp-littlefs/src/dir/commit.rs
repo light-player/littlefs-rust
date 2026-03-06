@@ -2265,10 +2265,10 @@ pub fn lfs_dir_orphaningcommit(
             ldir = pdir;
         }
 
+        // C: lfs.c:2472-2594 — relocation handling
         let mut orphans = false;
         let mut state = state;
         let mut lpair = lpair;
-        let mut parent_hasparent = false;
         #[cfg(feature = "loop_limits")]
         const MAX_RELOCATE_ITER: u32 = 512;
         #[cfg(feature = "loop_limits")]
@@ -2285,32 +2285,46 @@ pub fn lfs_dir_orphaningcommit(
                 relocate_iter += 1;
             }
             state = 0;
+
+            // C: lfs.c:2480-2483 — update internal root
             if lfs_pair_cmp(&lpair, &(*lfs).root) == 0 {
                 (*lfs).root[0] = ldir.pair[0];
                 (*lfs).root[1] = ldir.pair[1];
             }
 
-            let tag = crate::fs::parent::lfs_fs_parent(lfs, &lpair, &mut pdir);
+            // C: lfs.c:2486-2497 — update internally tracked dirs
+            {
+                let mut d = (*lfs).mlist;
+                while !d.is_null() {
+                    if lfs_pair_cmp(&lpair, &(*d).m.pair) == 0 {
+                        (*d).m.pair[0] = ldir.pair[0];
+                        (*d).m.pair[1] = ldir.pair[1];
+                    }
+                    d = (*d).next;
+                }
+            }
+
+            // C: lfs.c:2500-2547 — find parent and update
+            let mut tag = crate::fs::parent::lfs_fs_parent(lfs, &lpair, &mut pdir);
             if tag < 0 && tag != crate::error::LFS_ERR_NOENT {
                 return tag;
             }
-            parent_hasparent = tag != crate::error::LFS_ERR_NOENT;
-            let hasparent = parent_hasparent;
 
+            let hasparent = tag != crate::error::LFS_ERR_NOENT;
             if hasparent {
                 let err = crate::fs::superblock::lfs_fs_preporphans(lfs, 1);
                 if err != 0 {
                     return crate::lfs_pass_err!(err);
                 }
-            }
 
-            // Only do parent-based relocatingcommit when we found a parent (C: 2506-2547).
-            // When hasparent is false (e.g. root relocation), fall through to pred path.
-            if hasparent {
                 let mut moveid: u16 = 0x3ff;
                 if crate::lfs_gstate::lfs_gstate_hasmovehere(&(*lfs).gstate, &pdir.pair) {
                     moveid = crate::tag::lfs_tag_id((*lfs).gstate.tag);
                     crate::fs::superblock::lfs_fs_prepmove(lfs, 0x3ff, core::ptr::null());
+                    // C: lfs.c:2523-2525
+                    if moveid < crate::tag::lfs_tag_id(tag as u32) {
+                        tag -= crate::tag::lfs_mktag(0, 1, 0) as i32;
+                    }
                 }
 
                 let ppair = [pdir.pair[0], pdir.pair[1]];
@@ -2349,25 +2363,23 @@ pub fn lfs_dir_orphaningcommit(
                     continue;
                 }
             }
-        }
 
-        let err = crate::fs::parent::lfs_fs_pred(lfs, &lpair, &mut pdir);
-        if err != 0 && err != crate::error::LFS_ERR_NOENT {
-            return crate::lfs_pass_err!(err);
-        }
-
-        let haspred = err != crate::error::LFS_ERR_NOENT;
-        if haspred {
-            if crate::lfs_gstate::lfs_gstate_hasorphans(&(*lfs).gstate) {
-                let deorphan_delta = if parent_hasparent { -1 } else { 0 };
-                let err2 = crate::fs::superblock::lfs_fs_preporphans(lfs, deorphan_delta);
-                if err2 != 0 {
-                    return err2;
-                }
+            // C: lfs.c:2549-2593 — find pred and update tail (INSIDE the while loop)
+            let err = crate::fs::parent::lfs_fs_pred(lfs, &lpair, &mut pdir);
+            if err != 0 && err != crate::error::LFS_ERR_NOENT {
+                return crate::lfs_pass_err!(err);
             }
+            crate::lfs_assert!(!(hasparent && err == crate::error::LFS_ERR_NOENT));
 
-            // Skip tail update when pdir == ldir (would create self-reference/cycle).
-            if crate::util::lfs_pair_cmp(&pdir.pair, &ldir.pair) != 0 {
+            if err != crate::error::LFS_ERR_NOENT {
+                if crate::lfs_gstate::lfs_gstate_hasorphans(&(*lfs).gstate) {
+                    let deorphan_delta = if hasparent { -1 } else { 0 };
+                    let err2 = crate::fs::superblock::lfs_fs_preporphans(lfs, deorphan_delta);
+                    if err2 != 0 {
+                        return err2;
+                    }
+                }
+
                 let mut moveid: u16 = 0x3ff;
                 if crate::lfs_gstate::lfs_gstate_hasmovehere(&(*lfs).gstate, &pdir.pair) {
                     moveid = crate::tag::lfs_tag_id((*lfs).gstate.tag);
@@ -2409,6 +2421,7 @@ pub fn lfs_dir_orphaningcommit(
                 if state < 0 {
                     return state;
                 }
+
                 ldir = pdir;
             }
         }

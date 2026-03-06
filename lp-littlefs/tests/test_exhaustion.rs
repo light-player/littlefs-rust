@@ -58,7 +58,10 @@ fn run_exhaustion(lfs: *mut Lfs, config: *const LfsConfig, prefix: &str, files: 
                     &c as *const u8 as *const core::ffi::c_void,
                     1,
                 );
-                assert!(res == 1 || res == LFS_ERR_NOSPC);
+                assert!(
+                    res == 1 || res == LFS_ERR_NOSPC,
+                    "write returned {res} at cycle={cycle} file={i}"
+                );
                 if res == LFS_ERR_NOSPC {
                     let err = lfs_file_close(lfs, file.as_mut_ptr());
                     assert!(err == 0 || err == LFS_ERR_NOSPC);
@@ -68,7 +71,10 @@ fn run_exhaustion(lfs: *mut Lfs, config: *const LfsConfig, prefix: &str, files: 
             }
 
             let err = lfs_file_close(lfs, file.as_mut_ptr());
-            assert!(err == 0 || err == LFS_ERR_NOSPC);
+            assert!(
+                err == 0 || err == LFS_ERR_NOSPC,
+                "close returned {err} at cycle={cycle} file={i}"
+            );
             if err == LFS_ERR_NOSPC {
                 assert_ok(lfs_unmount(lfs));
                 break 'outer;
@@ -127,7 +133,6 @@ fn verify_after_exhaustion(lfs: *mut Lfs, config: *const LfsConfig, prefix: &str
 /// ERASE_CYCLES=10, BLOCK_CYCLES=5, ERASE_COUNT=256, FILES=10
 /// Write random files under "roadrunner/" until NOSPC, verify after exhaustion.
 #[rstest]
-#[ignore = "block_cycles>0 wear-leveling relocation not yet working; data corruption on read-back"]
 fn test_exhaustion_normal(
     #[values(
         BadBlockBehavior::ProgError,
@@ -176,7 +181,6 @@ fn test_exhaustion_normal(
 /// Upstream: [cases.test_exhaustion_superblocks]
 /// Same as normal but files in root (no "roadrunner/"), forcing superblock expansion.
 #[rstest]
-#[ignore = "block_cycles>0 wear-leveling relocation not yet working; data corruption on read-back"]
 fn test_exhaustion_superblocks(
     #[values(
         BadBlockBehavior::ProgError,
@@ -303,7 +307,7 @@ fn verify_after_exhaustion_root(lfs: *mut Lfs, config: *const LfsConfig, files: 
 /// Run exhaustion twice: first with BLOCK_COUNT/2 usable blocks, then full device.
 /// Assert doubling blocks yields >= 2x cycles (within 10% tolerance).
 #[test]
-#[ignore = "block_cycles>0 wear-leveling relocation not yet working; data corruption on read-back"]
+#[ignore = "LFS_ERR_CORRUPT leaks to user during bad-block relocation; separate from relocation fix"]
 fn test_exhaustion_wear_leveling() {
     let erase_cycles: u32 = 20;
     let block_cycles: i32 = (erase_cycles / 2) as i32;
@@ -376,7 +380,7 @@ fn test_exhaustion_wear_leveling() {
 /// Upstream: [cases.test_exhaustion_wear_leveling_superblocks]
 /// Same as wear_leveling but files in root (superblock expansion).
 #[test]
-#[ignore = "block_cycles>0 wear-leveling relocation not yet working; data corruption on read-back"]
+#[ignore = "LFS_ERR_CORRUPT leaks to user during bad-block relocation; separate from relocation fix"]
 fn test_exhaustion_wear_leveling_superblocks() {
     let erase_cycles: u32 = 20;
     let block_cycles: i32 = (erase_cycles / 2) as i32;
@@ -433,7 +437,6 @@ fn test_exhaustion_wear_leveling_superblocks() {
 /// if = 'BLOCK_CYCLES < CYCLES/10'
 /// Run CYCLES write cycles. Check wear distribution: stddev^2 < 8.
 #[rstest]
-#[ignore = "block_cycles>0 wear-leveling relocation not yet working; data corruption on read-back"]
 fn test_exhaustion_wear_distribution(#[values(5, 4, 3, 2, 1)] block_cycles_val: i32) {
     let cycles: u32 = 100;
     // C: if = 'BLOCK_CYCLES < CYCLES/10'

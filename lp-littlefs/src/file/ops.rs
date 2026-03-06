@@ -947,6 +947,9 @@ pub fn lfs_file_sync_(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
                 }
             }
 
+            // C: copy ctz so alloc will work during a relocate
+            // Must live through lfs_dir_commit — declared outside the if/else
+            let mut ctz = file_ref.ctz;
             let (type_, buffer, size) = if (file_ref.flags as i32 & LFS_F_INLINE) != 0 {
                 (
                     LFS_TYPE_INLINESTRUCT,
@@ -954,7 +957,6 @@ pub fn lfs_file_sync_(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
                     file_ref.ctz.size,
                 )
             } else {
-                let mut ctz = file_ref.ctz;
                 crate::file::lfs_ctz::lfs_ctz_tole32(&mut ctz);
                 (
                     crate::lfs_type::lfs_type::LFS_TYPE_CTZSTRUCT,
