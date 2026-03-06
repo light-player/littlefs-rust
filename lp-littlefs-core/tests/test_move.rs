@@ -4,6 +4,7 @@
 //! Source: https://github.com/littlefs-project/littlefs/blob/master/tests/test_move.toml
 //!
 //! Corruption and powerloss tests; cross-dir rename implemented via lfs_rename_.
+#![allow(clippy::manual_c_str_literals)]
 
 mod common;
 

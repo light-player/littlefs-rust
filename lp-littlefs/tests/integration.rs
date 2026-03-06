@@ -261,7 +261,7 @@ fn test_read_dir_iterator() {
     fs.mkdir("/c").unwrap();
 
     let names: Vec<String> = {
-        let mut dir = fs.read_dir("/").unwrap();
+        let dir = fs.read_dir("/").unwrap();
         let mut names = Vec::new();
         for entry in dir {
             names.push(entry.unwrap().name);
@@ -286,7 +286,7 @@ fn test_read_dir_interleaved_with_file_ops() {
     fs.write_file("/y.txt", b"data-y").unwrap();
 
     {
-        let mut dir = fs.read_dir("/").unwrap();
+        let dir = fs.read_dir("/").unwrap();
         for entry in dir {
             let entry = entry.unwrap();
             if entry.file_type == FileType::File {

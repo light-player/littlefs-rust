@@ -5,9 +5,10 @@
 
 mod common;
 
+#[cfg(feature = "slow_tests")]
+use common::powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear};
 use common::{
     assert_err, assert_ok, default_config, dir_entry_names, init_context, init_logger, path_bytes,
-    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
     LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY,
 };
 use lp_littlefs_core::lfs_type::lfs_type::{LFS_TYPE_DIR, LFS_TYPE_REG};

@@ -259,7 +259,7 @@ fn test_orphans_one_orphan() {
         tail: [0, 0],
     };
     unsafe { lfs_alloc_ckpoint(lfs_ptr) };
-    assert_ok(lfs_dir_alloc(lfs_ptr, &mut orphan));
+    assert_ok(unsafe { lfs_dir_alloc(lfs_ptr, &mut orphan) });
     assert_ok(lfs_dir_commit(lfs_ptr, &mut orphan, core::ptr::null(), 0));
 
     // Append orphan to root and mark FS as having orphans
@@ -333,7 +333,7 @@ fn test_orphans_mkconsistent_one_orphan() {
         tail: [0, 0],
     };
     unsafe { lfs_alloc_ckpoint(lfs_ptr) };
-    assert_ok(lfs_dir_alloc(lfs_ptr, &mut orphan));
+    assert_ok(unsafe { lfs_dir_alloc(lfs_ptr, &mut orphan) });
     assert_ok(lfs_dir_commit(lfs_ptr, &mut orphan, core::ptr::null(), 0));
 
     // Append orphan to root and mark FS as having orphans

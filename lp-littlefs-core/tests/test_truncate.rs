@@ -14,6 +14,7 @@ use rstest::rstest;
 
 const HAIR: &[u8] = b"hair";
 const BALD: &[u8] = b"bald";
+#[allow(dead_code)]
 const COMB: &[u8] = b"comb";
 
 fn lfs_min(a: u32, b: u32) -> u32 {
@@ -42,7 +43,7 @@ fn lfs_min(a: u32, b: u32) -> u32 {
 #[case(2048, 8192)]
 #[case(2049, 8193)]
 fn test_truncate_simple(#[case] medium: u32, #[case] large: u32) {
-    if (medium == 32 && large >= 512) || (medium == 31 && large >= 512) {
+    if (medium == 31 || medium == 32) && large >= 512 {
         return; // truncated CTZ read returns 0xFF
     }
     let mut env = default_config(1024);
@@ -767,7 +768,7 @@ fn test_truncate_aggressive() {
 
     let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
 
-    for config in 0..6 {
+    for (config, _) in configs.iter().enumerate() {
         assert_ok(lfs_format(
             lfs.as_mut_ptr(),
             &env.config as *const LfsConfig,
