@@ -74,6 +74,8 @@ Before each retry (`continue 'relocate` or before calling `lfs_alloc` for a repl
 - **lfs_ctz_extend, lfs_file_relocate**: Call `lfs_alloc_lookahead(lfs, nblock)` before each `continue 'relocate` to mark the bad block as used.
 - **lfs_dir_compact**: Call `lfs_alloc_lookahead(lfs, dir_ref.pair[1])` before each CORRUPT retry.
 
-### GC hang (separate bug)
+### GC hang (fixed — was actually a `lfs_ctz_find` offset bug)
 
-With the lookahead fix, the first ghost fill correctly returns CORRUPT after ~13 writes. The second ghost fill reaches NOSPC. The hang occurs in **lfs_fs_gc**, specifically somewhere in `lfs_fs_forceconsistency` or `lfs_alloc_scan`. Defensive iteration caps added to deorphan, fs_traverse, and ctz_traverse do not trigger, so the hang may be in a different code path (e.g. `lfs_dir_get`, `lfs_dir_fetch`, or a commit/compact path). Next: run upstream C `test_alloc_bad_blocks` to compare; or add finer-grained timing/breakpoints to isolate the exact call site.
+The hang was not in GC or allocation. GC completed successfully. The actual hang occurred during the final `lfs_file_read` loop: `lfs_ctz_find` returned the raw file position as the within-block offset (`*off = pos` instead of `*off = target_off`), causing an infinite loop in `lfs_file_flushedread` when `diff = min(nsize, block_size - off) = 0`.
+
+See [../2026-03-05-ctz-find-offset/2026-03-05-ctz-find-offset.md](../2026-03-05-ctz-find-offset/2026-03-05-ctz-find-offset.md) for the full report.

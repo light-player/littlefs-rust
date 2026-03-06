@@ -185,7 +185,7 @@ pub fn lfs_ctz_find(
                 lfs,
                 pcache,
                 rcache,
-                block_size,
+                4,
                 head_val,
                 4 * skip,
                 &mut head_buf as *mut u32 as *mut u8,
@@ -200,7 +200,7 @@ pub fn lfs_ctz_find(
         }
 
         *block = head_val;
-        *off = pos;
+        *off = target_off;
     }
     0
 }
