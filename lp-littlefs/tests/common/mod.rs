@@ -601,6 +601,14 @@ pub const LFS_O_EXCL: i32 = 0x0200;
 pub const LFS_O_TRUNC: i32 = 0x0400;
 pub const LFS_O_APPEND: i32 = 0x0800;
 
+/// Seek whence. Per lfs.h enum lfs_whence_flags.
+pub const LFS_SEEK_SET: i32 = 0;
+pub const LFS_SEEK_CUR: i32 = 1;
+pub const LFS_SEEK_END: i32 = 2;
+
+/// Max file size. Per lfs.h LFS_FILE_MAX. lfs_soff_t is i32.
+pub const LFS_FILE_MAX: i32 = 2_147_483_647;
+
 /// Format, mount, create "hello" file with "Hello World!\0", unmount.
 /// Returns env. Caller mounts again before reading.
 pub fn fs_with_hello(env: &mut TestEnv) -> Result<(), i32> {
@@ -754,6 +762,9 @@ pub struct WearLevelingBd {
     /// Per-block erase count.
     pub wear: Vec<u32>,
     pub block_count: u32,
+    /// What value to fill blocks with on erase. -1 = no fill (skip memset).
+    /// C: lfs_emubd_config.erase_value
+    pub erase_value: i32,
 }
 
 impl WearLevelingBd {
@@ -764,6 +775,7 @@ impl WearLevelingBd {
             badblock_behavior: BadBlockBehavior::ProgError,
             wear: vec![0u32; block_count as usize],
             block_count,
+            erase_value: 0xff,
         }
     }
 
@@ -779,6 +791,24 @@ impl WearLevelingBd {
             badblock_behavior: behavior,
             wear: vec![0u32; block_count as usize],
             block_count,
+            erase_value: 0xff,
+        }
+    }
+
+    pub fn new_full(
+        block_count: u32,
+        block_size: u32,
+        erase_cycles: u32,
+        behavior: BadBlockBehavior,
+        erase_value: i32,
+    ) -> Self {
+        Self {
+            ram: RamStorage::new(block_size, block_count),
+            erase_cycles,
+            badblock_behavior: behavior,
+            wear: vec![0u32; block_count as usize],
+            block_count,
+            erase_value,
         }
     }
 
@@ -856,18 +886,21 @@ unsafe extern "C" fn wear_erase(cfg: *const LfsConfig, block: u32) -> i32 {
     // C: if (bd->cfg->erase_cycles) { ... }
     if bd.erase_cycles > 0 {
         if bd.wear[block as usize] >= bd.erase_cycles {
-            // block bad
             match bd.badblock_behavior {
                 BadBlockBehavior::EraseError => return LFS_ERR_CORRUPT,
                 BadBlockBehavior::EraseNoop => return 0,
                 _ => {}
             }
         } else {
-            // mark wear
             bd.wear[block as usize] += 1;
         }
     }
-    bd.ram.erase(block);
+    // C: if (bd->cfg->erase_value != -1) { memset(..., erase_value, ...); }
+    if bd.erase_value != -1 {
+        let base = bd.ram.block_offset(block);
+        let end = base + bd.ram.block_size as usize;
+        bd.ram.data[base..end].fill(bd.erase_value as u8);
+    }
     0
 }
 
@@ -898,6 +931,56 @@ pub fn config_with_wear_leveling_behavior(
 ) -> WearLevelingEnv {
     let block_size = BLOCK_SIZE;
     let bd = WearLevelingBd::new_with_behavior(block_count, block_size, erase_cycles, behavior);
+    let read_buf = vec![0u8; block_size as usize];
+    let prog_buf = vec![0u8; block_size as usize];
+    let lookahead_buf = vec![0u8; block_size as usize];
+
+    let config = LfsConfig {
+        context: core::ptr::null_mut(),
+        read: Some(wear_read),
+        prog: Some(wear_prog),
+        erase: Some(wear_erase),
+        sync: Some(wear_sync),
+        read_size: 16,
+        prog_size: 16,
+        block_size,
+        block_count,
+        block_cycles: -1,
+        cache_size: block_size,
+        lookahead_size: block_size,
+        compact_thresh: u32::MAX,
+        read_buffer: read_buf.as_ptr() as *mut core::ffi::c_void,
+        prog_buffer: prog_buf.as_ptr() as *mut core::ffi::c_void,
+        lookahead_buffer: lookahead_buf.as_ptr() as *mut core::ffi::c_void,
+        name_max: 255,
+        file_max: 2_147_483_647,
+        attr_max: 1022,
+        metadata_max: 0,
+        inline_max: 0,
+    };
+
+    let mut env = WearLevelingEnv {
+        bd,
+        config,
+        _read_buf: read_buf,
+        _prog_buf: prog_buf,
+        _lookahead_buf: lookahead_buf,
+    };
+    env.config.read_buffer = env._read_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.prog_buffer = env._prog_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env.config.lookahead_buffer = env._lookahead_buf.as_mut_ptr() as *mut core::ffi::c_void;
+    env
+}
+
+/// Build wear-leveling test environment with all parameters.
+pub fn config_with_wear_leveling_full(
+    block_count: u32,
+    erase_cycles: u32,
+    behavior: BadBlockBehavior,
+    erase_value: i32,
+) -> WearLevelingEnv {
+    let block_size = BLOCK_SIZE;
+    let bd = WearLevelingBd::new_full(block_count, block_size, erase_cycles, behavior, erase_value);
     let read_buf = vec![0u8; block_size as usize];
     let prog_buf = vec![0u8; block_size as usize];
     let lookahead_buf = vec![0u8; block_size as usize];
