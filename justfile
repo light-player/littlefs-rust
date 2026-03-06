@@ -50,3 +50,23 @@ no_std:
 # Cargo deny: license and advisory checks (run dev-init.sh first if needed)
 deny:
     cargo deny check
+
+# Sync reference/ to tracked upstream commit
+upstream-sync:
+    scripts/upstream sync
+
+# Show upstream commits since tracked
+upstream-log *ARGS:
+    scripts/upstream log {{ARGS}}
+
+# Show upstream diff since tracked
+upstream-diff *ARGS:
+    scripts/upstream diff {{ARGS}}
+
+# Generate upstream sync report
+upstream-report *ARGS:
+    scripts/upstream report {{ARGS}}
+
+# Generate agent prompt for upstream sync
+upstream-prompt *ARGS:
+    scripts/upstream prompt {{ARGS}}

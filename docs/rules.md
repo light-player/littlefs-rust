@@ -4,11 +4,11 @@ Hand-translation of LittleFS from C to Rust. These rules govern how to translate
 
 ## Reference Location
 
-**Use the local reference only.** Read C source from `reference/` in this repo (symlink to littlefs checkout). Commit in `docs/reference.md`.
+**Use the local reference only.** Read C source from `reference/` in this repo (symlink to littlefs checkout). Tracked commit in `.upstream`.
 
 - **Do NOT** fetch `lfs.c`, `lfs.h`, or other C source from the web or GitHub
 - Use `Read` or `Grep` on `reference/lfs.c`, `reference/lfs_util.c`, etc.
-- If `reference/` is missing, create a symlink to a littlefs checkout at the commit in `docs/reference.md` (e.g. `ln -s /path/to/littlefs reference`)
+- If `reference/` is missing, run `scripts/upstream sync` (or `just upstream-sync`)
 
 ## 0. Before You Translate
 
@@ -97,7 +97,7 @@ Hand-translation of LittleFS from C to Rust. These rules govern how to translate
 
 Tests are defined in upstream TOML files (`tests/test_*.toml`) which contain C snippets run by the littlefs test framework. Port them to Rust integration tests, preserving alignment with the reference.
 
-- **Source**: `https://github.com/littlefs-project/littlefs/blob/master/tests/*.toml`. Commit in `docs/reference.md`.
+- **Source**: `https://github.com/littlefs-project/littlefs/blob/master/tests/*.toml`. Tracked commit in `.upstream`.
 
 - **Names**: Keep the same test names as upstream. `[cases.test_bd_one_block]` → `test_bd_one_block`. Module mapping: `test_dirs.toml` → `tests/test_dirs.rs`, etc.
 

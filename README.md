@@ -86,8 +86,10 @@ running on ESP32.
 ./dev-init.sh
 ```
 
-Installs Rust (stable + rustfmt), the `thumbv6m-none-eabi` target for `no_std` checks, and
-cargo-deny. Requires [just](https://github.com/casey/just) to run the CI recipe locally.
+Installs Rust (stable + rustfmt), the `thumbv6m-none-eabi` target for `no_std` checks, cargo-deny,
+and sets up `reference/` (symlink to upstream littlefs at the commit in `.upstream`). Requires
+[just](https://github.com/casey/just) to run the CI recipe locally. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for the upstream sync workflow.
 
 ### Pre-commit
 
@@ -111,7 +113,7 @@ See [lp-littlefs-compat/README.md](lp-littlefs-compat/README.md) for details.
 ## Upstream and reference
 
 - [littlefs-project/littlefs](https://github.com/littlefs-project/littlefs) — original C
-  implementation
+  implementation. Tracked commit in `.upstream`; run `just upstream-sync` to populate `reference/`.
 - [DESIGN.md](https://github.com/littlefs-project/littlefs/blob/master/DESIGN.md) — design and
   rationale
 - [SPEC.md](https://github.com/littlefs-project/littlefs/blob/master/SPEC.md) — on-disk format

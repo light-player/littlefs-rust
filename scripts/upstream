@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+# Upstream littlefs sync tooling.
+# Usage: scripts/upstream <sync|log|diff|report|prompt|bump> [args...]
+
+set -e
+
+REPO_URL="https://github.com/littlefs-project/littlefs.git"
+CLONE_DIR=".upstream-cache/littlefs"
+TRACKING_FILE=".upstream"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+cd "$REPO_ROOT"
+
+get_tracked() {
+    grep -v '^#' "$TRACKING_FILE" 2>/dev/null | grep -v '^$' | head -1
+}
+
+ensure_clone() {
+    if [[ ! -d "$CLONE_DIR/.git" ]]; then
+        echo "Cloning littlefs..."
+        mkdir -p "$(dirname "$CLONE_DIR")"
+        git clone --quiet "$REPO_URL" "$CLONE_DIR"
+    else
+        git -C "$CLONE_DIR" fetch --quiet origin 2>/dev/null || true
+    fi
+}
+
+cmd_sync() {
+    ensure_clone
+    tracked=$(get_tracked)
+    if [[ -z "$tracked" ]]; then
+        echo "Error: No tracked commit in $TRACKING_FILE" >&2
+        exit 1
+    fi
+    ref="${1:-$tracked}"
+    git -C "$CLONE_DIR" checkout --quiet "$ref" 2>/dev/null || {
+        echo "Fetching $ref..."
+        git -C "$CLONE_DIR" fetch --quiet origin "$ref"
+        git -C "$CLONE_DIR" checkout --quiet FETCH_HEAD
+    }
+    rm -f reference
+    rm -rf reference
+    ln -sf "$(pwd)/$CLONE_DIR" reference
+    echo "reference/ now at $(git -C "$CLONE_DIR" rev-parse --short HEAD)"
+}
+
+cmd_log() {
+    ensure_clone
+    tracked=$(get_tracked)
+    if [[ -z "$tracked" ]]; then
+        echo "Error: No tracked commit in $TRACKING_FILE" >&2
+        exit 1
+    fi
+    ref="${1:-origin/master}"
+    git -C "$CLONE_DIR" fetch --quiet origin 2>/dev/null || true
+    git -C "$CLONE_DIR" log --oneline "$tracked..$ref" 2>/dev/null || true
+}
+
+cmd_diff() {
+    ensure_clone
+    tracked=$(get_tracked)
+    if [[ -z "$tracked" ]]; then
+        echo "Error: No tracked commit in $TRACKING_FILE" >&2
+        exit 1
+    fi
+    ref="${1:-origin/master}"
+    [[ $# -gt 0 ]] && shift
+    git -C "$CLONE_DIR" fetch --quiet origin 2>/dev/null || true
+    if [[ "$1" == "--" ]]; then
+        shift
+        git -C "$CLONE_DIR" diff "$tracked..$ref" -- "$@" || true
+    else
+        git -C "$CLONE_DIR" diff "$tracked..$ref" || true
+    fi
+}
+
+extract_functions() {
+    local diff_output="$1"
+    echo "$diff_output" | grep '^@@' | sed 's/.*@@.*@@ *//' | grep -oE 'lfs_[a-zA-Z0-9_]+' | sort -u
+}
+
+find_rust_file() {
+    local func="$1"
+    local hit
+    hit=$(rg -l "lfs\.c.*$func|$func.*lfs\.c" lp-littlefs-core/src/ 2>/dev/null | head -1)
+    if [[ -n "$hit" ]]; then
+        local line
+        line=$(rg -n "lfs\.c.*$func|$func.*lfs\.c" lp-littlefs-core/src/ 2>/dev/null | head -1 | cut -d: -f2)
+        echo "$hit:$line"
+    else
+        echo ""
+    fi
+}
+
+cmd_report() {
+    ensure_clone
+    tracked=$(get_tracked)
+    if [[ -z "$tracked" ]]; then
+        echo "Error: No tracked commit in $TRACKING_FILE" >&2
+        exit 1
+    fi
+    ref="${1:-origin/master}"
+    git -C "$CLONE_DIR" fetch --quiet origin 2>/dev/null || true
+
+    new_commit=$(git -C "$CLONE_DIR" rev-parse "$ref" 2>/dev/null || echo "")
+    if [[ -z "$new_commit" ]]; then
+        echo "Error: Cannot resolve ref: $ref" >&2
+        exit 1
+    fi
+
+    short_tracked=$(git -C "$CLONE_DIR" rev-parse --short "$tracked")
+    short_new=$(git -C "$CLONE_DIR" rev-parse --short "$new_commit")
+
+    mkdir -p .upstream-cache
+
+    # Diff for C sources and tests
+    diff_output=$(git -C "$CLONE_DIR" diff -p "$tracked..$ref" -- lfs.c lfs.h lfs_util.c lfs_util.h 2>/dev/null || true)
+    test_diff=$(git -C "$CLONE_DIR" diff "$tracked..$ref" -- "tests/*.toml" 2>/dev/null || true)
+
+    # Extract changed function names from C diff
+    functions=()
+    while IFS= read -r f; do
+        [[ -n "$f" ]] && functions+=("$f")
+    done < <(extract_functions "$diff_output")
+
+    # Build report
+    {
+        echo "# Upstream sync: $short_tracked..$short_new"
+        echo ""
+        echo "## Commits"
+        git -C "$CLONE_DIR" log --oneline "$tracked..$ref" | sed 's/^/- /'
+        echo ""
+        echo "## Changed C functions → Rust files"
+        echo "| C function | Rust file |"
+        echo "|------------|-----------|"
+        for f in "${functions[@]}"; do
+            rust_loc=$(find_rust_file "$f")
+            if [[ -n "$rust_loc" ]]; then
+                rust_file="${rust_loc%%:*}"
+                rust_line="${rust_loc##*:}"
+                echo "| \`$f\` | $rust_file (line ~$rust_line) |"
+            else
+                echo "| \`$f\` | (not found) |"
+            fi
+        done
+        if [[ ${#functions[@]} -eq 0 ]]; then
+            echo "| (none) | |"
+        fi
+        echo ""
+        if [[ -n "$test_diff" ]]; then
+            echo "## Changed test files"
+            git -C "$CLONE_DIR" diff --name-only "$tracked..$ref" -- "tests/*.toml" | sed 's/^/- /'
+            echo ""
+        fi
+        echo "## Full diff"
+        echo "<details><summary>lfs.c, lfs.h, lfs_util.c, lfs_util.h</summary>"
+        echo ""
+        echo '```diff'
+        echo "$diff_output"
+        echo '```'
+        echo "</details>"
+    } > .upstream-cache/pending-sync.md
+
+    echo "Report written to .upstream-cache/pending-sync.md"
+}
+
+cmd_prompt() {
+    ref="${1:-origin/master}"
+    # Ensure report is fresh
+    ensure_clone
+    tracked=$(get_tracked)
+    new_commit=$(git -C "$CLONE_DIR" rev-parse "$ref" 2>/dev/null || echo "")
+    short_tracked=$(git -C "$CLONE_DIR" rev-parse --short "$tracked")
+    short_new=$(git -C "$CLONE_DIR" rev-parse --short "$new_commit")
+
+    cmd_report "$ref" >/dev/null 2>&1
+
+    cat << PROMPT
+Port upstream littlefs changes from $short_tracked to $short_new.
+
+Read docs/rules.md for translation rules. Read AGENTS.md for commit conventions. Read .upstream-cache/pending-sync.md for the full diff and Rust file mapping.
+
+Steps:
+1. Run \`scripts/upstream sync\` to update reference/ to the NEW commit ($short_new).
+2. For each changed function listed in .upstream-cache/pending-sync.md, find the Rust translation in lp-littlefs-core/src/ (grep for the function name in \`Per lfs.c\` comments) and port the change.
+3. Update \`/// Per lfs.c ... (lines X-Y)\` references for any functions you modify.
+4. If test files changed, port the test changes to the corresponding lp-littlefs-core/tests/ file.
+5. Run: cargo test -p lp-littlefs-core --all-features
+6. Run: cargo test -p lp-littlefs-compat
+7. Run: scripts/upstream bump $new_commit
+8. Run: just fci
+9. Commit: fix(core): sync upstream littlefs $short_tracked..$short_new
+
+PROMPT
+}
+
+cmd_bump() {
+    commit="$1"
+    if [[ -z "$commit" ]]; then
+        echo "Usage: scripts/upstream bump <commit>" >&2
+        exit 1
+    fi
+    ensure_clone
+    full_hash=$(git -C "$CLONE_DIR" rev-parse "$commit" 2>/dev/null) || {
+        echo "Error: Commit $commit not found in upstream repo" >&2
+        exit 1
+    }
+    # Preserve comment lines
+    if [[ -f "$TRACKING_FILE" ]]; then
+        grep '^#' "$TRACKING_FILE" > "$TRACKING_FILE.tmp" 2>/dev/null || true
+    else
+        echo "# littlefs-project/littlefs — tracked upstream commit" > "$TRACKING_FILE.tmp"
+        echo "# https://github.com/littlefs-project/littlefs.git" >> "$TRACKING_FILE.tmp"
+    fi
+    echo "$full_hash" >> "$TRACKING_FILE.tmp"
+    mv "$TRACKING_FILE.tmp" "$TRACKING_FILE"
+    echo "Updated $TRACKING_FILE to $full_hash"
+}
+
+case "${1:-}" in
+    sync)   cmd_sync "${2:-}" ;;
+    log)    cmd_log "${2:-}" ;;
+    diff)   shift; cmd_diff "$@" ;;
+    report) cmd_report "${2:-}" ;;
+    prompt) cmd_prompt "${2:-}" ;;
+    bump)   cmd_bump "$2" ;;
+    *)
+        echo "Usage: scripts/upstream <sync|log|diff|report|prompt|bump> [args...]" >&2
+        exit 1
+        ;;
+esac

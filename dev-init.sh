@@ -19,4 +19,9 @@ rustup target add thumbv6m-none-eabi
 # Install cargo-deny for license and advisory checks
 cargo install cargo-deny
 
+# Set up reference/ symlink to upstream littlefs
+if [ -x scripts/upstream ]; then
+    scripts/upstream sync
+fi
+
 echo "Dev environment ready. Run 'just ci' to verify."
