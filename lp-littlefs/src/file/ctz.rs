@@ -254,7 +254,7 @@ pub fn lfs_ctz_find(
 /// ```
 pub fn lfs_ctz_traverse(
     lfs: *const crate::fs::Lfs,
-    _pcache: *const crate::bd::LfsCache,
+    pcache: *const crate::bd::LfsCache,
     rcache: *mut crate::bd::LfsCache,
     head: lfs_block_t,
     size: lfs_size_t,
@@ -299,14 +299,15 @@ pub fn lfs_ctz_traverse(
                 return 0;
             }
 
+            // C: count*sizeof(head) as hint
             let count = (2 - (index & 1)) as usize;
             let mut heads = [0u32; 2];
             let read_size = (count * core::mem::size_of::<lfs_block_t>()) as u32;
             let err = lfs_bd_read(
                 lfs,
-                core::ptr::null(),
+                pcache,
                 &mut *rcache,
-                (*lfs).cfg.as_ref().expect("cfg").block_size,
+                read_size,
                 current_head,
                 0,
                 heads.as_mut_ptr() as *mut u8,
