@@ -364,6 +364,56 @@ pub fn init_context(env: &mut TestEnv) {
     env.config.context = &mut env.ram as *mut RamStorage as *mut core::ffi::c_void;
 }
 
+/// A second config that shares the same RAM device but has its own buffers
+/// and a different block_count. For lfs_fs_grow shrink tests where the
+/// reduced-size config must mount the same underlying storage.
+///
+/// C pattern: `struct lfs_config cfg2 = *cfg; cfg2.block_count = N;`
+pub struct ClonedConfig {
+    pub config: LfsConfig,
+    pub _read_buf: Vec<u8>,
+    pub _prog_buf: Vec<u8>,
+    pub _lookahead_buf: Vec<u8>,
+}
+
+/// Clone a TestEnv's config with a different block_count, sharing the same
+/// RAM context pointer. Caller must ensure the original TestEnv outlives this.
+pub fn clone_config_with_block_count(env: &TestEnv, block_count: u32) -> ClonedConfig {
+    let bs = env.config.block_size as usize;
+    let mut read_buf = vec![0u8; bs];
+    let mut prog_buf = vec![0u8; bs];
+    let mut lookahead_buf = vec![0u8; bs];
+    let config = LfsConfig {
+        context: env.config.context,
+        read: env.config.read,
+        prog: env.config.prog,
+        erase: env.config.erase,
+        sync: env.config.sync,
+        read_size: env.config.read_size,
+        prog_size: env.config.prog_size,
+        block_size: env.config.block_size,
+        block_count,
+        block_cycles: env.config.block_cycles,
+        cache_size: env.config.cache_size,
+        lookahead_size: env.config.lookahead_size,
+        compact_thresh: env.config.compact_thresh,
+        read_buffer: read_buf.as_mut_ptr() as *mut core::ffi::c_void,
+        prog_buffer: prog_buf.as_mut_ptr() as *mut core::ffi::c_void,
+        lookahead_buffer: lookahead_buf.as_mut_ptr() as *mut core::ffi::c_void,
+        name_max: env.config.name_max,
+        file_max: env.config.file_max,
+        attr_max: env.config.attr_max,
+        metadata_max: env.config.metadata_max,
+        inline_max: env.config.inline_max,
+    };
+    ClonedConfig {
+        config,
+        _read_buf: read_buf,
+        _prog_buf: prog_buf,
+        _lookahead_buf: lookahead_buf,
+    }
+}
+
 /// TestEnv variant with bad-block BD. Use for test_alloc_bad_blocks.
 pub struct BadBlockTestEnv {
     pub badblock_ram: BadBlockRamStorage,

@@ -38,7 +38,7 @@ use core::ffi::c_void;
 pub use crate::dir::LfsDir;
 pub use crate::error::{
     LFS_ERR_CORRUPT, LFS_ERR_EXIST, LFS_ERR_INVAL, LFS_ERR_IO, LFS_ERR_ISDIR, LFS_ERR_NAMETOOLONG,
-    LFS_ERR_NOATTR, LFS_ERR_NOENT, LFS_ERR_NOMEM, LFS_ERR_NOSPC, LFS_ERR_NOTDIR,
+    LFS_ERR_NOATTR, LFS_ERR_NOENT, LFS_ERR_NOMEM, LFS_ERR_NOSPC, LFS_ERR_NOTDIR, LFS_ERR_NOTEMPTY,
 };
 pub use crate::file::LfsFile;
 pub use crate::fs::Lfs;
@@ -332,8 +332,8 @@ pub unsafe fn lfs_fs_hasorphans(lfs: *const Lfs) -> bool {
     crate::lfs_gstate::lfs_gstate_hasorphans(&(*lfs).gstate)
 }
 
-/// Grow the filesystem to a new size. Per lfs.h lfs_fs_grow (lfs.c:6511-6515).
+/// Grow (or shrink) the filesystem to a new size. Per lfs.h lfs_fs_grow (lfs.c:6511-6515).
 #[inline(never)]
 pub fn lfs_fs_grow(lfs: *mut Lfs, block_count: lfs_size_t) -> i32 {
-    todo!("lfs_fs_grow")
+    crate::fs::grow::lfs_fs_grow_(lfs, block_count)
 }
