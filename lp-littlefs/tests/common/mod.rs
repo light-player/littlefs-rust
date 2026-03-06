@@ -1025,6 +1025,40 @@ pub fn write_prng_file(
     size
 }
 
+/// Like write_prng_file but returns Err on write failure (e.g. power-loss LFS_ERR_IO).
+/// Use in power-loss tests where writes can legitimately fail.
+pub fn write_prng_file_result(
+    lfs: *mut lp_littlefs::Lfs,
+    file: *mut lp_littlefs::LfsFile,
+    size: u32,
+    chunk_size: u32,
+    seed: u32,
+) -> Result<u32, i32> {
+    let mut prng = seed;
+    let mut buffer = [0u8; 1024];
+    let mut i: u32 = 0;
+    while i < size {
+        let chunk = core::cmp::min(chunk_size, size - i);
+        for slot in buffer[..chunk as usize].iter_mut() {
+            *slot = (test_prng(&mut prng) & 0xff) as u8;
+        }
+        let n = lp_littlefs::lfs_file_write(
+            lfs,
+            file,
+            buffer.as_ptr() as *const core::ffi::c_void,
+            chunk,
+        );
+        if n < 0 {
+            return Err(n);
+        }
+        if n != chunk as i32 {
+            return Err(-1);
+        }
+        i += chunk;
+    }
+    Ok(size)
+}
+
 /// Read `size` bytes from an open file in `chunk_size` chunks and verify
 /// against the same PRNG sequence (seeded with `seed`). Panics on mismatch.
 ///
@@ -1067,6 +1101,42 @@ pub fn verify_prng_file(
             assert_eq!(
                 actual, expected,
                 "verify_prng_file: mismatch at byte {} (chunk offset {}), expected {:#04x}, got {:#04x}",
+                i as usize + b, b, expected, actual
+            );
+        }
+        i += chunk;
+    }
+}
+
+/// Same as verify_prng_file but uses existing PRNG state (for verifying a tail after advance).
+/// Used when reading SIZE2..SIZE1 in test_files_rewrite (PRNG was advanced by SIZE2 from seed 1).
+pub fn verify_prng_file_with_state(
+    lfs: *mut lp_littlefs::Lfs,
+    file: *mut lp_littlefs::LfsFile,
+    size: u32,
+    chunk_size: u32,
+    prng: &mut u32,
+) {
+    let mut buffer = [0u8; 1024];
+    let mut i: u32 = 0;
+    while i < size {
+        let chunk = core::cmp::min(chunk_size, size - i);
+        let n = lp_littlefs::lfs_file_read(
+            lfs,
+            file,
+            buffer.as_mut_ptr() as *mut core::ffi::c_void,
+            chunk,
+        );
+        assert_eq!(
+            n, chunk as i32,
+            "verify_prng_file_with_state: expected {} bytes read at offset {}, got {}",
+            chunk, i, n
+        );
+        for (b, &actual) in buffer[..chunk as usize].iter().enumerate() {
+            let expected = (test_prng(prng) & 0xff) as u8;
+            assert_eq!(
+                actual, expected,
+                "verify_prng_file_with_state: mismatch at byte {} (chunk offset {}), expected {:#04x}, got {:#04x}",
                 i as usize + b, b, expected, actual
             );
         }
