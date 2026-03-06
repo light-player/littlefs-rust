@@ -7,7 +7,10 @@ mod common;
 
 use common::{
     assert_ok_at, default_config, init_context, init_logger, path_bytes,
-    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
+    powerloss::{
+        init_powerloss_context, powerloss_config, powerloss_config_with_behavior,
+        run_powerloss_exhaustive, run_powerloss_linear, run_powerloss_log, PowerLossBehavior,
+    },
     read_block_raw, write_block_raw, LFS_O_APPEND, LFS_O_CREAT, LFS_O_RDONLY, LFS_O_WRONLY,
 };
 use lp_littlefs::{
@@ -624,6 +627,151 @@ fn test_debug_powerloss_after_corrupt_append() {
     }
     assert_ok_at("file_close", lfs_file_close(lfs_ptr, file.as_mut_ptr()));
     assert_ok_at("unmount", lfs_unmount(lfs_ptr));
+}
+
+// --- test_powerloss_runner_smoke_log ---
+// Same as test_powerloss_runner_smoke but using run_powerloss_log (exponential stepping).
+#[test]
+fn test_powerloss_runner_smoke_log() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok_at(
+        "format",
+        lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig),
+    );
+    let snapshot = env.snapshot();
+
+    let path_d = path_bytes("d");
+    let result = run_powerloss_log(
+        &mut env,
+        &snapshot,
+        64,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let err = lfs_mkdir(lfs_ptr, path_d.as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_unmount(lfs_ptr);
+            if err != 0 {
+                return Err(err);
+            }
+            Ok(())
+        },
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let _ = lfs_unmount(lfs_ptr);
+            Ok(())
+        },
+    );
+    result.expect("run_powerloss_log should complete");
+}
+
+// --- test_powerloss_runner_smoke_exhaustive ---
+// Same as test_powerloss_runner_smoke but using run_powerloss_exhaustive with depth=2.
+#[test]
+fn test_powerloss_runner_smoke_exhaustive() {
+    init_logger();
+    let mut env = powerloss_config(128);
+    init_powerloss_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok_at(
+        "format",
+        lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig),
+    );
+    let snapshot = env.snapshot();
+
+    let path_d = path_bytes("d");
+    let result = run_powerloss_exhaustive(
+        &mut env,
+        &snapshot,
+        64,
+        2,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let err = lfs_mkdir(lfs_ptr, path_d.as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_unmount(lfs_ptr);
+            if err != 0 {
+                return Err(err);
+            }
+            Ok(())
+        },
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let _ = lfs_unmount(lfs_ptr);
+            Ok(())
+        },
+    );
+    result.expect("run_powerloss_exhaustive depth=2 should complete");
+}
+
+// --- test_powerloss_ooo_smoke ---
+// OOO behaviour: writes between syncs may be reordered. Verify FS recovers correctly.
+#[test]
+fn test_powerloss_ooo_smoke() {
+    init_logger();
+    let mut env = powerloss_config_with_behavior(128, PowerLossBehavior::Ooo);
+    init_powerloss_context(&mut env);
+
+    let mut lfs = core::mem::MaybeUninit::<Lfs>::zeroed();
+    assert_ok_at(
+        "format",
+        lfs_format(lfs.as_mut_ptr(), &env.config as *const LfsConfig),
+    );
+    let snapshot = env.snapshot();
+
+    let path_d = path_bytes("d");
+    let result = run_powerloss_linear(
+        &mut env,
+        &snapshot,
+        64,
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let err = lfs_mkdir(lfs_ptr, path_d.as_ptr());
+            if err != 0 {
+                let _ = lfs_unmount(lfs_ptr);
+                return Err(err);
+            }
+            let err = lfs_unmount(lfs_ptr);
+            if err != 0 {
+                return Err(err);
+            }
+            Ok(())
+        },
+        |lfs_ptr, config| {
+            let err = lfs_mount(lfs_ptr, config);
+            if err != 0 {
+                return Err(err);
+            }
+            let _ = lfs_unmount(lfs_ptr);
+            Ok(())
+        },
+    );
+    result.expect("OOO powerloss linear should complete");
 }
 
 /// Minimal subdir: mkdir + file, single write + sync.
