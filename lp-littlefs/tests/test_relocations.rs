@@ -8,13 +8,11 @@
 mod common;
 
 use common::{
-    assert_ok, config_with_cache, default_config, init_context, init_logger, path_bytes,
-    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
-    LFS_O_CREAT, LFS_O_WRONLY,
+    assert_ok, default_config, init_context, init_logger, path_bytes, LFS_O_CREAT, LFS_O_WRONLY,
 };
 use lp_littlefs::{
-    lfs_file_close, lfs_file_open, lfs_file_write, lfs_format, lfs_mkdir, lfs_mount, lfs_remove,
-    lfs_rename, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsFile, LfsInfo,
+    lfs_file_close, lfs_file_open, lfs_file_write, lfs_format, lfs_mkdir, lfs_mount, lfs_stat,
+    lfs_unmount, Lfs, LfsConfig, LfsFile, LfsInfo,
 };
 use rstest::rstest;
 

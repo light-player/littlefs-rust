@@ -7,13 +7,13 @@
 mod common;
 
 use common::{
-    assert_ok, default_config, init_context, path_bytes, LFS_O_APPEND, LFS_O_CREAT, LFS_O_EXCL,
-    LFS_O_RDONLY, LFS_O_WRONLY,
+    assert_ok, default_config, init_context, path_bytes, LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY,
+    LFS_O_WRONLY,
 };
 use lp_littlefs::{
     lfs_dir_close, lfs_dir_open, lfs_dir_read, lfs_file_close, lfs_file_open, lfs_file_read,
-    lfs_file_size, lfs_file_sync, lfs_file_write, lfs_format, lfs_mount, lfs_remove, lfs_unmount,
-    Lfs, LfsConfig, LfsDir, LfsFile, LfsInfo,
+    lfs_file_sync, lfs_file_write, lfs_format, lfs_mount, lfs_remove, lfs_unmount, Lfs, LfsConfig,
+    LfsDir, LfsFile, LfsInfo,
 };
 use rstest::rstest;
 

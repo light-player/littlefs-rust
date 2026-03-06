@@ -3,15 +3,13 @@
 mod common;
 
 use common::{
-    assert_ok, default_config, init_context, path_bytes,
-    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
-    LFS_FILE_MAX, LFS_O_APPEND, LFS_O_CREAT, LFS_O_RDONLY, LFS_O_RDWR, LFS_O_WRONLY, LFS_SEEK_CUR,
-    LFS_SEEK_END, LFS_SEEK_SET,
+    assert_ok, default_config, init_context, path_bytes, LFS_FILE_MAX, LFS_O_APPEND, LFS_O_CREAT,
+    LFS_O_RDONLY, LFS_O_RDWR, LFS_O_WRONLY, LFS_SEEK_CUR, LFS_SEEK_END, LFS_SEEK_SET,
 };
 use lp_littlefs::{
     lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_rewind, lfs_file_seek, lfs_file_size,
     lfs_file_sync, lfs_file_tell, lfs_file_write, lfs_format, lfs_mount, lfs_unmount, Lfs,
-    LfsConfig, LfsFile, LFS_ERR_INVAL, LFS_ERR_NOENT,
+    LfsConfig, LfsFile, LFS_ERR_INVAL,
 };
 use rstest::rstest;
 

@@ -5,17 +5,19 @@
 
 mod common;
 
-use common::{
-    assert_ok, default_config, init_context, init_logger, path_bytes,
-    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
-    test_prng,
-};
+#[cfg(feature = "slow_tests")]
+use common::powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear};
+#[cfg(feature = "slow_tests")]
+use common::test_prng;
+use common::{assert_ok, default_config, init_context, init_logger, path_bytes};
+#[cfg(feature = "slow_tests")]
 use lp_littlefs::lfs_type::lfs_type::LFS_TYPE_DIR;
 use lp_littlefs::{
     lfs_format, lfs_fs_hasorphans, lfs_fs_mkconsistent, lfs_fs_preporphans, lfs_mkdir, lfs_mount,
-    lfs_remove, lfs_stat, lfs_unmount, Lfs, LfsConfig, LfsInfo, LFS_ERR_EXIST, LFS_ERR_NOENT,
-    LFS_ERR_NOTEMPTY,
+    lfs_remove, lfs_unmount, Lfs, LfsConfig,
 };
+#[cfg(feature = "slow_tests")]
+use lp_littlefs::{lfs_stat, LfsInfo, LFS_ERR_EXIST, LFS_ERR_NOENT, LFS_ERR_NOTEMPTY};
 
 // --- test_orphans_mkconsistent_fresh ---
 // Minimal: format, mount, mkconsistent. No mkdir/remove. Sanity check.

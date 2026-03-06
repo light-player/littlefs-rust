@@ -7,9 +7,7 @@ mod common;
 
 use common::{
     assert_err, assert_ok, assert_superblock_magic, clone_config_with_block_count, default_config,
-    init_context, path_bytes,
-    powerloss::{init_powerloss_context, powerloss_config, run_powerloss_linear},
-    LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY,
+    init_context, path_bytes, LFS_O_CREAT, LFS_O_EXCL, LFS_O_RDONLY, LFS_O_WRONLY,
 };
 use lp_littlefs::lfs_type::lfs_type::LFS_TYPE_REG;
 use lp_littlefs::{
@@ -769,6 +767,7 @@ fn test_superblocks_grow(
     assert_ok(lfs_unmount(lfs.as_mut_ptr()));
 }
 
+#[cfg(feature = "shrink")]
 const ERASE_COUNT_SHRINK: u32 = 128;
 
 /// Upstream: [cases.test_superblocks_shrink]
