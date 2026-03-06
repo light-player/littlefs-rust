@@ -478,7 +478,8 @@ fn test_files_reentrant_write(
         }
         let path = path_bytes("avacado");
         let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
-        let err = lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+        let err =
+            lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
         if err != 0 {
             let _ = lp_littlefs_core::lfs_unmount(lfs);
             return Ok(());
@@ -625,7 +626,8 @@ fn test_files_reentrant_write_sync(
         }
         let path = path_bytes("avacado");
         let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
-        if lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY) != 0 {
+        if lp_littlefs_core::lfs_file_open(lfs, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY) != 0
+        {
             let _ = lp_littlefs_core::lfs_unmount(lfs);
             return Ok(());
         }
@@ -833,8 +835,12 @@ fn test_files_many_power_loss() {
             }
 
             let mut rfile = core::mem::MaybeUninit::<LfsFile>::zeroed();
-            let e =
-                lp_littlefs_core::lfs_file_open(lfs, rfile.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+            let e = lp_littlefs_core::lfs_file_open(
+                lfs,
+                rfile.as_mut_ptr(),
+                path.as_ptr(),
+                LFS_O_RDONLY,
+            );
             if e != 0 {
                 return Err(e);
             }

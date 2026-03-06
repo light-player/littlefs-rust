@@ -480,7 +480,11 @@ fn create_empty_file_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str) -> Res
     check(lp_littlefs_core::lfs_file_close(lfs, file.as_mut_ptr()))
 }
 
-fn write_file_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str, content: &[u8]) -> Result<(), i32> {
+fn write_file_mounted(
+    lfs: *mut lp_littlefs_core::Lfs,
+    path: &str,
+    content: &[u8],
+) -> Result<(), i32> {
     let p = path_cstr(path);
     let flags = LFS_O_WRONLY | LFS_O_CREAT | LFS_O_EXCL;
     let mut file = MaybeUninit::<lp_littlefs_core::LfsFile>::zeroed();
@@ -576,7 +580,11 @@ fn read_file_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str) -> Result<Vec<
 fn dir_names_mounted(lfs: *mut lp_littlefs_core::Lfs, path: &str) -> Result<Vec<String>, i32> {
     let p = path_cstr(path);
     let mut dir = MaybeUninit::<lp_littlefs_core::LfsDir>::zeroed();
-    check(lp_littlefs_core::lfs_dir_open(lfs, dir.as_mut_ptr(), p.as_ptr()))?;
+    check(lp_littlefs_core::lfs_dir_open(
+        lfs,
+        dir.as_mut_ptr(),
+        p.as_ptr(),
+    ))?;
 
     let mut names = Vec::new();
     let mut info = MaybeUninit::<lp_littlefs_core::LfsInfo>::zeroed();

@@ -566,8 +566,12 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
 
             let path = path_bytes("baldy");
             let mut file = core::mem::MaybeUninit::<LfsFile>::zeroed();
-            let open_err =
-                lp_littlefs_core::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDONLY);
+            let open_err = lp_littlefs_core::lfs_file_open(
+                lfs_ptr,
+                file.as_mut_ptr(),
+                path.as_ptr(),
+                LFS_O_RDONLY,
+            );
             if open_err == 0 {
                 let sz = lp_littlefs_core::lfs_file_size(lfs_ptr, file.as_mut_ptr());
                 if sz == 0 || sz == LARGE as i32 || sz == medium as i32 || sz == small_size as i32 {
@@ -631,8 +635,12 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
                 return Err(e);
             }
 
-            let e =
-                lp_littlefs_core::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
+            let e = lp_littlefs_core::lfs_file_open(
+                lfs_ptr,
+                file.as_mut_ptr(),
+                path.as_ptr(),
+                LFS_O_RDWR,
+            );
             if e != 0 {
                 return Err(e);
             }
@@ -659,8 +667,12 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
                 return Err(e);
             }
 
-            let e =
-                lp_littlefs_core::lfs_file_open(lfs_ptr, file.as_mut_ptr(), path.as_ptr(), LFS_O_RDWR);
+            let e = lp_littlefs_core::lfs_file_open(
+                lfs_ptr,
+                file.as_mut_ptr(),
+                path.as_ptr(),
+                LFS_O_RDWR,
+            );
             if e != 0 {
                 return Err(e);
             }

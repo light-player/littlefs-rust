@@ -1252,7 +1252,8 @@ fn test_seek_reentrant_write(#[case] count: u32) {
         for _ in 0..count {
             off = (5 * off + 1) % count;
             let pos = (off * 11) as i32;
-            let seek_res = lp_littlefs_core::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
+            let seek_res =
+                lp_littlefs_core::lfs_file_seek(lfs, file.as_mut_ptr(), pos, LFS_SEEK_SET);
             if seek_res != pos {
                 return Err(-1);
             }

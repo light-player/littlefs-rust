@@ -1,0 +1,25 @@
+[package]
+name = "lp-littlefs"
+version = "0.1.0"
+edition = "2021"
+description = "Safe Rust API for the LittleFS embedded filesystem"
+license = "BSD-3-Clause"
+repository = "https://github.com/light-player/lp-littlefs"
+readme = "README.md"
+
+[lib]
+name = "lp_littlefs"
+path = "src/lib.rs"
+
+[dependencies]
+lp-littlefs-core = { path = "../lp-littlefs-core" }
+bitflags = "2"
+
+[dev-dependencies]
+env_logger = "0.10"
+
+[features]
+default = ["alloc"]
+alloc = ["lp-littlefs-core/alloc"]
+std = ["alloc"]
+log = ["lp-littlefs-core/log"]

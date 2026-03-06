@@ -1,18 +1,20 @@
 # lp-littlefs-core
 
-Pure Rust LittleFS implementation, agent-translated from
+Pure Rust LittleFS implementation, translated function-by-function from
 the [reference C source](https://github.com/littlefs-project/littlefs). On-disk format compatible
 with upstream LittleFS v2.
 
 `#![no_std]` by default. No C dependencies, no bindgen, no cross-compilation toolchain required.
+
+**Most users should use [`lp-littlefs`](../lp-littlefs/) instead**, which provides a safe Rust API
+on top of this core. Use this crate directly only if you need the low-level C-style API for FFI
+interop, custom wrappers, or testing.
 
 ## API
 
 The public API mirrors the C littlefs function signatures: raw pointers, `i32` return codes,
 `unsafe extern "C"` callbacks. This is intentional — it keeps the translation verifiable against
 upstream and makes porting bug fixes straightforward.
-
-A safe wrapper crate (`lp-littlefs`) is planned on top of this core.
 
 ### Filesystem lifecycle
 

@@ -329,7 +329,8 @@ fn test_powerloss_partial_prog() {
                 lfs_mount(lfs.as_mut_ptr(), cfg),
             );
             let mut info = core::mem::MaybeUninit::<lp_littlefs_core::LfsInfo>::zeroed();
-            let r = lp_littlefs_core::lfs_stat(lfs.as_mut_ptr(), path_a.as_ptr(), info.as_mut_ptr());
+            let r =
+                lp_littlefs_core::lfs_stat(lfs.as_mut_ptr(), path_a.as_ptr(), info.as_mut_ptr());
             assert!(r == 0, "lfs_stat a after corrupt: {r}");
             assert_ok_at("unmount after verify", lfs_unmount(lfs.as_mut_ptr()));
         }
