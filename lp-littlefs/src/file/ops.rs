@@ -1562,8 +1562,7 @@ pub fn lfs_file_truncate_(lfs: *mut crate::fs::Lfs, file: *mut LfsFile, size: lf
         }
 
         let pos = file_ref.pos;
-        // Logical size: for dirty writes, pos can exceed ctz.size until flush.
-        let oldsize = crate::util::lfs_max(file_ref.pos, file_ref.ctz.size);
+        let oldsize = lfs_file_size_(lfs as *const core::ffi::c_void, file) as lfs_off_t;
 
         if size < oldsize {
             if size <= lfs_ref.inline_max {
@@ -1670,14 +1669,17 @@ pub fn lfs_file_rewind_(lfs: *mut crate::fs::Lfs, file: *mut LfsFile) -> i32 {
     0
 }
 
-/// Per lfs.c lfs_file_size_ (lines 3849-3851)
-///
-/// Translation docs: Returns the file size in bytes.
+/// Per lfs.c lfs_file_size_ (lines 3849-3858)
 ///
 /// C:
 /// ```c
 /// static lfs_soff_t lfs_file_size_(lfs_t *lfs, lfs_file_t *file) {
 ///     (void)lfs;
+/// #ifndef LFS_READONLY
+///     if (file->flags & LFS_F_WRITING) {
+///         return lfs_max(file->pos, file->ctz.size);
+///     }
+/// #endif
 ///     return file->ctz.size;
 /// }
 /// ```
@@ -1685,5 +1687,10 @@ pub fn lfs_file_size_(
     _lfs: *const core::ffi::c_void,
     file: *const LfsFile,
 ) -> crate::types::lfs_soff_t {
-    unsafe { (*file).ctz.size as crate::types::lfs_soff_t }
+    unsafe {
+        if ((*file).flags as i32 & LFS_F_WRITING) != 0 {
+            return crate::util::lfs_max((*file).pos, (*file).ctz.size) as crate::types::lfs_soff_t;
+        }
+        (*file).ctz.size as crate::types::lfs_soff_t
+    }
 }

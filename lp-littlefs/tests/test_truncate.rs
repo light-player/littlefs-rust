@@ -7,9 +7,8 @@ use common::{
     LFS_O_TRUNC, LFS_O_WRONLY, LFS_SEEK_SET,
 };
 use lp_littlefs::{
-    lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_seek, lfs_file_size, lfs_file_sync,
-    lfs_file_tell, lfs_file_truncate, lfs_file_write, lfs_format, lfs_mount, lfs_unmount, Lfs,
-    LfsConfig, LfsFile,
+    lfs_file_close, lfs_file_open, lfs_file_read, lfs_file_seek, lfs_file_size, lfs_file_tell,
+    lfs_file_truncate, lfs_file_write, lfs_format, lfs_mount, lfs_unmount, Lfs, LfsConfig, LfsFile,
 };
 use rstest::rstest;
 
