@@ -1586,20 +1586,37 @@ pub fn lfs_file_truncate_(lfs: *mut crate::fs::Lfs, file: *mut LfsFile, size: lf
 
         if size < oldsize {
             if size <= lfs_ref.inline_max {
-                // C: lfs.c:3762-3786 — revert to inline.
-                // Seek(0) flushes; for inline the truncated data is in file.cache.
+                // C: lfs.c:3762-3786 — revert to inline
                 let res = lfs_file_seek_(lfs, file, 0, LFS_SEEK_SET);
                 if res < 0 {
                     return res as i32;
                 }
 
-                // Data is in file.cache from writes (or from open). Just set new size.
+                // Read existing data from CTZ blocks into rcache temporarily
+                crate::bd::bd::lfs_cache_drop(lfs, &mut (*lfs).rcache as *mut _);
+                let res = lfs_file_flushedread(
+                    lfs,
+                    file,
+                    (*lfs).rcache.buffer as *mut core::ffi::c_void,
+                    size,
+                );
+                if res < 0 {
+                    return res as i32;
+                }
+
                 file_ref.ctz.head = LFS_BLOCK_INLINE;
                 file_ref.ctz.size = size;
                 file_ref.flags |= (LFS_F_DIRTY | LFS_F_READING | LFS_F_INLINE) as u32;
                 file_ref.cache.block = file_ref.ctz.head;
                 file_ref.cache.off = 0;
                 file_ref.cache.size = lfs_ref.cfg.as_ref().expect("cfg").cache_size;
+
+                // Copy data from rcache into file cache
+                core::ptr::copy_nonoverlapping(
+                    (*lfs).rcache.buffer,
+                    file_ref.cache.buffer,
+                    size as usize,
+                );
             } else {
                 // C: lfs.c:3787-3806 — shrink CTZ
                 let err = lfs_file_flush(lfs as *const core::ffi::c_void, file);

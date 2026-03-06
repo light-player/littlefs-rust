@@ -704,7 +704,6 @@ fn test_truncate_reentrant_write(#[case] small_size: u32) {
 /// Upstream: [cases.test_truncate_aggressive]
 /// CONFIG 0..5, 5 files, various shrink/expand patterns
 #[test]
-#[ignore = "truncated CTZ read returns wrong content; implementation parity pending"]
 fn test_truncate_aggressive() {
     const SMALL: u32 = 32;
     const MEDIUM: u32 = 2048;
