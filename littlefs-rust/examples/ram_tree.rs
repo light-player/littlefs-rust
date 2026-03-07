@@ -7,7 +7,9 @@ fn main() {
     let config = Config::new(512, 128);
 
     Filesystem::format(&mut storage, &config).expect("format failed");
-    let fs = Filesystem::mount(storage, config).expect("mount failed");
+    let fs = Filesystem::mount(storage, config)
+        .map_err(|(e, _)| e)
+        .expect("mount failed");
 
     // Build a small directory tree with some files.
     fs.mkdir("/docs").expect("mkdir docs");

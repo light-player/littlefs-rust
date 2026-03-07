@@ -13,7 +13,7 @@
 //! let config = Config::new(512, 128);
 //!
 //! Filesystem::format(&mut storage, &config).unwrap();
-//! let fs = Filesystem::mount(storage, config).unwrap();
+//! let fs = Filesystem::mount(storage, config).map_err(|(e, _)| e).unwrap();
 //!
 //! fs.write_file("/hello.txt", b"Hello, littlefs!").unwrap();
 //! let data = fs.read_to_vec("/hello.txt").unwrap();
