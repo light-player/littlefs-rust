@@ -12,7 +12,9 @@ fn main() {
 
     // Format lays down the superblock; mount opens the filesystem for use.
     Filesystem::format(&mut storage, &config).expect("format failed");
-    let fs = Filesystem::mount(storage, config).expect("mount failed");
+    let fs = Filesystem::mount(storage, config)
+        .map_err(|(e, _)| e)
+        .expect("mount failed");
 
     // write_file / read_to_vec are convenience wrappers that handle
     // open, write/read, and close in one call.

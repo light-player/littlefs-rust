@@ -161,7 +161,10 @@ impl<S: Storage> Filesystem<S> {
     }
 
     /// Mount an existing filesystem. Takes ownership of the storage.
-    pub fn mount(storage: S, config: Config) -> Result<Self, Error> {
+    ///
+    /// On failure the storage is returned alongside the error so the caller
+    /// can retry (e.g. format + mount).
+    pub fn mount(storage: S, config: Config) -> Result<Self, (Error, S)> {
         let mut inner = Box::new(build_inner(storage, &config));
         wire_context(&mut inner);
         let rc = littlefs_rust_core::lfs_mount(
@@ -169,7 +172,7 @@ impl<S: Storage> Filesystem<S> {
             &inner.config as *const LfsConfig,
         );
         if rc != 0 {
-            return Err(Error::from(rc));
+            return Err((Error::from(rc), inner.storage));
         }
         inner.mounted = true;
         Ok(Filesystem {

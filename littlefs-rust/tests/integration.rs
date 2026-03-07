@@ -6,7 +6,9 @@ fn format_and_mount() -> Filesystem<RamStorage> {
     let mut storage = RamStorage::new(512, 128);
     let config = Config::new(512, 128);
     Filesystem::format(&mut storage, &config).expect("format");
-    Filesystem::mount(storage, config).expect("mount")
+    Filesystem::mount(storage, config)
+        .map_err(|(e, _)| e)
+        .expect("mount")
 }
 
 #[test]
@@ -14,7 +16,9 @@ fn test_format_mount_unmount() {
     let mut storage = RamStorage::new(512, 128);
     let config = Config::new(512, 128);
     Filesystem::format(&mut storage, &config).unwrap();
-    let fs = Filesystem::mount(storage, config).unwrap();
+    let fs = Filesystem::mount(storage, config)
+        .map_err(|(e, _)| e)
+        .unwrap();
     let _storage = fs.unmount().unwrap();
 }
 
@@ -23,8 +27,9 @@ fn test_mount_unformatted_fails() {
     let storage = RamStorage::new(512, 128);
     let config = Config::new(512, 128);
     let result = Filesystem::mount(storage, config);
-    assert!(result.is_err());
-    assert_eq!(result.err().unwrap(), Error::Corrupt);
+    let (err, recovered) = result.err().expect("mount should fail");
+    assert_eq!(err, Error::Corrupt);
+    assert_eq!(recovered.block_size(), 512);
 }
 
 #[test]
@@ -33,7 +38,9 @@ fn test_drop_unmounts() {
     let config = Config::new(512, 128);
     Filesystem::format(&mut storage, &config).unwrap();
     {
-        let _fs = Filesystem::mount(storage, config).unwrap();
+        let _fs = Filesystem::mount(storage, config)
+            .map_err(|(e, _)| e)
+            .unwrap();
     }
     // No panic — Drop ran unmount
 }
