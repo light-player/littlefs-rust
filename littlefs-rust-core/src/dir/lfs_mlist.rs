@@ -26,8 +26,20 @@ pub struct LfsMlist {
 ///     return false;
 /// }
 /// ```
-pub fn lfs_mlist_isopen(_head: *mut LfsMlist, _node: *const LfsMlist) -> bool {
-    todo!("lfs_mlist_isopen")
+pub fn lfs_mlist_isopen(head: *mut LfsMlist, node: *const LfsMlist) -> bool {
+    if head.is_null() || node.is_null() {
+        return false;
+    }
+    unsafe {
+        let mut p = head;
+        while !p.is_null() {
+            if core::ptr::eq(p, node) {
+                return true;
+            }
+            p = (*p).next;
+        }
+        false
+    }
 }
 
 /// Per lfs.c lfs_mlist_remove (lines 520-527)
