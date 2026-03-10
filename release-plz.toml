@@ -5,3 +5,4 @@ repo_url = "https://github.com/light-player/littlefs-rust"
 [[package]]
 name = "littlefs-rust-compat"
 release = false
+publish = false
