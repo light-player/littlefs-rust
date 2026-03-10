@@ -758,11 +758,18 @@ pub fn lfs_dir_commit_size(
 /// }
 /// ```
 pub fn lfs_dir_commit_commit(
-    _p: *mut core::ffi::c_void,
-    _tag: lfs_tag_t,
-    _buffer: *const core::ffi::c_void,
+    p: *mut core::ffi::c_void,
+    tag: lfs_tag_t,
+    buffer: *const core::ffi::c_void,
 ) -> i32 {
-    todo!("lfs_dir_commit_commit")
+    if p.is_null() {
+        return crate::error::LFS_ERR_INVAL;
+    }
+    unsafe {
+        let commit_commit = &*(p as *const (*mut Lfs, *mut LfsCommit));
+        let (lfs, commit) = *commit_commit;
+        lfs_dir_commitattr(lfs, commit, tag, buffer)
+    }
 }
 
 /// Per lfs.c lfs_dir_needsrelocation (lines 1939-1949)
