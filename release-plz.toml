@@ -1,5 +1,4 @@
 [workspace]
-git_only = true
 publish = true
 repo_url = "https://github.com/light-player/littlefs-rust"
 
